@@ -361,3 +361,23 @@ at the bottom.
 **Next session should start with:** Christopher looking at the live app (hard-refresh once) and reacting — the design is for him; his veto/tweaks welcome. Then Gate B inputs or M6 authoring.
 **Open questions for Christopher:** does the board/copper identity land for you? Any tweaks before it settles?
 **New DECISIONS.md entries this session:** D-020 (ratified — his request)
+
+## Session 2026-07-19 (nineteenth block — dashboard-first home, D-021)
+
+**Stage:** B — continued design work at Christopher's direction ("first page should be the dashboard… full screen… big text/small text… animations").
+**Done this session:**
+
+- PRODUCT.md + DESIGN.md created (durable design context; Stage E wanted DESIGN.md anyway). Impeccable skill loaded (product register) to govern the pass
+- Home rebuilt dashboard-first (D-021): data-driven hero pushing exactly ONE action — no history → "Start lesson 1" (with lesson/question totals as the sell), due > 0 → "Review N due questions", else → "Continue: <next unfinished lesson>"; big type (3.3rem headline on desktop, copper mono figures), eyebrow shows the streak
+- Full-width desktop layout: 84rem shell, top-bar header (wordmark + nav), main + 19rem side-rail grid at ≥1024px; reading routes (lesson/quiz/backup/review/dashboard) wrapped in a 44rem `.narrow` column
+- Side rail: streak calendar, run trend, weakest areas, backup status; on first run it becomes a "How it works" explainer written in the app's own via language (hollow → ringed → filled) — the empty state teaches the interface and balances the page
+- Modules de-boxed: hairline-separated sections with per-module "n/m done" counts; via rail unchanged
+- Panels extracted to components/panels.tsx (shared home + dashboard, one vocabulary); dashboard remains the detail page; nav renamed Modules→Home, Dashboard→Progress
+- Motion: staggered 500ms rise on load (opacity/transform only, ease-out-quint, killed by prefers-reduced-motion); via dots transition on state change. Skill bans applied: removed ALL colored side-stripe borders (banners/explanation/blockquote → full hairline + tint)
+- Screenshot critique loop at 1440×900 and 414×896, both hero states verified (one iteration: empty-state rail was blank → HowItWorks panel). 53 tests green
+- Test-env note: stale-SW-serving-old-build hit twice more during verification; worked around, no product bug
+
+**In progress / half-finished:** nothing half-finished.
+**Next session should start with:** Christopher's reaction to the new landing; then Gate B inputs or M6 authoring.
+**Open questions for Christopher:** verdict on the dashboard-first landing?
+**New DECISIONS.md entries this session:** D-021 (ratified — his direction)

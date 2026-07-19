@@ -64,16 +64,18 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  // Reading surfaces stay a centered column; home manages the full width.
+  const narrow = route.screen !== "home";
+
   return (
     <div class="shell">
       <header class="shell-header">
         <h1>
           <a href="#/">Metal</a>
         </h1>
-        <p class="tagline">Machine Learning Systems, learned properly.</p>
         <nav class="shell-nav">
-          <a href="#/">Modules</a>
-          <a href="#/dashboard">Dashboard</a>
+          <a href="#/">Home</a>
+          <a href="#/dashboard">Progress</a>
           <a href="#/review">Review</a>
           <a href="#/backup">Backup</a>
         </nav>
@@ -84,7 +86,7 @@ export function App() {
           but quiz results won't be recorded.
         </p>
       )}
-      <main class="shell-main">
+      <main class={narrow ? "shell-main narrow" : "shell-main"}>
         {dbState.status === "opening" ? (
           <p class="status">Loading…</p>
         ) : (
