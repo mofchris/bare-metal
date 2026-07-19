@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lessonHref, parseRoute } from "./route";
+import { lessonHref, parseRoute, quizHref } from "./route";
 
 describe("parseRoute", () => {
   it("treats empty, root, and unknown hashes as home", () => {
@@ -19,5 +19,13 @@ describe("parseRoute", () => {
   it("round-trips ids through lessonHref", () => {
     const id = "m1/01-memory-hierarchy";
     expect(parseRoute(lessonHref(id))).toEqual({ screen: "lesson", lessonId: id });
+  });
+
+  it("parses quiz routes and treats a bare quiz prefix as home", () => {
+    expect(parseRoute(quizHref("m1/01-memory-hierarchy"))).toEqual({
+      screen: "quiz",
+      lessonId: "m1/01-memory-hierarchy",
+    });
+    expect(parseRoute("#/quiz/")).toEqual({ screen: "home" });
   });
 });

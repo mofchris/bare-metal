@@ -1,7 +1,7 @@
 // Curriculum lookups shared by screens.
 // Depends on: curriculum.ts (types). Depended on by: app.tsx, lesson-view.tsx.
 
-import type { Curriculum, Lesson, Module } from "./curriculum";
+import type { Curriculum, Lesson, Module, Question } from "./curriculum";
 
 export interface LessonLocation {
   module: Module;
@@ -28,7 +28,12 @@ export function findLesson(
   return null;
 }
 
+/** All questions attached to a specific lesson, in question-bank order. */
+export function questionsFor(module: Module, lessonId: string): Question[] {
+  return module.questions.filter((q) => q.lesson === lessonId);
+}
+
 /** Count questions attached to a specific lesson. */
 export function questionCountFor(module: Module, lessonId: string): number {
-  return module.questions.filter((q) => q.lesson === lessonId).length;
+  return questionsFor(module, lessonId).length;
 }

@@ -199,3 +199,125 @@ a {
   margin-top: 1rem;
   text-align: right;
 }
+
+/* ---------------- quiz ---------------- */
+
+.btn {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.quiz-cta {
+  margin-top: 1.5rem;
+}
+
+.quiz-prompt {
+  font-size: 1.05rem;
+  margin: 1rem 0;
+}
+
+.quiz-options {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.quiz-option {
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quiz-option:hover {
+  border-color: var(--accent);
+}
+
+.quiz-short {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.quiz-short input {
+  flex: 1;
+  min-width: 12rem;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--text-dim);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+}
+
+.quiz-result {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.quiz-result.correct {
+  color: var(--accent);
+}
+
+.quiz-result.incorrect {
+  color: var(--danger);
+}
+
+.quiz-given {
+  color: var(--text-dim);
+}
+
+.quiz-explanation {
+  background: var(--surface-raised);
+  border-radius: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.quiz-review {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.quiz-review li {
+  padding: 0.3rem 0;
+}
+
+.quiz-review-mark {
+  display: inline-block;
+  width: 1.5rem;
+  font-weight: 700;
+}
+
+.quiz-review li.correct .quiz-review-mark {
+  color: var(--accent);
+}
+
+.quiz-review li.incorrect .quiz-review-mark {
+  color: var(--danger);
+}
+
+.quiz-note {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.quiz-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}

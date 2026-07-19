@@ -96,3 +96,25 @@ at the bottom.
 - Internet/power reliability note for BUILD_PLAN MY SETUP
 - D-013…D-016 pending batch review
   **New DECISIONS.md entries this session:** D-016 (pending)
+
+## Session 2026-07-19 (fifth block — quiz engine)
+
+**Stage:** A — Walking Skeleton | **Gate status:** Gate A unsigned
+**Done this session:**
+
+- Quiz grading glue: `src/lib/quiz.ts` (`gradeResponse` maps MCQ/short responses onto questions; throws on type mismatch instead of silently marking wrong) + 3 tests
+- Quiz screen: `components/quiz.tsx` — one question at a time, MCQ option buttons + short-answer input (Enter submits, empty submits ignored), immediate feedback showing your answer / the correct one / the explanation, end summary with per-question ✓✗ review, retry, and an explicit "results aren't saved yet" note
+- Routing: `#/quiz/<lessonId>` added (route.ts + tests); lesson view gained a "Take the quiz (N questions)" CTA; `questionsFor` added to lookup.ts
+- Quiz styles in style.css (options, feedback colors, summary)
+- 22 tests total, all passing; bundle 8.5 KB gzipped
+- End-to-end verified in headless browser: lesson → quiz CTA → answered all 5 M1 questions (one deliberately wrong) → feedback correct on both paths → summary shows 4/5 with ✗ on the missed one; zero console errors; mobile (414×896) screenshot clean
+- Note: during verification hit a stale-cache false alarm (browser held the previous build's JS; reload fixed) — not an app bug
+
+**In progress / half-finished:** Stage A ~60%. Quiz results are session-only by design until persistence lands. Not built yet: IndexedDB persistence (next), PWA manifest + service worker, M1 lessons 02–05, README v1.
+**Next session should start with:** the carried-over Gate 0 quiz, then IndexedDB persistence (D-007: `idb` dependency, attempts + lessonProgress stores per docs/DATA_MODEL.md) wired to quiz completion — after that, killing the app mid-quiz can be tested (Gate A manual test).
+**Open questions for Christopher:**
+
+- Gate 0 quiz answers (carried over — fifth time; the app now has a quiz engine, you have no excuse)
+- Internet/power reliability note for BUILD_PLAN MY SETUP
+- D-013…D-016 pending batch review
+  **New DECISIONS.md entries this session:** none

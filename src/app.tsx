@@ -10,9 +10,10 @@ import { useEffect, useState } from "preact/hooks";
 import type { Curriculum } from "./lib/curriculum";
 import { loadCurriculum } from "./lib/load-curriculum";
 import { parseRoute, type Route } from "./lib/route";
-import { findLesson } from "./lib/lookup";
+import { findLesson, questionsFor } from "./lib/lookup";
 import { Home } from "./components/home";
 import { LessonView } from "./components/lesson-view";
+import { Quiz } from "./components/quiz";
 
 type LoadState =
   | { status: "loading" }
@@ -68,7 +69,7 @@ function Screen({ load, route }: { load: LoadState; route: Route }) {
       </div>
     );
   }
-  if (route.screen === "lesson") {
+  if (route.screen === "lesson" || route.screen === "quiz") {
     const location = findLesson(load.curriculum, route.lessonId);
     if (!location) {
       return (
@@ -79,6 +80,15 @@ function Screen({ load, route }: { load: LoadState; route: Route }) {
             <a href="#/">Back to all modules.</a>
           </p>
         </div>
+      );
+    }
+    if (route.screen === "quiz") {
+      return (
+        <Quiz
+          module={location.module}
+          lesson={location.lesson}
+          questions={questionsFor(location.module, location.lesson.id)}
+        />
       );
     }
     return <LessonView location={location} />;

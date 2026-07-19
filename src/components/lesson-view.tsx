@@ -2,11 +2,12 @@
 // Depends on: lib/curriculum (types), lib/route, lib/lookup (LessonLocation).
 // Depended on by: app.tsx.
 
-import type { LessonLocation } from "../lib/lookup";
-import { lessonHref } from "../lib/route";
+import { questionCountFor, type LessonLocation } from "../lib/lookup";
+import { lessonHref, quizHref } from "../lib/route";
 
 export function LessonView({ location }: { location: LessonLocation }) {
   const { module, lesson, next } = location;
+  const questionCount = questionCountFor(module, lesson.id);
   return (
     <article>
       <nav class="crumbs">
@@ -28,6 +29,14 @@ export function LessonView({ location }: { location: LessonLocation }) {
           content compiler from repo-reviewed Markdown — it is our own
           content, not user input (trust model documented in D-014). */}
       <div class="lesson-body" dangerouslySetInnerHTML={{ __html: lesson.html }} />
+
+      {questionCount > 0 && (
+        <p class="quiz-cta">
+          <a class="btn" href={quizHref(lesson.id)}>
+            Take the quiz ({questionCount} questions)
+          </a>
+        </p>
+      )}
 
       <footer class="lesson-footer">
         <div class="sources">
