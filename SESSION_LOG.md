@@ -413,3 +413,19 @@ at the bottom.
 - 4-second timeout in app.tsx: if storage stays blocked, the app renders anyway (browsing works, saving off) with a banner telling the user to close other Metal windows and reload
   **Verified:** cross-tab simulation — holder at v2 in tab A, app in tab B → banner after 4 s + fully rendered home. Normal path unaffected. 60 tests green.
   **Lesson recorded:** schema migrations on a multi-context PWA must always ship blocked/blocking handling; the daemon-based verification missed this because it tests a single fresh context.
+
+## Session 2026-07-19 (twenty-first block — study-time streak calendar, D-024)
+
+**Stage:** B — gamification at Christopher's direction; gradient banding fix.
+**Done this session:**
+
+- Study-time tracking: 15-second heartbeat in app.tsx credits time while a lesson/quiz/review/exam is open and the tab visible; per-(day, installId) rows in the new `studyTime` store (DB v4, backup v4, max-per-row idempotent merge). Honest approximation: ±one tick per sitting
+- The 30-minute streak rule (`src/lib/study-time.ts`, pure + 7 tests): a day counts at ≥30 tracked minutes; pre-tracking days with attempts grandfather in; today has until midnight before it breaks the chain
+- The streak calendar: full month view (Monday-first, day numbers in cells) — goal-met days filled copper, partial days copper-ringed, today outlined with a live X/30-min progress bar, per-cell minute tooltips, streak count in big copper mono. On Home's rail (always visible, even day one — the goal teaches itself) and on Progress; the old 8-week strip and attempt-based streakInfo removed (one definition of "streak" everywhere)
+- Gradient removed after Christopher reported banding on his LCD (dark radial gradients band on 8-bit panels — recorded in D-024 so it doesn't come back). Replaced with a flat-stroke animated PCB-trace SVG (draws/retreats over 14 s; solid colors cannot band; freezes under reduced-motion)
+- 63 tests green; verified in browser with seeded data: "4 day streak", "today 18/30 min", calendar states all correct, trace visible, no banner
+- Bonus field-validation: the hotfix's degrade path fired for real during testing (a leftover test tab held an old DB version — banner + usable app, exactly as designed). One franken-DB artifact came from the test scaffold itself, not the product
+  **In progress / half-finished:** nothing half-finished. Study-sync (username+PIN, D-022) remains the queued next block.
+  **Next session should start with:** Christopher's reaction; then study-sync integration.
+  **Open questions for Christopher:** none new
+  **New DECISIONS.md entries this session:** D-024 (ratified — his direction)

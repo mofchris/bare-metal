@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Curriculum } from "./curriculum";
 import type { AttemptRecord } from "./progress-store";
-import {
-  localDateKey,
-  masteryByLesson,
-  runHistory,
-  streakInfo,
-  weakestLessons,
-} from "./stats";
+import { localDateKey, masteryByLesson, runHistory, weakestLessons } from "./stats";
 
 const q = (id: string, lesson: string) => ({
   id,
@@ -87,35 +81,6 @@ describe("runHistory", () => {
   });
 });
 
-describe("streakInfo", () => {
-  const noonLocal = (isoDay: string) => new Date(`${isoDay}T12:00:00`);
-
-  it("counts consecutive study days ending today", () => {
-    const attempts = [
-      attempt("q1", noonLocal("2026-07-17").toISOString(), true),
-      attempt("q1", noonLocal("2026-07-18").toISOString(), true),
-      attempt("q1", noonLocal("2026-07-19").toISOString(), true),
-    ];
-    expect(streakInfo(attempts, noonLocal("2026-07-19")).currentStreak).toBe(3);
-  });
-
-  it("doesn't break the streak just because today hasn't been studied yet", () => {
-    const attempts = [
-      attempt("q1", noonLocal("2026-07-17").toISOString(), true),
-      attempt("q1", noonLocal("2026-07-18").toISOString(), true),
-    ];
-    expect(streakInfo(attempts, noonLocal("2026-07-19")).currentStreak).toBe(2);
-  });
-
-  it("resets across a missed day", () => {
-    const attempts = [
-      attempt("q1", noonLocal("2026-07-15").toISOString(), true),
-      attempt("q1", noonLocal("2026-07-19").toISOString(), true),
-    ];
-    expect(streakInfo(attempts, noonLocal("2026-07-19")).currentStreak).toBe(1);
-  });
-});
-
 describe("performance with large histories (Gate B requirement)", () => {
   it("derives all dashboard stats from 5000 attempts well under a frame budget", () => {
     const attempts: AttemptRecord[] = [];
@@ -133,7 +98,6 @@ describe("performance with large histories (Gate B requirement)", () => {
     const mastery = masteryByLesson(curriculum, attempts);
     weakestLessons(mastery, 3);
     runHistory(attempts, 10);
-    streakInfo(attempts, new Date());
     const elapsed = performance.now() - start;
     // Generous bound to stay CI-stable; typical is single-digit ms.
     expect(elapsed).toBeLessThan(200);

@@ -30,13 +30,6 @@ export interface RunSummary {
   total: number;
 }
 
-export interface StreakInfo {
-  /** Local date keys (YYYY-MM-DD) with at least one attempt. */
-  activeDays: Set<string>;
-  /** Consecutive study days ending today (or yesterday, if today is untouched). */
-  currentStreak: number;
-}
-
 /** Local-timezone YYYY-MM-DD — streaks follow the student's wall clock. */
 export function localDateKey(date: Date): string {
   const y = date.getFullYear();
@@ -119,24 +112,4 @@ export function runHistory(attempts: AttemptRecord[], limit: number): RunSummary
   return [...runs.values()]
     .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
     .slice(-limit);
-}
-
-/**
- * Study streak from attempt timestamps. Today not (yet) studying doesn't
- * break the streak until the day is over — the streak counts from today if
- * active, else from yesterday.
- */
-export function streakInfo(attempts: AttemptRecord[], now: Date): StreakInfo {
-  const activeDays = new Set<string>();
-  for (const attempt of attempts) activeDays.add(localDateKey(new Date(attempt.at)));
-
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  let currentStreak = 0;
-  let cursor = now.getTime();
-  if (!activeDays.has(localDateKey(now))) cursor -= DAY_MS; // grace for today
-  while (activeDays.has(localDateKey(new Date(cursor)))) {
-    currentStreak += 1;
-    cursor -= DAY_MS;
-  }
-  return { activeDays, currentStreak };
 }

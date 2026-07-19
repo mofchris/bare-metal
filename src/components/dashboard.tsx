@@ -8,11 +8,13 @@ import type { Curriculum } from "../lib/curriculum";
 import type { AttemptRecord, ProgressDb } from "../lib/progress-store";
 import { dueQuestionIds } from "../lib/srs";
 import { lessonHref } from "../lib/route";
-import { masteryByLesson, runHistory, streakInfo, weakestLessons } from "../lib/stats";
+import { localDateKey, masteryByLesson, runHistory, weakestLessons } from "../lib/stats";
+import { studyStreak, type StudyTimeRecord } from "../lib/study-time";
 import { MasteryBar, RunTrend, StreakCalendar, WeakestAreas } from "./panels";
 
 interface Data {
   attempts: AttemptRecord[];
+  studyTime: StudyTimeRecord[];
   dueCount: number;
 }
 
@@ -32,11 +34,11 @@ export function Dashboard({
 
   useEffect(() => {
     if (!db) return;
-    Promise.all([db.allAttempts(), db.allSrsStates()])
-      .then(([attempts, srs]) =>
+    Promise.all([db.allAttempts(), db.allStudyTime(), db.allSrsStates()])
+      .then(([attempts, studyTime, srs]) =>
         setState({
           status: "ready",
-          data: { attempts, dueCount: dueQuestionIds(srs, new Date()).length },
+          data: { attempts, studyTime, dueCount: dueQuestionIds(srs, new Date()).length },
         }),
       )
       .catch((e: unknown) =>
@@ -64,7 +66,7 @@ export function Dashboard({
     );
   }
 
-  const { attempts, dueCount } = state.data;
+  const { attempts, studyTime, dueCount } = state.data;
   if (attempts.length === 0) {
     return (
       <div>
@@ -85,7 +87,8 @@ export function Dashboard({
   const attempted = mastery.filter((m) => m.attempted > 0);
   const masteredTotal = attempted.reduce((n, m) => n + m.mastered, 0);
   const attemptedTotal = attempted.reduce((n, m) => n + m.attempted, 0);
-  const streak = streakInfo(attempts, now);
+  const attemptDays = new Set(attempts.map((a) => localDateKey(new Date(a.at))));
+  const streak = studyStreak(studyTime, attemptDays, now);
 
   return (
     <div>
@@ -95,7 +98,7 @@ export function Dashboard({
       <h2>Progress</h2>
 
       <div class="stat-tiles">
-        <StatTile value={`${streak.currentStreak}`} label="day streak" />
+        <StatTile value={`${streak.current}`} label="day streak" />
         <StatTile
           value={
             attemptedTotal > 0
@@ -110,8 +113,8 @@ export function Dashboard({
 
       <RunTrend runs={runHistory(attempts, 10)} />
       <section>
-        <h3 class="dash-section">Study days · last 8 weeks</h3>
-        <StreakCalendar activeDays={streak.activeDays} now={now} />
+        <h3 class="dash-section">Study streak</h3>
+        <StreakCalendar records={studyTime} attemptDays={attemptDays} now={now} />
       </section>
       <WeakestAreas weakest={weakestLessons(mastery, 3)} />
 

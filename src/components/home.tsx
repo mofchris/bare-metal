@@ -22,7 +22,8 @@ import {
   passedLessonCount,
   PASS_MARK,
 } from "../lib/gating";
-import { masteryByLesson, runHistory, streakInfo, weakestLessons } from "../lib/stats";
+import { localDateKey, masteryByLesson, runHistory, weakestLessons } from "../lib/stats";
+import { studyStreak, type StudyTimeRecord } from "../lib/study-time";
 import type {
   AttemptRecord,
   ExamResultRecord,
@@ -35,10 +36,14 @@ interface ProgressData {
   statuses: Map<string, LessonProgressRecord>;
   exams: Map<string, ExamResultRecord>;
   attempts: AttemptRecord[];
+  studyTime: StudyTimeRecord[];
   due: number;
   nextDue: string | null;
   reminder: ReminderState;
 }
+
+const attemptDaysOf = (attempts: AttemptRecord[]): Set<string> =>
+  new Set(attempts.map((a) => localDateKey(new Date(a.at))));
 
 export function Home({
   curriculum,
@@ -56,15 +61,17 @@ export function Home({
       db.lessonStatuses(),
       db.examResults(),
       db.allAttempts(),
+      db.allStudyTime(),
       db.allSrsStates(),
       db.getMeta("lastExportAt"),
     ])
-      .then(([statuses, exams, attempts, srs, lastExportAt]) => {
+      .then(([statuses, exams, attempts, studyTime, srs, lastExportAt]) => {
         const now = new Date();
         setData({
           statuses,
           exams,
           attempts,
+          studyTime,
           due: dueQuestionIds(srs, now).length,
           nextDue: nextDueAt(srs, now),
           reminder: exportReminder(lastExportAt ?? null, attempts.length > 0, now),
@@ -126,8 +133,20 @@ export function Home({
         </section>
 
         <aside class="home-rail rise" style={{ animationDelay: "180ms" }}>
+          <section>
+            <h3 class="dash-section">Study streak</h3>
+            <StreakCalendar
+              records={data?.studyTime ?? []}
+              attemptDays={attemptDaysOf(data?.attempts ?? [])}
+              now={new Date()}
+            />
+            {data && data.due === 0 && data.nextDue && (
+              <p class="rail-note">
+                Reviews up to date. Next: {new Date(data.nextDue).toLocaleDateString()}
+              </p>
+            )}
+          </section>
           {(!data || data.attempts.length === 0) && <HowItWorks />}
-          <ActivityPanel data={data} />
           {data && <RunTrend runs={runHistory(data.attempts, 10)} />}
           {data && (
             <WeakestAreas
@@ -282,6 +301,7 @@ function Hero({
     const first = curriculum.modules[0]?.lessons[0];
     return (
       <section class="hero rise">
+        <TraceDecor />
         <p class="hero-eyebrow">Machine Learning Systems · self-study</p>
         <h2 class="hero-title">Learn the metal under the models.</h2>
         <p class="hero-sub">
@@ -302,7 +322,9 @@ function Hero({
 
   const { attempts, due } = data;
   const now = new Date();
-  const streak = streakInfo(attempts, now);
+  const streak = {
+    currentStreak: studyStreak(data.studyTime, attemptDaysOf(attempts), now).current,
+  };
   // A finished module whose exam hasn't been passed outranks "continue".
   const pendingExam = curriculum.modules.find(
     (m) =>
@@ -317,6 +339,7 @@ function Hero({
 
   return (
     <section class="hero rise">
+      <TraceDecor />
       <p class="hero-eyebrow">
         {streak.currentStreak > 0
           ? `Day ${streak.currentStreak} of the streak`
@@ -359,6 +382,25 @@ function Hero({
   );
 }
 
+/* Flat-color PCB trace behind the hero — the decorative element. Solid
+   strokes only: gradients band on LCD panels (learned the hard way). The
+   dash slowly draws and retreats; reduced-motion freezes it. */
+function TraceDecor() {
+  return (
+    <svg
+      class="hero-trace"
+      viewBox="0 0 480 120"
+      fill="none"
+      aria-hidden="true"
+      preserveAspectRatio="xMaxYMid meet"
+    >
+      <path class="hero-trace-path" d="M0 90 H150 L190 50 H300 L340 90 H440" />
+      <circle cx="446" cy="90" r="5" class="hero-trace-via" />
+      <circle cx="300" cy="50" r="4" class="hero-trace-via" />
+    </svg>
+  );
+}
+
 /* First-run rail: teach the loop in the app's own visual language. */
 function HowItWorks() {
   return (
@@ -379,22 +421,6 @@ function HowItWorks() {
           mastery numbers up top do the honest bookkeeping.
         </li>
       </ul>
-    </section>
-  );
-}
-
-function ActivityPanel({ data }: { data: ProgressData | null }) {
-  if (!data || data.attempts.length === 0) return null;
-  const streak = streakInfo(data.attempts, new Date());
-  return (
-    <section>
-      <h3 class="dash-section">Study days · last 8 weeks</h3>
-      <StreakCalendar activeDays={streak.activeDays} now={new Date()} />
-      {data.due === 0 && data.nextDue && (
-        <p class="rail-note">
-          Reviews up to date. Next: {new Date(data.nextDue).toLocaleDateString()}
-        </p>
-      )}
     </section>
   );
 }

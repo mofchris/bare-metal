@@ -6,8 +6,10 @@
 // load failure, unknown lesson id — because a blank or half-drawn screen is
 // a silent failure (CLAUDE.md).
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { Curriculum } from "./lib/curriculum";
+import { localDateKey } from "./lib/stats";
+import { TICK_SECONDS } from "./lib/study-time";
 import { loadCurriculum } from "./lib/load-curriculum";
 import { parseRoute, type Route } from "./lib/route";
 import { findLesson, questionsFor } from "./lib/lookup";
@@ -80,6 +82,31 @@ export function App() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  // Study-time heartbeat (D-024): every TICK_SECONDS, if a study screen is
+  // open and the tab is visible, credit the tick to today. Deliberately
+  // approximate (±one tick per sitting); idle tabs don't accrue because
+  // hidden documents fail the visibility check.
+  const routeRef = useRef(route);
+  routeRef.current = route;
+  useEffect(() => {
+    if (dbState.status !== "ready" || !dbState.db) return;
+    const db = dbState.db;
+    const studyScreens = new Set(["lesson", "quiz", "review", "exam"]);
+    const interval = setInterval(() => {
+      if (
+        studyScreens.has(routeRef.current.screen) &&
+        document.visibilityState === "visible"
+      ) {
+        db.addStudySeconds(localDateKey(new Date()), TICK_SECONDS).catch((e: unknown) =>
+          // Not worth interrupting studying over — the next tick retries —
+          // but never silent (CLAUDE.md).
+          console.error("Metal: study-time tick failed to record", e),
+        );
+      }
+    }, TICK_SECONDS * 1000);
+    return () => clearInterval(interval);
+  }, [dbState]);
 
   // Reading surfaces stay a centered column; home manages the full width.
   const narrow = route.screen !== "home";

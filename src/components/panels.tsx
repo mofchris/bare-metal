@@ -4,6 +4,12 @@
 
 import { lessonHref } from "../lib/route";
 import { localDateKey, type LessonMastery, type RunSummary } from "../lib/stats";
+import {
+  DAILY_GOAL_SECONDS,
+  secondsByDay,
+  studyStreak,
+  type StudyTimeRecord,
+} from "../lib/study-time";
 
 /* Single-series column list: height ∝ accuracy, baseline-anchored; per-column
    title tooltip; only the latest run gets a direct label. */
@@ -36,31 +42,98 @@ export function RunTrend({ runs }: { runs: RunSummary[] }) {
   );
 }
 
-/* 8-week binary calendar, columns = weeks, ending today. Cell titles carry
-   the date + state; the streak number lives in the hero/tiles. */
+/* The streak calendar (D-024): a month view of the 30-minutes-a-day goal.
+   Cell states — goal met (filled copper), some study (copper ring), nothing
+   (dim), today (outlined, with live minutes underneath). Cell titles carry
+   the exact minutes, so color is never the only carrier. */
 export function StreakCalendar({
-  activeDays,
+  records,
+  attemptDays,
   now,
 }: {
-  activeDays: Set<string>;
+  records: StudyTimeRecord[];
+  attemptDays: Set<string>;
   now: Date;
 }) {
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const days: { key: string; active: boolean; today: boolean }[] = [];
-  for (let i = 55; i >= 0; i--) {
-    const date = new Date(now.getTime() - i * DAY_MS);
-    const key = localDateKey(date);
-    days.push({ key, active: activeDays.has(key), today: i === 0 });
-  }
+  const streak = studyStreak(records, attemptDays, now);
+  const seconds = secondsByDay(records);
+  const todayKey = localDateKey(now);
+  const todayMinutes = Math.floor(streak.todaySeconds / 60);
+  const goalMinutes = DAILY_GOAL_SECONDS / 60;
+
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const first = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Monday-first column for day 1 (getDay(): 0 = Sunday).
+  const lead = (first.getDay() + 6) % 7;
+  const monthName = first.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+  const cellFor = (dayNum: number) => {
+    const key = localDateKey(new Date(year, month, dayNum));
+    const secs = seconds.get(key) ?? 0;
+    const mins = Math.floor(secs / 60);
+    const future = key > todayKey;
+    const state = future
+      ? "future"
+      : streak.countedDays.has(key)
+        ? "met"
+        : secs > 0
+          ? "some"
+          : "none";
+    return (
+      <span
+        key={key}
+        class={`cal-cell ${state}${key === todayKey ? " today" : ""}`}
+        title={
+          future
+            ? key
+            : `${key} · ${mins} min${streak.countedDays.has(key) ? " · goal met" : ""}`
+        }
+      >
+        {dayNum}
+      </span>
+    );
+  };
+
   return (
-    <div class="streak-grid">
-      {days.map((d) => (
+    <div class="streak-cal">
+      <div class="streak-cal-head">
+        <span class="streak-cal-count">
+          <strong>{streak.current}</strong> day streak
+        </span>
+        <span class="streak-cal-today">
+          today {Math.min(todayMinutes, goalMinutes)}/{goalMinutes} min
+        </span>
+      </div>
+      <div
+        class="streak-cal-todaybar"
+        role="img"
+        aria-label={`${todayMinutes} of ${goalMinutes} minutes today`}
+      >
         <span
-          key={d.key}
-          class={`streak-cell${d.active ? " active" : ""}${d.today ? " today" : ""}`}
-          title={`${d.key}: ${d.active ? "studied" : "no study"}`}
+          class="streak-cal-todayfill"
+          style={{ width: `${Math.min((todayMinutes / goalMinutes) * 100, 100)}%` }}
         />
-      ))}
+      </div>
+      <p class="streak-cal-month">{monthName}</p>
+      <div class="cal-grid">
+        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+          <span key={`h${i}`} class="cal-head">
+            {d}
+          </span>
+        ))}
+        {Array.from({ length: lead }, (_, i) => (
+          <span key={`lead${i}`} />
+        ))}
+        {Array.from({ length: daysInMonth }, (_, i) => cellFor(i + 1))}
+      </div>
+      <p class="rail-note">
+        A day counts at {goalMinutes}+ minutes of lessons, quizzes, or reviews.
+      </p>
     </div>
   );
 }

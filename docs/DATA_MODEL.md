@@ -117,14 +117,15 @@ already rendered to HTML. The app treats it as read-only and versioned
 Database `metal-progress`, versioned via IndexedDB's own `version` +
 `schemaVersion` in a `meta` store (migrations run on upgrade, loudly).
 
-| Store            | Key          | Value (shape)                                                                                                                                       |
-| ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `attempts`       | auto-id      | `{ questionId, at (ISO), correct, givenAnswer, sessionId }`                                                                                         |
-| `lessonProgress` | `lessonId`   | `{ status: "not-started"\|"in-progress"\|"done", completedAt?, bestScorePct? }` — best quiz score drives gating (D-023)                             |
-| `examResults`    | `moduleId`   | `{ moduleId, bestScorePct, passed, updatedAt }` — module exams, v3 (D-023)                                                                          |
-| `srsState`       | `questionId` | `{ dueAt, intervalDays, ease, reps, lapses, lastReviewedAt }` — derived, rebuildable by replaying `attempts` through the SM-2-binary engine (D-018) |
-| `labResults`     | `labId`      | `{ importedAt, metrics: {...}, passed, runnerVersion }`                                                                                             |
-| `meta`           | fixed keys   | `{ schemaVersion, lastExportAt, installId }`                                                                                                        |
+| Store            | Key              | Value (shape)                                                                                                                                       |
+| ---------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attempts`       | auto-id          | `{ questionId, at (ISO), correct, givenAnswer, sessionId }`                                                                                         |
+| `lessonProgress` | `lessonId`       | `{ status: "not-started"\|"in-progress"\|"done", completedAt?, bestScorePct? }` — best quiz score drives gating (D-023)                             |
+| `examResults`    | `moduleId`       | `{ moduleId, bestScorePct, passed, updatedAt }` — module exams, v3 (D-023)                                                                          |
+| `studyTime`      | `day\|installId` | `{ id, day, installId, seconds }` — per-device daily study seconds, v4 (D-024); merge = max per row, day total = sum across devices                 |
+| `srsState`       | `questionId`     | `{ dueAt, intervalDays, ease, reps, lapses, lastReviewedAt }` — derived, rebuildable by replaying `attempts` through the SM-2-binary engine (D-018) |
+| `labResults`     | `labId`          | `{ importedAt, metrics: {...}, passed, runnerVersion }`                                                                                             |
+| `meta`           | fixed keys       | `{ schemaVersion, lastExportAt, installId }`                                                                                                        |
 
 Design rules:
 

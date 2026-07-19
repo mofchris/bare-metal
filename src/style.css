@@ -257,36 +257,48 @@ a:hover {
   padding: clamp(2.5rem, 7vw, 5rem) 0 clamp(2rem, 5vw, 3.5rem);
 }
 
-/* A slow copper glow drifting behind the hero — the one gradient in the app,
-   kept faint on purpose. Transform-only animation; dies with reduced-motion. */
-.hero::before {
-  content: "";
+/* Flat-color PCB trace behind the hero. Solid strokes, no gradients —
+   radial gradients band visibly on LCD panels (removed after Christopher
+   reported exactly that). The dash slowly draws; freezes on reduced-motion. */
+.hero-trace {
   position: absolute;
-  top: -20%;
-  right: -5%;
-  width: 34rem;
-  height: 34rem;
-  border-radius: 50%;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--copper) 14%, transparent),
-    transparent 70%
-  );
-  animation: drift 16s ease-in-out infinite alternate;
+  top: 0.5rem;
+  right: 0;
+  width: min(30rem, 55%);
+  height: auto;
   pointer-events: none;
 }
 
-@keyframes drift {
+.hero-trace-path {
+  stroke: var(--copper);
+  stroke-width: 2;
+  opacity: 0.3;
+  stroke-dasharray: 640;
+  animation: trace-draw 14s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+
+.hero-trace-via {
+  fill: var(--board);
+  stroke: var(--copper);
+  stroke-width: 2;
+  opacity: 0.35;
+}
+
+@keyframes trace-draw {
   from {
-    transform: translate(0, 0) scale(1);
+    stroke-dashoffset: 640;
   }
   to {
-    transform: translate(-8rem, 3rem) scale(1.15);
+    stroke-dashoffset: 0;
   }
 }
 
 .hero > * {
   position: relative;
+}
+
+.hero > .hero-trace {
+  position: absolute;
 }
 
 .hero-eyebrow {
@@ -927,27 +939,112 @@ article h2,
   color: var(--ink-dim);
 }
 
-.streak-grid {
-  display: grid;
-  grid-template-rows: repeat(7, 12px);
-  grid-auto-flow: column;
-  gap: 3px;
-  justify-content: start;
+/* ---------------- streak calendar (D-024) ---------------- */
+
+.streak-cal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.8rem;
+  flex-wrap: wrap;
 }
 
-.streak-cell {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+.streak-cal-count {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.streak-cal-count strong {
+  font-size: 1.6rem;
+  color: var(--copper);
+  font-variant-numeric: tabular-nums;
+}
+
+.streak-cal-today {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+}
+
+.streak-cal-todaybar {
+  height: 4px;
+  border-radius: 2px;
   background: var(--mask-2);
+  margin: 0.5rem 0 0.9rem;
+  overflow: hidden;
 }
 
-.streak-cell.active {
+.streak-cal-todayfill {
+  display: block;
+  height: 100%;
   background: var(--copper);
+  border-radius: 2px;
 }
 
-.streak-cell.today {
-  outline: 1px solid var(--ink-dim);
+.streak-cal-month {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+  margin-bottom: 0.45rem;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-head {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-dim);
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.cal-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  transition: background 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cal-cell.none {
+  background: var(--mask-2);
+  color: var(--ink-dim);
+}
+
+.cal-cell.some {
+  background: var(--mask-2);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--copper-dark);
+}
+
+.cal-cell.met {
+  background: var(--copper);
+  color: var(--board);
+  font-weight: 600;
+}
+
+.cal-cell.future {
+  color: color-mix(in srgb, var(--ink-dim) 45%, transparent);
+}
+
+.cal-cell.today {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+
+.cal-cell.met.today {
+  box-shadow:
+    inset 0 0 0 1.5px var(--board),
+    0 0 0 1.5px var(--copper);
 }
 
 .mastery-list {

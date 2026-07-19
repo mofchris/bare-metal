@@ -15,9 +15,11 @@ import type {
   ProgressDb,
 } from "./progress-store";
 import type { SrsState } from "./srs";
+import type { StudyTimeRecord } from "./study-time";
 
 export const BACKUP_FORMAT = "metal-backup";
-export const BACKUP_SCHEMA_VERSION = 3; // v3 adds examResults + lesson scores
+// v3 added examResults + lesson scores; v4 adds studyTime (D-024).
+export const BACKUP_SCHEMA_VERSION = 4;
 
 export interface BackupFile {
   format: typeof BACKUP_FORMAT;
@@ -30,6 +32,8 @@ export interface BackupFile {
     lessonProgress: LessonProgressRecord[];
     /** Absent in v2 files. */
     examResults?: ExamResultRecord[];
+    /** Absent before v4. */
+    studyTime?: StudyTimeRecord[];
     /** Included for inspection; restore ignores it and rebuilds (D-019). */
     srsState: SrsState[];
   };
@@ -52,6 +56,7 @@ export async function buildBackup(db: ProgressDb): Promise<BackupFile> {
       attempts: await db.allAttempts(),
       lessonProgress: [...(await db.lessonStatuses()).values()],
       examResults: [...(await db.examResults()).values()],
+      studyTime: await db.allStudyTime(),
       srsState: await db.allSrsStates(),
     },
   };
@@ -138,6 +143,16 @@ export async function restoreBackup(
         existing ? { ...incoming, passed: incoming.passed || existing.passed } : incoming,
       );
       examsMerged += 1;
+    }
+  }
+
+  // Study time: per (day, device) rows; seconds only grow, so max wins and
+  // restoring the same file twice changes nothing.
+  const localTime = new Map((await db.allStudyTime()).map((r) => [r.id, r]));
+  for (const incoming of backup.stores.studyTime ?? []) {
+    const existing = localTime.get(incoming.id);
+    if (!existing || incoming.seconds > existing.seconds) {
+      await db.putStudyTime(incoming);
     }
   }
 
