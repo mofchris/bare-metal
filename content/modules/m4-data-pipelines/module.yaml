@@ -1,0 +1,12 @@
+# M4 — Data pipelines. Outline: docs/CURRICULUM.md. The most common
+# real-world performance bug (starved accelerators) and the first place a
+# new MLSys hire gets pointed at.
+id: m4-data-pipelines
+title: "Data pipelines: feeding the model is a systems problem"
+prereqs:
+  - m2-measurement
+lessons:
+  - 01-input-pipeline
+  - 02-overlap
+  - 03-storage-formats
+  - 04-pipeline-health

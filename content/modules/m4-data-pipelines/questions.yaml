@@ -1,0 +1,262 @@
+# M4 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+
+# ---- Lesson 01: the input pipeline ----
+
+- id: m4/q-001
+  lesson: m4/01-input-pipeline
+  type: mcq
+  prompt: "In an image training pipeline, why is the DECODE stage usually expensive?"
+  options:
+    - "It reads from disk, and disks are slow"
+    - "JPEG decoding is real computation (entropy decoding, IDCT) costing milliseconds of CPU per image"
+    - "It runs on the GPU and blocks kernels"
+    - "It isn't — decode is a simple memory copy"
+  answer: 1
+  explanation: >-
+    Decode turns compressed bytes into pixels by computing, not copying.
+    That CPU cost per sample is a chief reason pipelines fall behind
+    accelerators.
+  tags: [pipelines, decode]
+
+- id: m4/q-002
+  lesson: m4/01-input-pipeline
+  type: mcq
+  prompt: "A pipeline of chained stages processes at the rate of:"
+  options:
+    - "The average of its stages"
+    - "Its slowest stage — the bottleneck"
+    - "Its fastest stage, if buffered"
+    - "The sum of all stage rates"
+  answer: 1
+  explanation: >-
+    The pipeline law: the slowest stage sets throughput, and speeding up any
+    other stage changes nothing — Amdahl's logic applied to a chain.
+  tags: [pipelines, bottleneck]
+
+- id: m4/q-003
+  lesson: m4/01-input-pipeline
+  type: mcq
+  prompt: "Why does PyTorch's DataLoader use worker PROCESSES instead of threads?"
+  options:
+    - "Processes are always faster than threads"
+    - "Python's GIL prevents true thread parallelism for Python-level work"
+    - "Threads can't open files"
+    - "A historical accident kept for compatibility"
+  answer: 1
+  explanation: >-
+    The global interpreter lock serializes Python bytecode across threads;
+    separate processes (num_workers) sidestep it so decodes genuinely run in
+    parallel.
+  tags: [pipelines, python]
+
+- id: m4/q-004
+  lesson: m4/01-input-pipeline
+  type: short
+  prompt: >-
+    The situation where an accelerator sits idle because the input pipeline
+    can't keep up is called a data ______. (one word)
+  accept:
+    - "stall"
+    - "data stall"
+  explanation: >-
+    A data stall (Mohan et al. measured them rampant in real training jobs).
+    Diagnosing them is lesson 04's whole topic.
+  tags: [pipelines, stalls]
+
+# ---- Lesson 02: overlap ----
+
+- id: m4/q-005
+  lesson: m4/02-overlap
+  type: mcq
+  prompt: "Prefetching makes the input pipeline's cost disappear when:"
+  options:
+    - "The dataset fits in RAM"
+    - "Preparing a batch consistently takes less time than computing one — prep hides entirely behind compute"
+    - "At least 8 workers are configured"
+    - "The data is stored uncompressed"
+  answer: 1
+  explanation: >-
+    Overlap hides cost; it doesn't shrink it. If prep < compute, the model
+    never waits; if prep > compute, no buffer size saves you — the fixes
+    become structural.
+  tags: [pipelines, prefetch]
+
+- id: m4/q-006
+  lesson: m4/02-overlap
+  type: mcq
+  prompt: "Why does a prefetch buffer of 2–4 batches usually beat a buffer of 100?"
+  options:
+    - "Big buffers make the model overfit"
+    - "A small buffer already absorbs prep-time spikes; a queue that's always full doesn't get fuller, and each buffered batch costs host RAM"
+    - "Frameworks can't allocate more than 4"
+  answer: 1
+  explanation: >-
+    Buffering exists to absorb variance in prep time. Once spikes are
+    covered, extra depth adds memory cost and zero throughput.
+  tags: [pipelines, prefetch]
+
+- id: m4/q-007
+  lesson: m4/02-overlap
+  type: mcq
+  prompt: "Adding DataLoader workers speeds things up until:"
+  options:
+    - "Exactly 4 workers, always"
+    - "A shared resource saturates — all physical cores busy, disk at its limit, or memory bandwidth spent"
+    - "The batch size is reached"
+    - "It never stops helping"
+  answer: 1
+  explanation: >-
+    Scaling is roughly linear while independent work remains; the plateau
+    arrives when workers start competing for the same core, spindle, or
+    bandwidth. Found by experiment, not formula (lab L4.1).
+  tags: [pipelines, workers]
+
+- id: m4/q-008
+  lesson: m4/02-overlap
+  type: mcq
+  prompt: "What does pinned (page-locked) host memory enable?"
+  options:
+    - "Larger batch sizes"
+    - "Faster DMA copies and asynchronous host→device transfer that overlaps with compute"
+    - "Protection against out-of-memory errors"
+    - "Deterministic training"
+  answer: 1
+  explanation: >-
+    The DMA engine can read locked pages directly, and async transfer on a
+    separate stream lets batch N+1's copy ride under batch N's compute — the
+    third lane of full overlap.
+  tags: [pipelines, transfer]
+
+# ---- Lesson 03: storage formats ----
+
+- id: m4/q-009
+  lesson: m4/03-storage-formats
+  type: mcq
+  prompt: "Training reads whole samples in random order. Which layout serves that directly?"
+  options:
+    - "Columnar — each field stored contiguously"
+    - "Row-oriented — each sample stored contiguously (TFRecord, WebDataset)"
+    - "One file per sample"
+    - "A relational database"
+  answer: 1
+  explanation: >-
+    Reading a whole sample from a row layout is one contiguous touch.
+    Columnar (Parquet/Arrow) shines when you read few fields across many
+    rows — analytics and feature engineering.
+  tags: [storage, layout]
+
+- id: m4/q-010
+  lesson: m4/03-storage-formats
+  type: mcq
+  prompt: "Why is 'a million small JPEG files' a pipeline disaster?"
+  options:
+    - "JPEGs can't be read in parallel"
+    - "Per-file metadata overhead plus random placement turns reading into seeking; object stores throttle per request"
+    - "Small files decompress slower"
+    - "Filesystems cap directories at 65536 entries"
+  answer: 1
+  explanation: >-
+    Every file pays open/stat/close before its first byte, and random layout
+    forfeits sequential bandwidth. Sharding — packing samples into a few
+    hundred large archives — restores streaming reads.
+  tags: [storage, sharding]
+
+- id: m4/q-011
+  lesson: m4/03-storage-formats
+  type: mcq
+  prompt: "How do sharded pipelines approximate random shuffling without random I/O?"
+  options:
+    - "They read every shard twice"
+    - "Shuffle the order of shards per epoch + shuffle within a streaming memory buffer"
+    - "True shuffling is impossible with shards"
+    - "They sort samples by label instead"
+  answer: 1
+  explanation: >-
+    Shard-order shuffle plus a shuffle buffer gives approximate randomness
+    at sequential-read prices — the standard compromise (WebDataset,
+    tf.data).
+  tags: [storage, shuffling]
+
+- id: m4/q-012
+  lesson: m4/03-storage-formats
+  type: mcq
+  prompt: "On a fast local NVMe drive, heavy compression can make an epoch SLOWER because:"
+  options:
+    - "NVMe drives can't read compressed bytes"
+    - "The drive delivers bytes faster than the CPU can decompress them — decompression becomes the bottleneck stage"
+    - "Compression corrupts tensors"
+    - "It can't — compression always helps"
+  answer: 1
+  explanation: >-
+    Compression trades CPU for bandwidth. When bandwidth is abundant and the
+    pipeline's CPU is already busy, the trade inverts — hence fast codecs
+    (or none) as the default, and 'measure it' as the rule.
+  tags: [storage, compression]
+
+# ---- Lesson 04: pipeline health ----
+
+- id: m4/q-013
+  lesson: m4/04-pipeline-health
+  type: mcq
+  prompt: >-
+    Training runs at the same speed with real data and with a cached
+    synthetic batch. The conclusion:
+  options:
+    - "The pipeline is the bottleneck"
+    - "The pipeline was never the limit — you are compute-bound; pipeline work is wasted effort"
+    - "The experiment is inconclusive"
+    - "The synthetic data is broken"
+  answer: 1
+  explanation: >-
+    Removing the pipeline changed nothing, so it wasn't the constraint. The
+    decisive experiment, outcome one — go optimize the model instead.
+  tags: [pipelines, diagnosis]
+
+- id: m4/q-014
+  lesson: m4/04-pipeline-health
+  type: mcq
+  prompt: "Accelerator utilization that sawtooths (busy → idle gap → busy) during training signals:"
+  options:
+    - "Healthy overlap"
+    - "Data stalls at batch boundaries — the prefetch queue is emptying faster than it refills"
+    - "Thermal throttling"
+    - "A learning-rate schedule"
+  answer: 1
+  explanation: >-
+    The idle gaps are the model waiting for the next batch. Follow up on the
+    producer side: pegged worker cores → widen prep; idle cores + busy disk
+    → fix I/O.
+  tags: [pipelines, diagnosis]
+
+- id: m4/q-015
+  lesson: m4/04-pipeline-health
+  type: mcq
+  prompt: "Why is epoch 2 often dramatically faster than epoch 1, with no code change?"
+  options:
+    - "The model has learned the data"
+    - "The OS page cache now serves file reads from RAM instead of disk"
+    - "Python JIT-compiles the loop after one epoch"
+    - "The scheduler prioritizes long-running jobs"
+  answer: 1
+  explanation: >-
+    Recently read files live in the page cache. Epoch 1 measures cold I/O;
+    epoch 2 measures RAM. Decide which question you're asking before
+    benchmarking either (M2's warmup discipline).
+  tags: [pipelines, measurement]
+
+- id: m4/q-016
+  lesson: m4/04-pipeline-health
+  type: short
+  prompt: >-
+    Occasional pipeline starvation hides in the mean but shows in per-step
+    time percentiles. Which M2 statistic family exposes it? (say the
+    percentile everyone quotes)
+  accept:
+    - "p95"
+    - "p99"
+    - "tail percentiles"
+    - "percentiles"
+  explanation: >-
+    Tail percentiles (p95/p99) of step time. Stalls are tail events — M2's
+    right-skew lesson wearing pipeline clothes.
+  tags: [pipelines, measurement]

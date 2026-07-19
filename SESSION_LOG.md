@@ -313,3 +313,18 @@ at the bottom.
 **Next session should start with:** Christopher's Gate B inputs; else M4 authoring.
 **Open questions for Christopher:** unchanged
 **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (sixteenth block — M4 authoring)
+
+**Stage:** B (build complete; gate waiting on Christopher) — curriculum authoring block, no Stage C work touched.
+**Done this session:**
+
+- Authored M4 — Data pipelines, complete (4 lessons, sourced): 01 the input pipeline (five-stage anatomy, decode cost, the pipeline law, GIL → worker processes; tf.data VLDB 2021, Mohan data stalls VLDB 2021), 02 overlap (prefetching + why small buffers suffice, worker scaling to saturation, pinned memory + async transfer, what overlap cannot fix), 03 storage formats (row vs column per Abadi SIGMOD 2008, row groups, the small-file trap + sharding, shuffle buffers, compression as CPU-vs-bandwidth trade that inverts on NVMe), 04 pipeline health (the synthetic-data experiment as decisive diagnostic, sawtooth utilization reading, page-cache/warmup/tail measurement traps)
+- 16 new questions (m4/q-001…q-016) — curriculum now 4 modules, 17 lessons, 70 questions
+- Prereq chain deepened: m4 → m2 (first non-m1 prereq); compiles and orders correctly
+- Verified in browser: M4 on home, storage-formats lesson renders, zero console errors
+
+**In progress / half-finished:** nothing half-finished. Next authoring target: M5 (training mechanics).
+**Next session should start with:** Christopher's Gate B inputs; else M5 authoring.
+**Open questions for Christopher:** unchanged
+**New DECISIONS.md entries this session:** none
