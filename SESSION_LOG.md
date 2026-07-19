@@ -8,7 +8,7 @@ at the bottom.
 
 ## Session 2026-07-19
 
-**Stage:** 0 — Discovery & Design | **Gate status:** unsigned (Gate 0 package presented, awaiting Christopher)
+**Stage:** 0 — Discovery & Design | **Gate status:** GATE 0 SIGNED — APPROVED 2026-07-19 by Christopher
 **Done this session:**
 - Recorded hardware/hours in BUILD_PLAN.md (HP OmniBook X Flip 14, Core Ultra 7, 16 GB, no discrete GPU, Win 11; iPhone XR; ~21 h/week)
 - Initialized git repo (branch `main`), first commits made
@@ -18,10 +18,13 @@ at the bottom.
 - Created docs/DATA_MODEL.md: content format, question bank, IndexedDB progress schema, export file format
 - Created docs/RISKS.md: top 5 risks with mitigations
 
-**In progress / half-finished:** nothing half-finished — all Stage 0 deliverables drafted. Nothing breaks if run; there is no code.
-**Next session should start with:** Christopher's Gate 0 review — answers to the quiz, verdicts on D-001…D-010 (especially D-010 curriculum scope), internet/power reliability note for BUILD_PLAN, then sign Gate 0 or resolve questions. No Stage A work before that.
+- Checked how the GRE sim (mofchris/gre-mock-exam-simulator) saves progress (localStorage blob `gre-sim-v1` + study-sync Cloudflare Worker); found its architecture doc stale on sync
+- Logged D-011: Metal gets its own purpose-built sync Worker at Stage E (not study-sync reuse); Christopher confirmed timing
+- **Gate 0 signed: APPROVED 2026-07-19.** D-001…D-011 ratified.
+
+**In progress / half-finished:** nothing half-finished — all Stage 0 deliverables done. No code exists yet.
+**Next session should start with:** (1) the carried-over Gate 0 explain-back quiz — Christopher approved without answering it; it is a required gate test and must open the Stage A kickoff (4 questions are in the 2026-07-19 chat: offline persistence, build-time content validation, lab-results hand-off, no-sync-in-v1). (2) Get the internet/power reliability line for BUILD_PLAN's MY SETUP. (3) Then begin Stage A: repo scaffolding (Vite + TS + Preact + Vitest), content compiler skeleton, M1 authoring.
 **Open questions for Christopher:**
-- Does the M1–M10 module list match what you want before Fall 2027 (D-010)?
-- Internet/power reliability — fill in the [to confirm] note in BUILD_PLAN.md
-- Gate 0 quiz answers (in chat)
-**New DECISIONS.md entries this session:** D-001…D-010
+- Gate 0 quiz answers (carried over — not optional)
+- Internet/power reliability note (still [to confirm] in BUILD_PLAN.md)
+**New DECISIONS.md entries this session:** D-001…D-011 (all ratified at Gate 0)

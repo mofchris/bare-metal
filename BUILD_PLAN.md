@@ -64,7 +64,10 @@ v1 vs later, deployment architecture as specified above
 **Tests:** none (no code) — but I must be able to explain the architecture back
 in my own words; Claude Code should quiz me briefly and correct misunderstandings
 
-**⛔ GATE 0 sign-off:** \_\_\_\_\_\_\_\_\_\_\_\_\_\_
+**⛔ GATE 0 sign-off:** APPROVED 2026-07-19 (Christopher). Note: the
+explain-back quiz was not completed at sign-off — carried over as the first
+item of the Stage A kickoff (see SESSION_LOG 2026-07-19). Internet/power note
+in MY SETUP still \[to confirm].
 
 ***
 
