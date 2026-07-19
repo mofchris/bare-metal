@@ -447,3 +447,9 @@ at the bottom.
 **Next session should start with:** Christopher's live sync test (sign in on two devices, verify progress meets); then whatever he directs — or Gate B business (his week of use is now genuinely seamless across devices).
 **Open questions for Christopher:** do the live sign-in test on the deployed site
 **New DECISIONS.md entries this session:** D-022 (ratified — his direction)
+
+## Session 2026-07-19 (sync hotfix — push failed 500)
+
+**Root cause (found from Christopher's screenshot — signed in as derjager, "push failed (500 server_error)"):** the live D1 `progress` table carried `CHECK (app IN ('gre','netplus'))` from before the Worker patch. The Worker accepted app=metal; the DATABASE rejected the INSERT with a constraint violation → uncaught → 500. Worker code and DB schema are deployed separately — the schema migration was missed.
+**Fix:** production rows snapshotted to scratchpad first (2 rows: gre, netplus); copy-migration (SQLite can't alter a CHECK): new table with `CHECK (app IN ('gre','netplus','metal'))`, rows copied, swap. Verified: both rows intact, new constraint live, and a scratch metal row inserts + deletes cleanly. schema.sql updated in the study-sync repo to match reality.
+**Lesson recorded:** a Worker deploy is not a schema deploy — D1 constraints must be migrated alongside allowlist changes; test suites using fresh schemas won't catch drift against the live database.
