@@ -11,6 +11,7 @@ import type { Curriculum } from "./lib/curriculum";
 import { loadCurriculum } from "./lib/load-curriculum";
 import { parseRoute, type Route } from "./lib/route";
 import { findLesson, questionsFor } from "./lib/lookup";
+import { openProgressDb, type ProgressDb } from "./lib/progress-store";
 import { Home } from "./components/home";
 import { LessonView } from "./components/lesson-view";
 import { Quiz } from "./components/quiz";
@@ -23,6 +24,8 @@ type LoadState =
 export function App() {
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [route, setRoute] = useState<Route>(() => parseRoute(location.hash));
+  const [db, setDb] = useState<ProgressDb | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
     loadCurriculum()
@@ -30,6 +33,12 @@ export function App() {
       .catch((e: unknown) =>
         setLoad({ status: "error", message: e instanceof Error ? e.message : String(e) }),
       );
+    // Progress storage failing (e.g. hard-private browsing modes) must not
+    // brick studying — the app stays usable and says out loud that nothing
+    // is being recorded.
+    openProgressDb()
+      .then(setDb)
+      .catch((e: unknown) => setDbError(e instanceof Error ? e.message : String(e)));
   }, []);
 
   useEffect(() => {
@@ -50,14 +59,28 @@ export function App() {
         </h1>
         <p class="tagline">Machine Learning Systems, learned properly.</p>
       </header>
+      {dbError && (
+        <p class="warn-banner">
+          Progress saving is unavailable in this browser ({dbError}). The app still works,
+          but quiz results won't be recorded.
+        </p>
+      )}
       <main class="shell-main">
-        <Screen load={load} route={route} />
+        <Screen load={load} route={route} db={db} />
       </main>
     </div>
   );
 }
 
-function Screen({ load, route }: { load: LoadState; route: Route }) {
+function Screen({
+  load,
+  route,
+  db,
+}: {
+  load: LoadState;
+  route: Route;
+  db: ProgressDb | null;
+}) {
   if (load.status === "loading") {
     return <p class="status">Loading curriculum…</p>;
   }
@@ -88,10 +111,11 @@ function Screen({ load, route }: { load: LoadState; route: Route }) {
           module={location.module}
           lesson={location.lesson}
           questions={questionsFor(location.module, location.lesson.id)}
+          db={db}
         />
       );
     }
     return <LessonView location={location} />;
   }
-  return <Home curriculum={load.curriculum} />;
+  return <Home curriculum={load.curriculum} db={db} />;
 }

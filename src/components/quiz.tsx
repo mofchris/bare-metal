@@ -1,20 +1,23 @@
 // Quiz screen: one question at a time — answer, immediate feedback with the
 // explanation, then a score summary. Depends on: lib/curriculum (types),
-// lib/quiz (grading), lib/route. Depended on by: app.tsx.
+// lib/quiz (grading), lib/route, lib/progress-store. Depended on by: app.tsx.
 //
-// Results live only in component state for now: persistence (IndexedDB,
-// D-007) is the next Stage A piece, and the summary says so out loud rather
-// than letting anyone believe their history is being kept.
+// Persistence contract (docs/DATA_MODEL.md): every answer is written to the
+// attempts store THE MOMENT it is graded — killing the app mid-quiz loses at
+// most the question currently on screen. If a write fails, the quiz keeps
+// working and the failure is shown, never swallowed.
 
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import type { Lesson, Module, Question } from "../lib/curriculum";
 import { gradeResponse, type QuizResponse } from "../lib/quiz";
 import { lessonHref } from "../lib/route";
+import type { ProgressDb } from "../lib/progress-store";
 
 interface QuizProps {
   module: Module;
   lesson: Lesson;
   questions: Question[];
+  db: ProgressDb | null;
 }
 
 interface AnsweredQuestion {
@@ -23,25 +26,50 @@ interface AnsweredQuestion {
   correct: boolean;
 }
 
-export function Quiz({ module, lesson, questions }: QuizProps) {
+export function Quiz({ module, lesson, questions, db }: QuizProps) {
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   // "answering" → inputs live; "feedback" → result + explanation shown.
   const [phase, setPhase] = useState<"answering" | "feedback">("answering");
+  // One id per quiz run, so Stage B can group a run's attempts together.
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const current = questions[answered.length];
 
   const submit = (response: QuizResponse) => {
     if (!current) return;
-    setAnswered([
-      ...answered,
-      { question: current, response, correct: gradeResponse(current, response) },
-    ]);
+    const correct = gradeResponse(current, response);
+    setAnswered([...answered, { question: current, response, correct }]);
     setPhase("feedback");
+
+    if (db) {
+      const givenAnswer =
+        response.type === "mcq"
+          ? (current.type === "mcq" && current.options[response.choice]) ||
+            `option ${response.choice}`
+          : response.text;
+      const writes = [
+        db.recordAttempt({
+          questionId: current.id,
+          at: new Date().toISOString(),
+          correct,
+          givenAnswer,
+          sessionId,
+        }),
+      ];
+      if (answered.length === 0) {
+        writes.push(db.setLessonStatus(lesson.id, "in-progress"));
+      }
+      Promise.all(writes).catch((e: unknown) =>
+        setSaveError(e instanceof Error ? e.message : String(e)),
+      );
+    }
   };
 
   const restart = () => {
     setAnswered([]);
     setPhase("answering");
+    setSessionId(crypto.randomUUID());
   };
 
   if (questions.length === 0) {
@@ -57,7 +85,15 @@ export function Quiz({ module, lesson, questions }: QuizProps) {
 
   const finished = phase !== "feedback" && answered.length === questions.length;
   if (finished) {
-    return <Summary lesson={lesson} answered={answered} onRestart={restart} />;
+    return (
+      <Summary
+        lesson={lesson}
+        answered={answered}
+        onRestart={restart}
+        db={db}
+        saveError={saveError}
+      />
+    );
   }
 
   const shown = phase === "feedback" ? answered[answered.length - 1]! : null;
@@ -190,12 +226,27 @@ function Summary({
   lesson,
   answered,
   onRestart,
+  db,
+  saveError,
 }: {
   lesson: Lesson;
   answered: AnsweredQuestion[];
   onRestart: () => void;
+  db: ProgressDb | null;
+  saveError: string | null;
 }) {
   const correctCount = answered.filter((a) => a.correct).length;
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  // Completing the quiz marks the lesson done — once, on first render of
+  // the summary, not on every re-render.
+  useEffect(() => {
+    if (db && !saveError) {
+      db.setLessonStatus(lesson.id, "done").catch((e: unknown) =>
+        setStatusError(e instanceof Error ? e.message : String(e)),
+      );
+    }
+  }, []);
   return (
     <div>
       <nav class="crumbs">
@@ -212,10 +263,21 @@ function Summary({
           </li>
         ))}
       </ul>
-      <p class="quiz-note">
-        Results aren't saved yet — progress persistence is the next piece of Stage A. For
-        now this is practice only.
-      </p>
+      {db && !saveError ? (
+        <p class="quiz-note">
+          All {answered.length} answers were recorded on this device
+          {statusError ? ` (but marking the lesson done failed: ${statusError})` : ""}.
+          The progress dashboard arrives in Stage B.
+        </p>
+      ) : (
+        <p class="quiz-note quiz-note-warn">
+          These results were NOT saved
+          {saveError
+            ? ` — saving failed: ${saveError}`
+            : " — progress storage is unavailable in this browser"}
+          .
+        </p>
+      )}
       <div class="quiz-actions">
         <button class="btn" onClick={onRestart}>
           Retry quiz

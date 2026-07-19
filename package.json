@@ -15,11 +15,13 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "idb": "^8.0.3",
     "preact": "^10.27.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.0",
     "@types/node": "^24.0.0",
+    "fake-indexeddb": "^6.2.5",
     "marked": "^16.0.0",
     "prettier": "^3.6.0",
     "typescript": "~5.9.0",

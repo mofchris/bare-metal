@@ -118,3 +118,25 @@ at the bottom.
 - Internet/power reliability note for BUILD_PLAN MY SETUP
 - D-013…D-016 pending batch review
   **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (sixth block — IndexedDB persistence)
+
+**Stage:** A — Walking Skeleton | **Gate status:** Gate A unsigned
+**Done this session:**
+
+- Progress persistence live: `src/lib/progress-store.ts` — database `metal-progress` v1 (stores: `attempts` append-only with by-question index, `lessonProgress` keyed by lessonId, `meta` with installId). New runtime dep `idb` (D-007, ratified at Gate 0)
+- Durability design (D-017): every answer writes to `attempts` the moment it's graded — no quiz snapshot needed; killing the app mid-quiz loses at most the on-screen question. Each quiz run gets a `sessionId` (UUID) for Stage B grouping
+- Quiz records attempts + marks lesson in-progress on first answer, done on completion; summary now truthfully reports "All N answers were recorded on this device" or a loud NOT-saved warning with the reason
+- Home shows per-lesson badges: "started ·" / "done ✓" read from lessonProgress
+- App shell opens the db at boot; failure (e.g. blocked storage) shows a banner and the app keeps working unrecorded
+- 5 new automated persistence tests on `fake-indexeddb` (dev dep, D-017): read/write, reopen durability, index filtering, status upsert — 27 tests total, all green
+- End-to-end verified in headless browser: answered 2 questions → hard reload (simulated kill) → both attempts present in IndexedDB and home shows "started"; completed full quiz → 5/5, home shows "done ✓"; 7 attempts across 2 session ids
+
+**In progress / half-finished:** Stage A ~75%. Gate A's "kill mid-quiz, no data loss" now passes in simulation — Christopher must still do it by hand on laptop + phone at the gate. Not built: PWA manifest + service worker (next), M1 lessons 02–05, README v1.
+**Next session should start with:** the carried-over Gate 0 quiz, then the PWA layer — manifest + hand-rolled service worker (D-008) with precache manifest generated at build, then offline verification.
+**Open questions for Christopher:**
+
+- Gate 0 quiz answers (carried over — sixth time)
+- Internet/power reliability note for BUILD_PLAN MY SETUP
+- D-013…D-017 pending batch review
+  **New DECISIONS.md entries this session:** D-017 (pending)

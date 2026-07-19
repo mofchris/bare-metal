@@ -321,3 +321,27 @@ a {
   gap: 1rem;
   align-items: center;
 }
+
+.quiz-note-warn {
+  color: var(--danger);
+}
+
+/* ---------------- progress ---------------- */
+
+.warn-banner {
+  background: var(--surface);
+  border-left: 4px solid var(--danger);
+  border-radius: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.badge-done {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.badge-progress {
+  color: var(--text-dim);
+}
