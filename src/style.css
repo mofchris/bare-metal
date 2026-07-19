@@ -253,7 +253,40 @@ a:hover {
 /* ---------------- home: hero ---------------- */
 
 .hero {
+  position: relative;
   padding: clamp(2.5rem, 7vw, 5rem) 0 clamp(2rem, 5vw, 3.5rem);
+}
+
+/* A slow copper glow drifting behind the hero — the one gradient in the app,
+   kept faint on purpose. Transform-only animation; dies with reduced-motion. */
+.hero::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  right: -5%;
+  width: 34rem;
+  height: 34rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--copper) 14%, transparent),
+    transparent 70%
+  );
+  animation: drift 16s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(-8rem, 3rem) scale(1.15);
+  }
+}
+
+.hero > * {
+  position: relative;
 }
 
 .hero-eyebrow {
@@ -401,6 +434,49 @@ a:hover {
   font-weight: 500;
   font-size: 1rem;
   letter-spacing: 0.01em;
+}
+
+.module-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--mask-2);
+  margin: 0.55rem 0 0.35rem;
+  overflow: hidden;
+}
+
+.module-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--copper);
+  border-radius: 2px;
+}
+
+.module-block.locked .module-head h2,
+.locked-title {
+  color: var(--ink-dim);
+}
+
+.module-locked-note {
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+  padding: 0.5rem 0 0.4rem;
+}
+
+.locked-lesson::before {
+  border-style: dashed !important;
+}
+
+.exam-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-top: 1px dashed var(--hairline);
+  margin: 0.4rem 0 0;
+  padding: 0.6rem 0 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
 }
 
 /* The signature: a trace runs down the lesson list; each lesson is a via.

@@ -18,7 +18,9 @@ import { Quiz } from "./components/quiz";
 import { Review } from "./components/review";
 import { Dashboard } from "./components/dashboard";
 import { Backup } from "./components/backup";
+import { Gated } from "./components/gated";
 import { lessonHref } from "./lib/route";
+import { examUnlocked, lessonUnlocked, moduleUnlocked, PASS_MARK } from "./lib/gating";
 
 type LoadState =
   | { status: "loading" }
@@ -130,19 +132,70 @@ function Screen({
         </div>
       );
     }
-    if (route.screen === "quiz") {
+    const lessonGate = (
+      statuses: Map<string, import("./lib/progress-store").LessonProgressRecord>,
+      exams: Map<string, import("./lib/progress-store").ExamResultRecord>,
+    ): string | null => {
+      if (!moduleUnlocked(location.module, exams)) {
+        return `This module is locked. Pass the previous module's exam (${PASS_MARK}%) to open it.`;
+      }
+      if (!lessonUnlocked(location.module, location.lesson.id, statuses)) {
+        return `This lesson is locked. Score ${PASS_MARK}% on the previous lesson's quiz to open it.`;
+      }
+      return null;
+    };
+    return (
+      <Gated db={db} check={lessonGate}>
+        {route.screen === "quiz" ? (
+          <Quiz
+            title={location.module.title}
+            backHref={lessonHref(location.lesson.id)}
+            backLabel={location.lesson.title}
+            questions={questionsFor(location.module, location.lesson.id)}
+            db={db}
+            markDoneLessonId={location.lesson.id}
+          />
+        ) : (
+          <LessonView location={location} />
+        )}
+      </Gated>
+    );
+  }
+  if (route.screen === "exam") {
+    const module = load.curriculum.modules.find((m) => m.id === route.moduleId);
+    if (!module) {
       return (
-        <Quiz
-          title={location.module.title}
-          backHref={lessonHref(location.lesson.id)}
-          backLabel={location.lesson.title}
-          questions={questionsFor(location.module, location.lesson.id)}
-          db={db}
-          markDoneLessonId={location.lesson.id}
-        />
+        <div class="error-block">
+          <h2>Module not found</h2>
+          <p>
+            No module has id "{route.moduleId}". <a href="#/">Back home.</a>
+          </p>
+        </div>
       );
     }
-    return <LessonView location={location} />;
+    return (
+      <Gated
+        db={db}
+        check={(statuses, exams) => {
+          if (!moduleUnlocked(module, exams)) {
+            return `This module is locked. Pass the previous module's exam (${PASS_MARK}%) to open it.`;
+          }
+          if (!examUnlocked(module, statuses)) {
+            return `The exam opens once every lesson in this module is passed at ${PASS_MARK}%.`;
+          }
+          return null;
+        }}
+      >
+        <Quiz
+          title={`${module.title} — module exam`}
+          backHref="#/"
+          backLabel="Home"
+          questions={module.questions}
+          db={db}
+          examModuleId={module.id}
+        />
+      </Gated>
+    );
   }
   if (route.screen === "review") {
     return <Review curriculum={load.curriculum} db={db} />;

@@ -27,6 +27,14 @@ describe("parseRoute", () => {
     expect(parseRoute("#/backup")).toEqual({ screen: "backup" });
   });
 
+  it("parses exam routes", () => {
+    expect(parseRoute("#/exam/m1-hardware-foundations")).toEqual({
+      screen: "exam",
+      moduleId: "m1-hardware-foundations",
+    });
+    expect(parseRoute("#/exam/")).toEqual({ screen: "home" });
+  });
+
   it("parses quiz routes and treats a bare quiz prefix as home", () => {
     expect(parseRoute(quizHref("m1/01-memory-hierarchy"))).toEqual({
       screen: "quiz",

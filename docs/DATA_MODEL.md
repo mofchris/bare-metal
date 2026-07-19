@@ -120,7 +120,8 @@ Database `metal-progress`, versioned via IndexedDB's own `version` +
 | Store            | Key          | Value (shape)                                                                                                                                       |
 | ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `attempts`       | auto-id      | `{ questionId, at (ISO), correct, givenAnswer, sessionId }`                                                                                         |
-| `lessonProgress` | `lessonId`   | `{ status: "not-started"\|"in-progress"\|"done", completedAt? }`                                                                                    |
+| `lessonProgress` | `lessonId`   | `{ status: "not-started"\|"in-progress"\|"done", completedAt?, bestScorePct? }` — best quiz score drives gating (D-023)                             |
+| `examResults`    | `moduleId`   | `{ moduleId, bestScorePct, passed, updatedAt }` — module exams, v3 (D-023)                                                                          |
 | `srsState`       | `questionId` | `{ dueAt, intervalDays, ease, reps, lapses, lastReviewedAt }` — derived, rebuildable by replaying `attempts` through the SM-2-binary engine (D-018) |
 | `labResults`     | `labId`      | `{ importedAt, metrics: {...}, passed, runnerVersion }`                                                                                             |
 | `meta`           | fixed keys   | `{ schemaVersion, lastExportAt, installId }`                                                                                                        |

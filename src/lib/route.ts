@@ -9,13 +9,17 @@ export type Route =
   | { screen: "quiz"; lessonId: string }
   | { screen: "review" }
   | { screen: "dashboard" }
-  | { screen: "backup" };
+  | { screen: "backup" }
+  | { screen: "exam"; moduleId: string };
 
 /** Parse a location.hash value. Anything unrecognized falls back to home. */
 export function parseRoute(hash: string): Route {
   if (hash === "#/review") return { screen: "review" };
   if (hash === "#/dashboard") return { screen: "dashboard" };
   if (hash === "#/backup") return { screen: "backup" };
+  if (hash.startsWith("#/exam/") && hash.length > "#/exam/".length) {
+    return { screen: "exam", moduleId: decodeURIComponent(hash.slice("#/exam/".length)) };
+  }
   // Lesson ids contain "/" (e.g. "m1/01-memory-hierarchy"), so everything
   // after the prefix is the id — no further splitting.
   for (const screen of ["lesson", "quiz"] as const) {
@@ -35,4 +39,9 @@ export function lessonHref(lessonId: string): string {
 /** Build the href for a lesson's quiz. */
 export function quizHref(lessonId: string): string {
   return `#/quiz/${lessonId}`;
+}
+
+/** Build the href for a module's exam. */
+export function examHref(moduleId: string): string {
+  return `#/exam/${moduleId}`;
 }

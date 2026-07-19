@@ -381,3 +381,23 @@ at the bottom.
 **Next session should start with:** Christopher's reaction to the new landing; then Gate B inputs or M6 authoring.
 **Open questions for Christopher:** verdict on the dashboard-first landing?
 **New DECISIONS.md entries this session:** D-021 (ratified — his direction)
+
+## Session 2026-07-19 (twentieth block — exams + 75% gating, D-023)
+
+**Stage:** B — feature work at Christopher's direction (module exams, gated progression, gradient, progress bars).
+**Done this session:**
+
+- Gating library `src/lib/gating.ts` (pure, 7 tests): PASS_MARK 75; lesson N+1 needs lesson N passed; exam needs all lessons passed; module needs all prereq exams passed (real prereq graph — M5 requires M3 AND M4). Legacy score-less done records grandfather as passed
+- DB v3: `examResults` store; lessonProgress gains bestScorePct (best-across-retakes, first completedAt kept; done never demotes). Backup v3 exports/merges exams (best-wins) and scores; round-trip + merge tests updated — 60 tests green
+- Quiz flow: lesson summaries record score and show pass/fail vs 75% ("passed. The next lesson is open." / "below the 75% mark…"); module exam mode at `#/exam/<moduleId>` runs ALL module questions and records the result
+- Home: per-module copper progress bars (always visible — the GRE-sim-style timeline element he asked about), locked lessons as dashed vias with "needs 75% on previous", exam row per module (locked/open/passed with best score), locked modules show exactly what opens them; hero action chain now start → review → module-exam → continue
+- Route guard (`components/gated.tsx`): direct URLs to locked content get a plain "what unlocks this" page; storage-unavailable sessions stay open (can't gate what can't be tracked)
+- The one animated gradient: a faint copper glow drifting behind the hero (16 s, transform-only, dies with reduced-motion)
+- Charts answer for Christopher: run trend, streak calendar, and mastery bars already existed but are data-fed — module progress bars now give day-one visuals
+- E2E verified in browser: fresh state shows locks everywhere; scoring 100% on lesson 1 → summary pass line → lesson 2 unlocked, module bar 1/5, hero "Continue: Why CPUs are fast"; locked-lesson deep link correctly blocked; screenshot clean
+- NOT done this block (next): study-sync Worker wiring (username+PIN, cross-device) — reverses D-011, needs the private worker repo checked + auth UI; deliberately its own block
+
+**In progress / half-finished:** nothing half-finished.
+**Next session should start with:** the study-sync integration block (D-022 to log the D-011 reversal: reuse study-sync — the backup file already IS a lossless blob and client-side merge exists; check worker accepts app=metal; auth UI on Backup page; note Turnstile's external script as an online-only exception to offline-first).
+**Open questions for Christopher:** none new — sync lands next block.
+**New DECISIONS.md entries this session:** D-023 (ratified — his direction)

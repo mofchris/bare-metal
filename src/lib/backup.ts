@@ -8,11 +8,16 @@
 // rank, and SRS state is not merged at all — it's rebuilt from the merged
 // attempts, because derived state gets recomputed, not reconciled.
 
-import type { AttemptRecord, LessonProgressRecord, ProgressDb } from "./progress-store";
+import type {
+  AttemptRecord,
+  ExamResultRecord,
+  LessonProgressRecord,
+  ProgressDb,
+} from "./progress-store";
 import type { SrsState } from "./srs";
 
 export const BACKUP_FORMAT = "metal-backup";
-export const BACKUP_SCHEMA_VERSION = 2;
+export const BACKUP_SCHEMA_VERSION = 3; // v3 adds examResults + lesson scores
 
 export interface BackupFile {
   format: typeof BACKUP_FORMAT;
@@ -23,6 +28,8 @@ export interface BackupFile {
   stores: {
     attempts: AttemptRecord[];
     lessonProgress: LessonProgressRecord[];
+    /** Absent in v2 files. */
+    examResults?: ExamResultRecord[];
     /** Included for inspection; restore ignores it and rebuilds (D-019). */
     srsState: SrsState[];
   };
@@ -31,6 +38,7 @@ export interface BackupFile {
 export interface RestoreSummary {
   attemptsAdded: number;
   lessonsMerged: number;
+  examsMerged: number;
 }
 
 /** Snapshot the database into a backup object (serialize with JSON.stringify). */
@@ -43,6 +51,7 @@ export async function buildBackup(db: ProgressDb): Promise<BackupFile> {
     stores: {
       attempts: await db.allAttempts(),
       lessonProgress: [...(await db.lessonStatuses()).values()],
+      examResults: [...(await db.examResults()).values()],
       srsState: await db.allSrsStates(),
     },
   };
@@ -101,22 +110,40 @@ export async function restoreBackup(
       lessonsMerged += 1;
       continue;
     }
-    // "done" outranks "in-progress"; two "done"s keep the EARLIER
-    // completedAt — the historical first completion.
-    const incomingWins =
-      (incoming.status === "done" && existing.status !== "done") ||
-      (incoming.status === "done" &&
-        existing.status === "done" &&
-        (incoming.completedAt ?? "") < (existing.completedAt ?? ""));
-    if (incomingWins) {
-      await db.putLessonProgress(incoming);
+    // "done" outranks "in-progress"; the merged record keeps the EARLIER
+    // completedAt (historical first completion) and the BEST score.
+    const bestScore = Math.max(existing.bestScorePct ?? -1, incoming.bestScorePct ?? -1);
+    const merged: LessonProgressRecord = {
+      lessonId: incoming.lessonId,
+      status:
+        incoming.status === "done" || existing.status === "done" ? "done" : "in-progress",
+      ...(bestScore >= 0 ? { bestScorePct: bestScore } : {}),
+    };
+    const completedAt = [existing.completedAt, incoming.completedAt]
+      .filter((d): d is string => d !== undefined)
+      .sort()[0];
+    if (completedAt) merged.completedAt = completedAt;
+    if (JSON.stringify(merged) !== JSON.stringify(existing)) {
+      await db.putLessonProgress(merged);
       lessonsMerged += 1;
+    }
+  }
+
+  let examsMerged = 0;
+  const localExams = await db.examResults();
+  for (const incoming of backup.stores.examResults ?? []) {
+    const existing = localExams.get(incoming.moduleId);
+    if (!existing || incoming.bestScorePct > existing.bestScorePct) {
+      await db.putExamResult(
+        existing ? { ...incoming, passed: incoming.passed || existing.passed } : incoming,
+      );
+      examsMerged += 1;
     }
   }
 
   // Derived state: recompute, never reconcile.
   await db.rebuildSrsFromAttempts();
-  return { attemptsAdded, lessonsMerged };
+  return { attemptsAdded, lessonsMerged, examsMerged };
 }
 
 /* ---------------- weekly reminder ---------------- */

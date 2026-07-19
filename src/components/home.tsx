@@ -9,14 +9,23 @@
 // decide what studying means today.
 
 import { useEffect, useState } from "preact/hooks";
-import type { Curriculum, Lesson } from "../lib/curriculum";
-import { lessonHref, quizHref } from "../lib/route";
+import type { Curriculum, Lesson, Module } from "../lib/curriculum";
+import { examHref, lessonHref, quizHref } from "../lib/route";
 import { questionCountFor } from "../lib/lookup";
 import { dueQuestionIds, nextDueAt } from "../lib/srs";
 import { exportReminder, type ReminderState } from "../lib/backup";
+import {
+  examUnlocked,
+  lessonPassed,
+  lessonUnlocked,
+  moduleUnlocked,
+  passedLessonCount,
+  PASS_MARK,
+} from "../lib/gating";
 import { masteryByLesson, runHistory, streakInfo, weakestLessons } from "../lib/stats";
 import type {
   AttemptRecord,
+  ExamResultRecord,
   LessonProgressRecord,
   ProgressDb,
 } from "../lib/progress-store";
@@ -24,6 +33,7 @@ import { RunTrend, StreakCalendar, WeakestAreas } from "./panels";
 
 interface ProgressData {
   statuses: Map<string, LessonProgressRecord>;
+  exams: Map<string, ExamResultRecord>;
   attempts: AttemptRecord[];
   due: number;
   nextDue: string | null;
@@ -44,14 +54,16 @@ export function Home({
     if (!db) return;
     Promise.all([
       db.lessonStatuses(),
+      db.examResults(),
       db.allAttempts(),
       db.allSrsStates(),
       db.getMeta("lastExportAt"),
     ])
-      .then(([statuses, attempts, srs, lastExportAt]) => {
+      .then(([statuses, exams, attempts, srs, lastExportAt]) => {
         const now = new Date();
         setData({
           statuses,
+          exams,
           attempts,
           due: dueQuestionIds(srs, now).length,
           nextDue: nextDueAt(srs, now),
@@ -62,9 +74,18 @@ export function Home({
   }, [db]);
 
   const statuses = data?.statuses ?? new Map<string, LessonProgressRecord>();
+  const exams = data?.exams ?? new Map<string, ExamResultRecord>();
   const lessons = curriculum.modules.flatMap((m) => m.lessons);
-  const doneCount = lessons.filter((l) => statuses.get(l.id)?.status === "done").length;
-  const continueLesson = lessons.find((l) => statuses.get(l.id)?.status !== "done");
+  const doneCount = lessons.filter((l) => lessonPassed(statuses.get(l.id))).length;
+  // The next actionable lesson: first unlocked, un-passed lesson in an
+  // unlocked module (gating-aware, D-023).
+  const continueLesson = curriculum.modules
+    .filter((m) => moduleUnlocked(m, exams))
+    .flatMap((m) =>
+      m.lessons.filter(
+        (l) => lessonUnlocked(m, l.id, statuses) && !lessonPassed(statuses.get(l.id)),
+      ),
+    )[0];
 
   return (
     <div>
@@ -90,43 +111,17 @@ export function Home({
       <div class="home-grid">
         <section class="home-modules rise" style={{ animationDelay: "90ms" }}>
           {curriculum.modules.map((module) => (
-            <section class="module-block" key={module.id}>
-              <div class="module-head">
-                <h2>{module.title}</h2>
-                <span class="lesson-meta">
-                  {
-                    module.lessons.filter((l) => statuses.get(l.id)?.status === "done")
-                      .length
-                  }
-                  /{module.lessons.length} done
-                </span>
-              </div>
-              <ul class="lesson-list">
-                {module.lessons.map((lesson) => {
-                  const questions = questionCountFor(module, lesson.id);
-                  const status = statuses.get(lesson.id)?.status;
-                  // The class drives the via-rail marker: done = filled
-                  // copper, started = copper ring, absent = hollow.
-                  return (
-                    <li
-                      key={lesson.id}
-                      class={
-                        status === "done"
-                          ? "done"
-                          : status === "in-progress"
-                            ? "started"
-                            : ""
-                      }
-                    >
-                      <a href={lessonHref(lesson.id)}>{lesson.title}</a>
-                      <span class="lesson-meta">
-                        {questions > 0 ? `${questions} questions` : "no questions yet"}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
+            <ModuleBlock
+              key={module.id}
+              module={module}
+              statuses={statuses}
+              exams={exams}
+              unlocked={moduleUnlocked(module, exams)}
+              prereqTitles={module.prereqs.map(
+                (p) =>
+                  (curriculum.modules.find((m) => m.id === p)?.title ?? p).split(":")[0]!,
+              )}
+            />
           ))}
         </section>
 
@@ -153,6 +148,116 @@ export function Home({
         </aside>
       </div>
     </div>
+  );
+}
+
+/* One module: header with progress bar, gated lesson rows, exam row. */
+function ModuleBlock({
+  module,
+  statuses,
+  exams,
+  unlocked,
+  prereqTitles,
+}: {
+  module: Module;
+  statuses: Map<string, LessonProgressRecord>;
+  exams: Map<string, ExamResultRecord>;
+  unlocked: boolean;
+  prereqTitles: string[];
+}) {
+  const passed = passedLessonCount(module, statuses);
+  const exam = exams.get(module.id);
+  const examOpen = unlocked && examUnlocked(module, statuses);
+
+  return (
+    <section class={unlocked ? "module-block" : "module-block locked"}>
+      <div class="module-head">
+        <h2>{module.title}</h2>
+        <span class="lesson-meta">
+          {passed}/{module.lessons.length} passed
+        </span>
+      </div>
+      <div
+        class="module-progress"
+        role="img"
+        aria-label={`${passed} of ${module.lessons.length} lessons passed`}
+      >
+        <span
+          class="module-progress-fill"
+          style={{ width: `${(passed / module.lessons.length) * 100}%` }}
+        />
+      </div>
+
+      {!unlocked ? (
+        <p class="module-locked-note">
+          Locked. Pass the {prereqTitles.join(" and ")} exam ({PASS_MARK}%) to open this
+          module.
+        </p>
+      ) : (
+        <>
+          <ul class="lesson-list">
+            {module.lessons.map((lesson) => {
+              const questions = questionCountFor(module, lesson.id);
+              const record = statuses.get(lesson.id);
+              const open = lessonUnlocked(module, lesson.id, statuses);
+              const cls = lessonPassed(record)
+                ? "done"
+                : record?.status === "in-progress" || record?.status === "done"
+                  ? "started"
+                  : "";
+              return (
+                <li key={lesson.id} class={open ? cls : "locked-lesson"}>
+                  {open ? (
+                    <a href={lessonHref(lesson.id)}>{lesson.title}</a>
+                  ) : (
+                    <span
+                      class="locked-title"
+                      title={`Score ${PASS_MARK}% on the previous lesson's quiz to open`}
+                    >
+                      {lesson.title}
+                    </span>
+                  )}
+                  <span class="lesson-meta">
+                    {record?.bestScorePct !== undefined &&
+                      `best ${record.bestScorePct}% · `}
+                    {open
+                      ? questions > 0
+                        ? `${questions} questions`
+                        : "no questions yet"
+                      : `needs ${PASS_MARK}% on previous`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p class="exam-row">
+            {exam?.passed ? (
+              <>
+                <a href={examHref(module.id)}>Module exam</a>
+                <span class="lesson-meta badge-done">
+                  passed · best {exam.bestScorePct}%
+                </span>
+              </>
+            ) : examOpen ? (
+              <>
+                <a href={examHref(module.id)}>
+                  Module exam · all {module.questions.length} questions
+                </a>
+                <span class="lesson-meta">
+                  {exam ? `best ${exam.bestScorePct}% · ` : ""}pass {PASS_MARK}% to unlock
+                  the next module
+                </span>
+              </>
+            ) : (
+              <>
+                <span class="locked-title">Module exam</span>
+                <span class="lesson-meta">opens when every lesson is passed</span>
+              </>
+            )}
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -198,6 +303,13 @@ function Hero({
   const { attempts, due } = data;
   const now = new Date();
   const streak = streakInfo(attempts, now);
+  // A finished module whose exam hasn't been passed outranks "continue".
+  const pendingExam = curriculum.modules.find(
+    (m) =>
+      moduleUnlocked(m, data.exams) &&
+      examUnlocked(m, data.statuses) &&
+      data.exams.get(m.id)?.passed !== true,
+  );
   const mastery = masteryByLesson(curriculum, attempts).filter((m) => m.attempted > 0);
   const known = mastery.reduce((n, m) => n + m.mastered, 0);
   const tracked = mastery.reduce((n, m) => n + m.attempted, 0);
@@ -226,13 +338,17 @@ function Hero({
           <a class="btn btn-lg" href="#/review">
             Review {due} due question{due === 1 ? "" : "s"}
           </a>
+        ) : pendingExam ? (
+          <a class="btn btn-lg" href={examHref(pendingExam.id)}>
+            Take the {pendingExam.title.split(":")[0]} exam
+          </a>
         ) : continueLesson ? (
           <a class="btn btn-lg" href={lessonHref(continueLesson.id)}>
             Continue: {continueLesson.title}
           </a>
         ) : (
           <a class="btn btn-lg" href={quizHref(curriculum.modules[0]!.lessons[0]!.id)}>
-            All lessons done. Requiz yourself
+            Everything passed. Requiz yourself
           </a>
         )}
         <a class="hero-secondary" href="#/dashboard">

@@ -13,6 +13,7 @@
 import { useEffect, useState } from "preact/hooks";
 import type { Question } from "../lib/curriculum";
 import { gradeResponse, type QuizResponse } from "../lib/quiz";
+import { PASS_MARK } from "../lib/gating";
 import type { ProgressDb } from "../lib/progress-store";
 
 interface QuizProps {
@@ -22,8 +23,10 @@ interface QuizProps {
   backLabel: string;
   questions: Question[];
   db: ProgressDb | null;
-  /** Lesson quizzes pass their lesson id: completing the run marks it done. */
+  /** Lesson quizzes pass their lesson id: completing records status + best score. */
   markDoneLessonId?: string;
+  /** Module exams pass their module id: completing records the exam result. */
+  examModuleId?: string;
 }
 
 interface AnsweredQuestion {
@@ -39,6 +42,7 @@ export function Quiz({
   questions,
   db,
   markDoneLessonId,
+  examModuleId,
 }: QuizProps) {
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   // "answering" → inputs live; "feedback" → result + explanation shown.
@@ -109,6 +113,7 @@ export function Quiz({
         db={db}
         saveError={saveError}
         markDoneLessonId={markDoneLessonId}
+        examModuleId={examModuleId}
       />
     );
   }
@@ -247,6 +252,7 @@ function Summary({
   db,
   saveError,
   markDoneLessonId,
+  examModuleId,
 }: {
   backHref: string;
   backLabel: string;
@@ -255,18 +261,27 @@ function Summary({
   db: ProgressDb | null;
   saveError: string | null;
   markDoneLessonId?: string;
+  examModuleId?: string;
 }) {
   const correctCount = answered.filter((a) => a.correct).length;
+  const scorePct = Math.round((correctCount / answered.length) * 100);
+  const gated = markDoneLessonId !== undefined || examModuleId !== undefined;
   const [statusError, setStatusError] = useState<string | null>(null);
 
-  // Completing a lesson quiz marks the lesson done — once, on first render
-  // of the summary, not on every re-render.
+  // Completing a run records its outcome — once, on first render of the
+  // summary, not on every re-render.
   useEffect(() => {
-    if (db && !saveError && markDoneLessonId) {
-      db.setLessonStatus(markDoneLessonId, "done").catch((e: unknown) =>
-        setStatusError(e instanceof Error ? e.message : String(e)),
-      );
+    if (!db || saveError) return;
+    const writes: Promise<void>[] = [];
+    if (markDoneLessonId) {
+      writes.push(db.setLessonStatus(markDoneLessonId, "done", scorePct));
     }
+    if (examModuleId) {
+      writes.push(db.recordExamResult(examModuleId, scorePct, PASS_MARK));
+    }
+    Promise.all(writes).catch((e: unknown) =>
+      setStatusError(e instanceof Error ? e.message : String(e)),
+    );
   }, []);
   return (
     <div>
@@ -276,6 +291,18 @@ function Summary({
       <h2>
         {correctCount} of {answered.length} correct
       </h2>
+      {gated && (
+        <p
+          class={scorePct >= PASS_MARK ? "quiz-result correct" : "quiz-result incorrect"}
+        >
+          {scorePct}% —{" "}
+          {scorePct >= PASS_MARK
+            ? examModuleId
+              ? "exam passed. The next module is open."
+              : "passed. The next lesson is open."
+            : `below the ${PASS_MARK}% mark. Retake to unlock the next step.`}
+        </p>
+      )}
       <ul class="quiz-review">
         {answered.map(({ question, correct }) => (
           <li key={question.id} class={correct ? "correct" : "incorrect"}>
