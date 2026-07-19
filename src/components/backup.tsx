@@ -11,6 +11,7 @@ import {
 } from "../lib/backup";
 import { localDateKey } from "../lib/stats";
 import type { ProgressDb } from "../lib/progress-store";
+import { Account } from "./account";
 
 export function Backup({ db }: { db: ProgressDb | null }) {
   const [lastExportAt, setLastExportAt] = useState<string | null>(null);
@@ -78,11 +79,13 @@ export function Backup({ db }: { db: ProgressDb | null }) {
       <nav class="crumbs">
         <a href="#/">← All modules</a>
       </nav>
-      <h2>Backup</h2>
+      <h2>Backup & sync</h2>
       <p>
-        Browsers can evict local data without asking — the backup file is the insurance
-        policy, and the way progress moves between laptop and phone.
+        Sync keeps devices in step automatically; the backup file remains the offline
+        insurance policy against browser data eviction.
       </p>
+
+      <Account db={db} />
 
       <section>
         <h3 class="dash-section">Export</h3>

@@ -429,3 +429,21 @@ at the bottom.
   **Next session should start with:** Christopher's reaction; then study-sync integration.
   **Open questions for Christopher:** none new
   **New DECISIONS.md entries this session:** D-024 (ratified — his direction)
+
+## Session 2026-07-19 (twenty-second block — cross-device sync, D-022)
+
+**Stage:** B — sync integration at Christopher's direction; supersedes D-011.
+**Done this session:**
+
+- study-sync Worker patched, tested (66/66), pushed, and DEPLOYED (version 844be425): `app=metal` allowed; blob cap 256 KB → 1 MB (Metal's append-only history outgrows 256 KB in months). GRE/Net+ untouched
+- D-022 logged: reuse study-sync — D-011's "doesn't fit a blob" objection died when the backup file became a lossless single-JSON snapshot with idempotent merge. One account spans all three study apps (same origin, same localStorage token)
+- Metal sync client `src/lib/sync.ts`: signup/login/auth storage; syncNow = GET → merge via restoreBackup → PUT merged snapshot with baseUpdatedAt compare-and-swap → one re-merge retry on 409; PUT skipped when ground-truth stores (srsState excluded — derived) match the server's, respecting the Worker's D1 write budget; offline = a status, 401 = clean signed-out signal
+- Account UI on the Backup page (`components/account.tsx`): username + 6-digit PIN, Turnstile widget (the app's ONE external script, auth-form only — exception recorded in D-022), recovery code shown once with a write-it-down banner, signed-in state with last-sync time, Sync now, Sign out. Nav: Backup → "Sync"
+- Background sync in app.tsx: at boot + every 3 minutes while signed in and online; failures log, never interrupt studying
+- 4 sync tests (mocked worker, real IndexedDB): merge-then-push with correct base, skip-when-identical (caught a real bug: srsState in the comparison manufactured false changes), 409 → re-merge → single retry, 401 handling. 67 tests total, green
+- UI verified in browser (signed-out form renders). **Live auth E2E is Christopher's**: Turnstile blocks automated signup by design, and prod CORS only allows the live origin — he signs in on the deployed site with his existing GRE credentials
+
+**In progress / half-finished:** nothing half-finished. Backup-page copy still calls the page "Backup & sync"; deeper UX (sync status on home) can come later if wanted.
+**Next session should start with:** Christopher's live sync test (sign in on two devices, verify progress meets); then whatever he directs — or Gate B business (his week of use is now genuinely seamless across devices).
+**Open questions for Christopher:** do the live sign-in test on the deployed site
+**New DECISIONS.md entries this session:** D-022 (ratified — his direction)

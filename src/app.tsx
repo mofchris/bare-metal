@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { Curriculum } from "./lib/curriculum";
 import { localDateKey } from "./lib/stats";
 import { TICK_SECONDS } from "./lib/study-time";
+import { getAuth, syncNow } from "./lib/sync";
 import { loadCurriculum } from "./lib/load-curriculum";
 import { parseRoute, type Route } from "./lib/route";
 import { findLesson, questionsFor } from "./lib/lookup";
@@ -108,6 +109,27 @@ export function App() {
     return () => clearInterval(interval);
   }, [dbState]);
 
+  // Background sync (D-022): once at boot and every 3 minutes while signed
+  // in and online. Failures log; they never interrupt studying — the Backup
+  // page shows sync state on demand.
+  useEffect(() => {
+    if (dbState.status !== "ready" || !dbState.db) return;
+    const db = dbState.db;
+    const trySync = () => {
+      const auth = getAuth();
+      if (!auth || !navigator.onLine) return;
+      syncNow(db, auth).then(
+        (r) => {
+          if (!r.ok) console.error("Metal: background sync:", r.detail);
+        },
+        (e: unknown) => console.error("Metal: background sync failed", e),
+      );
+    };
+    trySync();
+    const interval = setInterval(trySync, 3 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [dbState]);
+
   // Reading surfaces stay a centered column; home manages the full width.
   const narrow = route.screen !== "home";
 
@@ -121,7 +143,7 @@ export function App() {
           <a href="#/">Home</a>
           <a href="#/dashboard">Progress</a>
           <a href="#/review">Review</a>
-          <a href="#/backup">Backup</a>
+          <a href="#/backup">Sync</a>
         </nav>
       </header>
       {dbError && (

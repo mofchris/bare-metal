@@ -873,6 +873,54 @@ article h2,
   align-items: center;
 }
 
+.btn-quiet {
+  background: none;
+  border: 1px solid var(--hairline);
+  color: var(--ink-dim);
+  border-radius: 3px;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-quiet:hover {
+  color: var(--ink);
+  border-color: var(--ink-dim);
+}
+
+.account-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.6rem 0;
+}
+
+.account-form input {
+  background: var(--mask);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0.55rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  min-width: 11rem;
+}
+
+.account-form input:focus {
+  border-color: var(--copper);
+  outline: none;
+}
+
+.turnstile-slot {
+  margin: 0.5rem 0;
+  min-height: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
 /* ---------------- dashboard ---------------- */
 
 .dash-section {
