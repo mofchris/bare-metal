@@ -401,3 +401,15 @@ at the bottom.
 **Next session should start with:** the study-sync integration block (D-022 to log the D-011 reversal: reuse study-sync — the backup file already IS a lossless blob and client-side merge exists; check worker accepts app=metal; auth UI on Backup page; note Turnstile's external script as an online-only exception to offline-first).
 **Open questions for Christopher:** none new — sync lands next block.
 **New DECISIONS.md entries this session:** D-023 (ratified — his direction)
+
+## Session 2026-07-19 (hotfix block — app stuck on Loading)
+
+**Stage:** B | **Severity:** live app unusable for Christopher after the v3 deploy
+**Root cause:** the D-023 block bumped IndexedDB to v3. A version upgrade BLOCKS indefinitely while any other context (older tab, installed PWA window, cached page) holds the previous version open — and the app renders nothing until storage settles. No blocked/blocking handlers, no timeout: infinite "Loading…" on every page. Found by Christopher, reproduced with a cross-tab v2 holder.
+**Fix (three layers):**
+
+- `blocking` handler in openProgressDb: an old-build tab now reloads itself when a newer version wants to upgrade — future migrations won't strand anyone
+- `blocked` handler: loud console diagnosis naming the cause
+- 4-second timeout in app.tsx: if storage stays blocked, the app renders anyway (browsing works, saving off) with a banner telling the user to close other Metal windows and reload
+  **Verified:** cross-tab simulation — holder at v2 in tab A, app in tab B → banner after 4 s + fully rendered home. Normal path unaffected. 60 tests green.
+  **Lesson recorded:** schema migrations on a multi-context PWA must always ship blocked/blocking handling; the daemon-based verification missed this because it tests a single fresh context.

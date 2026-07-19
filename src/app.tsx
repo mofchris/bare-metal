@@ -47,8 +47,23 @@ export function App() {
       );
     // Progress storage failing (e.g. hard-private browsing modes) must not
     // brick studying — the app stays usable (db: null) and says out loud
-    // that nothing is being recorded.
-    openProgressDb()
+    // that nothing is being recorded. The timeout covers a blocked schema
+    // upgrade (an older Metal tab/window holding the previous version open):
+    // without it the whole app sat on "Loading…" forever.
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              "storage is busy — another Metal tab, window, or the installed " +
+                "app is holding an older version open. Close other Metal " +
+                "windows, then reload",
+            ),
+          ),
+        4000,
+      ),
+    );
+    Promise.race([openProgressDb(), timeout])
       .then((db) => setDbState({ status: "ready", db }))
       .catch((e: unknown) => {
         setDbError(e instanceof Error ? e.message : String(e));
