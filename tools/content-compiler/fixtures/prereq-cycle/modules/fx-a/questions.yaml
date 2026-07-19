@@ -1,0 +1,6 @@
+- id: fxa/q-001
+  lesson: fxa/01-a
+  type: short
+  prompt: "Fixture"
+  accept: ["fixture"]
+  explanation: "Fixture."

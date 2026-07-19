@@ -15,7 +15,11 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    // tools/ run directly under Node's native TypeScript type-stripping
+    // (no ts-node/tsx dependency, see D-015); that requires relative imports
+    // to carry their .ts extension, which needs this flag.
+    "allowImportingTsExtensions": true,
+    "types": ["vite/client", "node"]
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "tools", "vite.config.ts"]
 }

@@ -1,0 +1,7 @@
+# Test fixture: one module carrying MANY deliberate defects, so tests can
+# assert the compiler reports all of them at once (error accumulation).
+id: fx-broken
+title: "Fixture: deliberately broken module"
+lessons:
+  - 01-no-sources
+  - 02-missing-file

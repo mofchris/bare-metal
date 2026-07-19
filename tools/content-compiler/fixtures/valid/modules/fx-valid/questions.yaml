@@ -1,0 +1,18 @@
+# Test fixture questions (not real curriculum).
+- id: fx/q-001
+  lesson: fx/01-fixture-lesson
+  type: mcq
+  prompt: "Fixture MCQ: which option is second?"
+  options:
+    - "first"
+    - "second"
+  answer: 1
+  explanation: "Index 1 is the second option."
+  tags: [fixture]
+
+- id: fx/q-002
+  lesson: fx/01-fixture-lesson
+  type: short
+  prompt: "Fixture short answer: type the word 'fixture'"
+  accept: ["fixture"]
+  explanation: "This checks the short-answer path."

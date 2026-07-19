@@ -1,0 +1,79 @@
+# M1 question bank. Grows as lessons are authored; ids are stable forever
+# (progress history references them — see docs/DATA_MODEL.md).
+- id: m1/q-001
+  lesson: m1/01-memory-hierarchy
+  type: mcq
+  prompt: "Roughly how much slower is a main-memory (DRAM) access than an L1 cache hit?"
+  options:
+    - "About 2×"
+    - "About 10×"
+    - "About 100×"
+    - "About 10,000×"
+  answer: 2
+  explanation: >-
+    L1 hits land in ~1 ns while DRAM takes ~60–100 ns — roughly two orders of
+    magnitude. (10,000× is the right ballpark for SSD reads, not DRAM.)
+  tags: [memory, latency]
+
+- id: m1/q-002
+  lesson: m1/01-memory-hierarchy
+  type: short
+  prompt: >-
+    What property of real programs makes caches effective despite being
+    thousands of times smaller than DRAM? (one word or phrase)
+  accept:
+    - "locality"
+    - "locality of reference"
+    - "temporal and spatial locality"
+    - "spatial and temporal locality"
+  explanation: >-
+    Locality of reference: programs re-touch recent data (temporal) and
+    neighboring data (spatial), so a small cache captures most accesses.
+  tags: [memory, locality]
+
+- id: m1/q-003
+  lesson: m1/01-memory-hierarchy
+  type: mcq
+  prompt: "Memory moves between DRAM and cache in fixed-size units called cache lines. How big is a typical cache line?"
+  options:
+    - "4 bytes"
+    - "64 bytes"
+    - "4 KB"
+    - "1 MB"
+  answer: 1
+  explanation: >-
+    64 bytes on essentially all current x86 and Arm cores — 16 float32 values
+    per line. (4 KB is a memory *page*, a different unit for a different
+    mechanism.)
+  tags: [memory, cache-lines]
+
+- id: m1/q-004
+  lesson: m1/01-memory-hierarchy
+  type: mcq
+  prompt: >-
+    Two loops sum the same large matrix stored row-major: loop A walks it row
+    by row, loop B column by column. Same arithmetic. Which statement is true?
+  options:
+    - "They run at the same speed — the work is identical"
+    - "A is faster: it uses each fetched 64-byte line fully; B wastes most of every line"
+    - "B is faster: columns are shorter than rows in memory"
+  answer: 1
+  explanation: >-
+    Row-major means row neighbors are adjacent in memory. Loop A consumes all
+    16 floats of each fetched line (spatial locality); loop B touches one
+    float per line and pays a fresh miss almost every access.
+  tags: [memory, locality, layout]
+
+- id: m1/q-005
+  lesson: m1/01-memory-hierarchy
+  type: short
+  prompt: >-
+    Reusing a weight matrix across every sample in a batch keeps it hot in
+    cache. Which form of locality is that exploiting? (one word)
+  accept:
+    - "temporal"
+    - "temporal locality"
+  explanation: >-
+    Temporal locality — the same data re-touched soon. Spatial locality would
+    be about touching *neighboring* data.
+  tags: [memory, locality, ml]

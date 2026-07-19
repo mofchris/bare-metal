@@ -1,0 +1,31 @@
+# Test fixture questions, each deliberately defective in one way.
+- id: fxb/q-001
+  lesson: fxb/01-no-sources
+  type: mcq
+  prompt: "Fixture: answer index out of range"
+  options: ["only", "two"]
+  answer: 5
+  explanation: "Defect: answer 5 with 2 options."
+
+- id: fxb/q-002
+  lesson: fxb/01-no-sources
+  type: short
+  prompt: "Fixture: empty accept list"
+  accept: []
+  explanation: "Defect: accept is empty."
+
+- id: fxb/q-003
+  lesson: fxb/does-not-exist
+  type: mcq
+  prompt: "Fixture: references an unknown lesson"
+  options: ["a", "b"]
+  answer: 0
+  explanation: "Defect: lesson ref is bogus."
+
+- id: fxb/q-001
+  lesson: fxb/01-no-sources
+  type: mcq
+  prompt: "Fixture: duplicate id (same as first question)"
+  options: ["a", "b"]
+  answer: 0
+  explanation: "Defect: id fxb/q-001 already used."

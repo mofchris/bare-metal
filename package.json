@@ -5,8 +5,9 @@
   "description": "Metal — a self-contained, offline-capable MLSys learning platform",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev": "npm run build:content && vite",
+    "build:content": "node tools/content-compiler/cli.ts",
+    "build": "npm run build:content && tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -18,9 +19,12 @@
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.0",
+    "@types/node": "^24.0.0",
+    "marked": "^16.0.0",
     "prettier": "^3.6.0",
     "typescript": "~5.9.0",
     "vite": "^7.0.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "yaml": "^2.8.0"
   }
 }

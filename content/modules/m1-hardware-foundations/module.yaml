@@ -1,0 +1,6 @@
+# M1 — Hardware foundations. Outline: docs/CURRICULUM.md.
+# Authoring status: lesson 01 of 5 done; the rest land through Stage A.
+id: m1-hardware-foundations
+title: "Hardware foundations: what code actually runs on"
+lessons:
+  - 01-memory-hierarchy

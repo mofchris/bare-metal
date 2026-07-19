@@ -1,0 +1,5 @@
+# Test fixture: fx-a and fx-b require each other — a prereq cycle.
+id: fx-b
+title: "Fixture module B"
+prereqs: [fx-a]
+lessons: [01-b]

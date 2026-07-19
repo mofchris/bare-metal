@@ -53,3 +53,25 @@ at the bottom.
 - D-012: repo name `bare-metal` — veto soon or it sticks
 - D-013: Prettier-only (no ESLint for now) — ok?
   **New DECISIONS.md entries this session:** D-012, D-013 (both pending)
+
+## Session 2026-07-19 (third block — content compiler)
+
+**Stage:** A — Walking Skeleton | **Gate status:** Gate A unsigned
+**Done this session:**
+
+- D-012 ratified: repo name `bare-metal` confirmed by Christopher
+- Curriculum types shared between compiler and app: `src/lib/curriculum.ts`
+- Content compiler built (`tools/content-compiler/`): parses content/modules/\*\* (YAML + Markdown frontmatter), validates per docs/DATA_MODEL.md (ids unique, refs resolve, mcq answers in range, non-empty accept lists, sources required, orphan lessons, missing files, prereq cycles), renders Markdown→HTML, emits `public/curriculum.json` with a content-version hash; reports ALL problems in one pass, each naming the offending file, and exits 1
+- Compiler tests: 5 new tests over 3 fixtures (valid, many-problems with 7 deliberate defects, prereq-cycle) — 10 tests total passing
+- M1 lesson 01 "The memory hierarchy" genuinely authored (sourced: H&P 6th ed, Drepper 2007, Dean's latency numbers) + 5 real quiz questions in `content/modules/m1-hardware-foundations/`
+- Wired into build: `npm run build:content` runs before dev and build; curriculum.json verified present in dist/ (8.1 KB); `public/curriculum.json` gitignored as a build artifact
+- New deps (dev-only): `yaml`, `marked`, `@types/node` (D-014); tools run via Node's native TS type-stripping, no tsx (D-015)
+
+**In progress / half-finished:** Stage A ~35% done. The app does NOT yet load curriculum.json — the shell is still the placeholder; lesson renderer + quiz UI are next. M1 has 1 of 5 lessons authored. Not built yet: IndexedDB persistence, PWA manifest + service worker, README v1.
+**Next session should start with:** the carried-over Gate 0 quiz, then the lesson renderer: fetch curriculum.json, module/lesson list navigation, render lesson HTML — making the deployed app actually show Module 1.
+**Open questions for Christopher:**
+
+- Gate 0 quiz answers (carried over a third time — answer them!)
+- Internet/power reliability note for BUILD_PLAN MY SETUP
+- D-013, D-014, D-015 pending your ok (batched, none urgent)
+  **New DECISIONS.md entries this session:** D-014, D-015 (pending); D-012 ratified

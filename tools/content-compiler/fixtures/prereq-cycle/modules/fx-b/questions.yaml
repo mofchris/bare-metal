@@ -1,0 +1,6 @@
+- id: fxb2/q-001
+  lesson: fxb2/01-b
+  type: short
+  prompt: "Fixture"
+  accept: ["fixture"]
+  explanation: "Fixture."
