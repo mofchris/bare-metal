@@ -453,3 +453,7 @@ at the bottom.
 **Root cause (found from Christopher's screenshot — signed in as derjager, "push failed (500 server_error)"):** the live D1 `progress` table carried `CHECK (app IN ('gre','netplus'))` from before the Worker patch. The Worker accepted app=metal; the DATABASE rejected the INSERT with a constraint violation → uncaught → 500. Worker code and DB schema are deployed separately — the schema migration was missed.
 **Fix:** production rows snapshotted to scratchpad first (2 rows: gre, netplus); copy-migration (SQLite can't alter a CHECK): new table with `CHECK (app IN ('gre','netplus','metal'))`, rows copied, swap. Verified: both rows intact, new constraint live, and a scratch metal row inserts + deletes cleanly. schema.sql updated in the study-sync repo to match reality.
 **Lesson recorded:** a Worker deploy is not a schema deploy — D1 constraints must be migrated alongside allowlist changes; test suites using fresh schemas won't catch drift against the live database.
+
+## Session 2026-07-19 (twenty-third block — header sync indicator)
+
+**Done:** GRE/Net+-style account chip in the header (all screens): signed-out = hollow-dot "not synced" linking to the Sync page; signed-in = copper dot + username + live status (syncing… / relative last-sync time / sync failed with red dot). syncNow now emits start/done window events so background, manual, and login-triggered syncs all drive the chip; a minute ticker keeps "2m ago" honest. Verified in browser in both states. 67 tests green.

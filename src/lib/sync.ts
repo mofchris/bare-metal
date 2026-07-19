@@ -148,8 +148,26 @@ export interface SyncResult {
   signedOut?: boolean;
 }
 
+/** Header indicator + Backup page both listen for this window event; syncNow
+    emits it at start and finish so every sync path feeds the UI. */
+export const SYNC_EVENT = "metal:sync";
+export type SyncEventDetail = { phase: "start" } | { phase: "done"; result: SyncResult };
+
+function emitSync(detail: SyncEventDetail): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail }));
+  }
+}
+
 /** Pull → merge → push (skip if identical) → retry once on conflict. */
 export async function syncNow(db: ProgressDb, auth: AuthState): Promise<SyncResult> {
+  emitSync({ phase: "start" });
+  const result = await syncInner(db, auth);
+  emitSync({ phase: "done", result });
+  return result;
+}
+
+async function syncInner(db: ProgressDb, auth: AuthState): Promise<SyncResult> {
   const pull = await request("GET", `/progress?app=${APP_ID}`, { token: auth.token });
   if (pull.status === 0) return { ok: false, detail: "offline — will sync when online" };
   if (pull.status === 401) {

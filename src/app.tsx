@@ -22,6 +22,7 @@ import { Review } from "./components/review";
 import { Dashboard } from "./components/dashboard";
 import { Backup } from "./components/backup";
 import { Gated } from "./components/gated";
+import { SyncIndicator } from "./components/sync-indicator";
 import { lessonHref } from "./lib/route";
 import { examUnlocked, lessonUnlocked, moduleUnlocked, PASS_MARK } from "./lib/gating";
 
@@ -139,12 +140,15 @@ export function App() {
         <h1>
           <a href="#/">Metal</a>
         </h1>
-        <nav class="shell-nav">
-          <a href="#/">Home</a>
-          <a href="#/dashboard">Progress</a>
-          <a href="#/review">Review</a>
-          <a href="#/backup">Sync</a>
-        </nav>
+        <div class="shell-header-right">
+          <nav class="shell-nav">
+            <a href="#/">Home</a>
+            <a href="#/dashboard">Progress</a>
+            <a href="#/review">Review</a>
+            <a href="#/backup">Sync</a>
+          </nav>
+          <SyncIndicator db={dbState.status === "ready" ? dbState.db : null} />
+        </div>
       </header>
       {dbError && (
         <p class="warn-banner">

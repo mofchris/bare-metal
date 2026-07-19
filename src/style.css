@@ -166,6 +166,13 @@ a:hover {
   text-decoration: none;
 }
 
+.shell-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+}
+
 .shell-nav {
   display: flex;
   gap: 1.4rem;
@@ -173,6 +180,46 @@ a:hover {
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* the account/sync chip, GRE-sim style */
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0.28rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 120ms ease;
+}
+
+.sync-chip:hover {
+  border-color: var(--copper);
+  color: var(--ink);
+}
+
+.sync-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--copper);
+}
+
+.sync-chip.signed-out {
+  color: var(--ink-dim);
+}
+
+.sync-chip.signed-out .sync-dot {
+  background: none;
+  border: 1.5px solid var(--ink-dim);
+}
+
+.sync-chip.error .sync-dot {
+  background: var(--led-err);
 }
 
 .shell-nav a {
