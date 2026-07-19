@@ -205,3 +205,27 @@ at the bottom.
 6. Then: "APPROVED + date" on Gate A, or the list of what failed
    **Open questions for Christopher:** Gate 0 quiz (ninth time), internet/power note, D-013…D-017, labs-scope ruling (above)
    **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (tenth block — Gate A signed)
+
+**Stage:** A → B boundary | **Gate status:** GATE A SIGNED — APPROVED 2026-07-19 by Christopher, with recorded caveats
+**Done this session:**
+
+- Gate A sign-off written into BUILD_PLAN with an explicit ⚠ caveat block: approved WITHOUT the gate's own manual tests
+- Labs-scope amendment applied to Stage A wording (theory + quiz bank; labs follow the Stage C harness) — covered by the blanket approval of the presented package
+- D-013…D-017 marked ratified at Gate A (they were explicitly in the package)
+- Cold-start blank filled with the preliminary 183 ms measurement, labeled preliminary; Christopher's own measurement noted as not taken
+
+**Open risk items carried forward (not resolved by the signature):**
+
+1. PWA install on real iOS Safari — never attempted on the actual iPhone XR
+2. Offline behavior on real devices — verified only in headless Chromium
+3. Mid-quiz kill on real devices — simulated only
+4. No lesson or quiz has ever been completed by Christopher on any device
+5. Gate 0 explain-back quiz — still unanswered after nine sessions
+6. Internet/power reliability note — still [to confirm]
+
+**In progress / half-finished:** nothing. Stage B may begin.
+**Next session should start with:** Stage B kickoff — but the FIRST thing to ask for is items 1–4 above (10 minutes on the phone settles them), because Gate B's own test is "a week of real daily use logged before sign-off," which cannot be simulated by the agent, rubber-stamped, or skipped without making the whole platform theater. Then: progress dashboard design (derive from attempts store), SRS engine (algorithm decision needed — new D entry), export/restore.
+**Open questions for Christopher:** items 1–6 above
+**New DECISIONS.md entries this session:** none (D-013…D-017 status updates only)

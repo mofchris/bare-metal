@@ -61,20 +61,20 @@ Status: ratified 2026-07-19.
 
 **D-013** | Stage A | _Formatter: Prettier (default config, printWidth 90), enforced in CI. Linter: deferred._
 Options considered: Prettier alone (zero-decision formatting, covers the CLAUDE.md consistency rule; `format:check` gates the deploy); Prettier + ESLint (adds real static analysis, but its value overlaps heavily with TypeScript strict mode in a small codebase — revisit when the codebase or contributor count grows); nothing (style drift, rejected outright). Tradeoff: some bug classes ESLint would catch are left to strict TS + tests for now. My question to Christopher: none.
-Status: pending.
+Status: ratified at Gate A (2026-07-19).
 
 **D-014** | Stage A | _Content compiler dependencies: `yaml` (~parse authored YAML) and `marked` (Markdown → HTML at build time). Both dev-only._
 Options considered: js-yaml (fine, but `yaml` has better TypeScript types and maintenance cadence); remark/unified for Markdown (powerful plugin pipeline we don't need yet); marked (small, boring, widely used, synchronous API). Per CLAUDE.md both are liabilities: justified because hand-rolling a YAML or Markdown parser is weeks of correctness bugs for zero learning value in scope. Neither ships to the client — they run only at build time, so the runtime bundle stays at ~5 KB. Tradeoff: marked's default HTML output is unsanitized; acceptable because all input is our own repo-reviewed content, not user input (re-evaluate if content ever comes from elsewhere). My question to Christopher: none.
-Status: pending.
+Status: ratified at Gate A (2026-07-19).
 
 **D-015** | Stage A | _Compiler runs via Node's native TypeScript type-stripping (`node cli.ts`); validation is hand-rolled, not a schema library._
 Options considered: tsx/ts-node to execute TS tools (extra dependency doing what Node ≥ 22.18 now does natively — our Node 24 runs .ts directly); compiling tools with tsc first (build-step bookkeeping for no gain). Validation: zod (nice API, but a ~14 KB dependency to express ~15 checks) vs hand-rolled validators with error accumulation (plain conditionals a stranger can read; every problem reported in one pass, tagged with the offending file). Tradeoff: hand-rolled checks must be updated by hand as the schema grows — acceptable, the schema is ours and small. Constraint accepted: type-stripping requires `.ts` extensions on relative imports in tools/ (`allowImportingTsExtensions`). My question to Christopher: none.
-Status: pending.
+Status: ratified at Gate A (2026-07-19).
 
 **D-016** | Stage A | _Navigation uses hash routing (`#/lesson/<id>`), not the history API._
 Options considered: history-API routes like `/lesson/m1/x` (cleaner URLs, but GitHub Pages is a static file server — refreshing or direct-linking such a URL 404s unless we add a 404.html redirect hack); hash routes (the fragment never reaches the server, so refresh, bookmarks, PWA launches, and offline all work with zero server config). Tradeoff: URLs are slightly uglier; irrelevant for a personal study app. Implementation is ~20 lines in `src/lib/route.ts` — no router dependency. My question to Christopher: none.
-Status: pending.
+Status: ratified at Gate A (2026-07-19).
 
 **D-017** | Stage A | _Mid-quiz durability via per-answer attempt writes, not an autosaved quiz snapshot; tests run on `fake-indexeddb` (new dev dependency)._
 Options considered: GRE-sim-style `inprogress` snapshot with resume (serializes whole quiz state every ~10 s; needs resume/discard UI and a snapshot format to maintain); write each attempt to the append-only store the moment it's graded (killing the app loses at most the question on screen, no snapshot format, no resume UI — a 5-question quiz doesn't need resumption). The append-only store was already the DATA_MODEL ground truth, so the snapshot would have been redundant machinery. Tradeoff: no mid-quiz resume — you restart the quiz, but answered questions are already in history. Test infra: `fake-indexeddb` (dev-only) polyfills IndexedDB in Node so the Gate A persistence tests are automated rather than manual-only; alternative was browser-based test running (heavier, slower, not needed yet). My question to Christopher: none.
-Status: pending.
+Status: ratified at Gate A (2026-07-19).

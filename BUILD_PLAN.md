@@ -77,7 +77,8 @@ in MY SETUP still \[to confirm].
 
 - App shell runs on laptop and phone browser: navigation, lesson renderer, quiz
   engine (MCQ + short answer), first foundations module fully authored (theory +
-  labs + quiz bank), local data persistence working
+  quiz bank; labs follow the Stage C harness — amended at Gate A, see
+  SESSION_LOG 2026-07-19), local data persistence working
 - Deployed to GitHub Pages and loading on my phone from the live URL
 - Installable to my phone's home screen (PWA) and fully functional offline after
   first load
@@ -92,9 +93,18 @@ in MY SETUP still \[to confirm].
 - Manual (me): complete one full lesson + quiz on laptop AND on phone; kill the
   app mid-quiz and confirm no data loss; disconnect internet and confirm
   everything works
-- Performance: cold start ≤ 2s on my laptop, measured and recorded here: \_\_\_\_
+- Performance: cold start ≤ 2s on my laptop, measured and recorded here:
+  183 ms total load / 131 ms DOM interactive — preliminary (headless Chromium
+  against localhost on the same laptop, 2026-07-19). Christopher's own
+  measurement on the live URL: not taken.
 
-**⛔ GATE A sign-off:** \_\_\_\_\_\_\_\_\_\_\_\_\_\_
+**⛔ GATE A sign-off:** APPROVED 2026-07-19 (Christopher). ⚠ Signed WITHOUT
+the manual tests this gate defines: no lesson+quiz completed on laptop or
+phone by Christopher, PWA install on real iOS unverified, offline and
+mid-quiz-kill tests done only in simulation (headless Chromium), cold start
+not measured on the live URL. These are carried as open risk items — see
+SESSION_LOG 2026-07-19 (tenth block). The Gate 0 explain-back quiz also
+remains unanswered.
 
 ---
 
