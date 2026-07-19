@@ -1,0 +1,12 @@
+# M5 — Training mechanics. Outline: docs/CURRICULUM.md. Memory, not compute,
+# is usually what kills a training run; this module explains why.
+id: m5-training-mechanics
+title: "Training mechanics: what backprop costs"
+prereqs:
+  - m3-numerics
+  - m4-data-pipelines
+lessons:
+  - 01-autodiff
+  - 02-memory-bill
+  - 03-batch-size
+  - 04-memory-tricks

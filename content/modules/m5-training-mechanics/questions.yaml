@@ -1,0 +1,267 @@
+# M5 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+
+# ---- Lesson 01: autodiff ----
+
+- id: m5/q-001
+  lesson: m5/01-autodiff
+  type: mcq
+  prompt: "Why does reverse-mode autodiff (backprop) dominate ML?"
+  options:
+    - "It's the only mode frameworks implement"
+    - "One backward pass yields gradients for ALL parameters at ~2–3× forward cost, regardless of parameter count"
+    - "It's more numerically accurate than forward mode"
+    - "It uses less memory than forward mode"
+  answer: 1
+  explanation: >-
+    Reverse mode's cost scales with outputs (one scalar loss), not inputs
+    (millions of params). Forward mode would need one pass per parameter.
+    This asymmetry makes deep learning feasible — and costs activation
+    memory, not less of it.
+  tags: [autodiff]
+
+- id: m5/q-002
+  lesson: m5/01-autodiff
+  type: mcq
+  prompt: "Why is numerical differentiation (finite differences) unusable for training?"
+  options:
+    - "It's patented"
+    - "One forward pass per parameter, plus catastrophic cancellation in the subtraction (M3)"
+    - "It only works for polynomials"
+    - "It computes the wrong sign"
+  answer: 1
+  explanation: >-
+    O(params) full evaluations and a subtraction of nearly equal numbers —
+    slow AND noisy. It survives only as gradcheck, a spot-check of autodiff.
+  tags: [autodiff, numerics]
+
+- id: m5/q-003
+  lesson: m5/01-autodiff
+  type: short
+  prompt: >-
+    The record of operations and saved values that the forward pass builds so
+    backward can replay it in reverse — what's it commonly called? (one word)
+  accept:
+    - "tape"
+    - "the tape"
+    - "graph"
+    - "computation graph"
+  explanation: >-
+    The tape (or computation graph). PyTorch builds it dynamically each
+    forward pass — whatever actually executed is the graph.
+  tags: [autodiff]
+
+- id: m5/q-004
+  lesson: m5/01-autodiff
+  type: mcq
+  prompt: "Why must layer activations stay in memory until the backward pass?"
+  options:
+    - "For debugging purposes"
+    - "Local derivatives need forward values — e.g. the gradient w.r.t. W in y = W·x needs x"
+    - "The OS forbids freeing them mid-step"
+    - "They don't — inference and training use the same memory"
+  answer: 1
+  explanation: >-
+    The chain rule's local factors are functions of the forward values, so
+    the tape pins every layer's activations until backward consumes them.
+    Inference frees immediately; training cannot — hence lesson 02's bill.
+  tags: [autodiff, memory]
+
+# ---- Lesson 02: the memory bill ----
+
+- id: m5/q-005
+  lesson: m5/02-memory-bill
+  type: mcq
+  prompt: "Training with Adam in fp32 costs how much memory per parameter, before activations?"
+  options:
+    - "4 bytes"
+    - "8 bytes"
+    - "16 bytes — weight + gradient + momentum + variance, 4 each"
+    - "32 bytes"
+  answer: 2
+  explanation: >-
+    4×4 bytes: the parameter, its gradient, and Adam's two state buffers.
+    The standard mixed-precision recipe lands on the same 16 (ZeRO's famous
+    figure). A 1B-param model = 16 GB before batch one.
+  tags: [memory]
+
+- id: m5/q-006
+  lesson: m5/02-memory-bill
+  type: mcq
+  prompt: "Which memory line item scales with batch size?"
+  options:
+    - "Weights"
+    - "Optimizer state"
+    - "Activations"
+    - "All of them equally"
+  answer: 2
+  explanation: >-
+    Activations are per-sample values kept for backward — double the batch,
+    double them. Weights, gradients, and optimizer state depend only on the
+    model. That's why the OOM boundary is a batch size.
+  tags: [memory]
+
+- id: m5/q-007
+  lesson: m5/02-memory-bill
+  type: mcq
+  prompt: >-
+    A training job OOMs while monitoring shows plenty of free memory. A
+    common real cause:
+  options:
+    - "The monitor is always wrong"
+    - "Fragmentation — free memory exists but in pieces too small for the requested block"
+    - "The model is secretly larger than reported"
+    - "Cosmic rays"
+  answer: 1
+  explanation: >-
+    Allocators can have gigabytes free that no single contiguous request
+    fits into. Caching allocators also hold freed blocks, confusing external
+    tools — read the framework's own ledger.
+  tags: [memory, allocators]
+
+- id: m5/q-008
+  lesson: m5/02-memory-bill
+  type: mcq
+  prompt: "Fine-tuning a 7B-parameter model with plain Adam on a 16 GB machine fails because:"
+  options:
+    - "7B models require special licenses"
+    - "16 bytes/param × 7B ≈ 112 GB of training state — 7× the machine, before activations"
+    - "The disk is too slow"
+    - "It doesn't fail — 7B fits fine"
+  answer: 1
+  explanation: >-
+    The 16-byte rule is merciless. Parameter-efficient methods (LoRA etc.)
+    exist precisely to shrink the trainable-parameter count this rule
+    multiplies against.
+  tags: [memory]
+
+# ---- Lesson 03: batch size ----
+
+- id: m5/q-009
+  lesson: m5/03-batch-size
+  type: mcq
+  prompt: "Why does samples/second rise with batch size — and then stop rising?"
+  options:
+    - "Bigger batches use faster memory"
+    - "Bigger matmuls have higher arithmetic intensity and amortize fixed per-step costs — until the hardware saturates, after which per-sample speed is flat"
+    - "The OS prioritizes bigger jobs"
+    - "It rises without limit"
+  answer: 1
+  explanation: >-
+    Free lunch until the execution units are full (M1's intensity story),
+    zero after. Where saturation lands is machine-specific — you find it by
+    sweeping (lab L5.1).
+  tags: [batch-size, throughput]
+
+- id: m5/q-010
+  lesson: m5/03-batch-size
+  type: mcq
+  prompt: "Per Shallue et al., growing batch size eventually hits a 'maximal useful' size where:"
+  options:
+    - "Training crashes"
+    - "Additional samples per step buy no reduction in steps needed — the gradient estimate is already accurate enough"
+    - "The learning rate becomes zero"
+    - "Accuracy doubles"
+  answer: 1
+  explanation: >-
+    Perfect scaling → diminishing returns → a plateau where extra averaging
+    is wasted samples. The location varies by model and dataset; no
+    universal number exists.
+  tags: [batch-size, optimization]
+
+- id: m5/q-011
+  lesson: m5/03-batch-size
+  type: mcq
+  prompt: "When scaling batch size up substantially, the classic recipe also:"
+  options:
+    - "Scales the learning rate linearly with batch size, with warmup"
+    - "Halves the number of layers"
+    - "Switches the optimizer to plain SGD"
+    - "Nothing — batch size is independent of all other hyperparameters"
+  answer: 0
+  explanation: >-
+    Goyal et al.'s linear scaling rule + warmup. Sweeping batch size at a
+    fixed LR measures the wrong thing — the coupling is part of the knob.
+  tags: [batch-size, optimization]
+
+- id: m5/q-012
+  lesson: m5/03-batch-size
+  type: mcq
+  prompt: "What does batch size NOT change?"
+  options:
+    - "Activation memory"
+    - "Hardware utilization"
+    - "The arithmetic (FLOPs) per epoch"
+    - "Steps needed to converge"
+  answer: 2
+  explanation: >-
+    Every sample costs the same forward/backward arithmetic however grouped.
+    Batching changes execution efficiency and step count — never the
+    per-epoch FLOPs.
+  tags: [batch-size]
+
+# ---- Lesson 04: memory tricks ----
+
+- id: m5/q-013
+  lesson: m5/04-memory-tricks
+  type: mcq
+  prompt: "Gradient checkpointing saves memory by:"
+  options:
+    - "Compressing activations with zstd"
+    - "Storing only segment-boundary activations and recomputing interiors during backward"
+    - "Moving activations to disk"
+    - "Skipping the backward pass for some layers"
+  answer: 1
+  explanation: >-
+    Forget on purpose, recompute on demand — the forward pass is
+    deterministic, so interiors can be re-derived from boundaries exactly
+    when backward needs them.
+  tags: [checkpointing]
+
+- id: m5/q-014
+  lesson: m5/04-memory-tricks
+  type: mcq
+  prompt: "The classic checkpointing trade (√n segments) costs and saves roughly:"
+  options:
+    - "2× compute for 2× memory saved"
+    - "~30% extra compute for activation memory dropping from O(n) to O(√n) layers"
+    - "No compute cost — it's free memory"
+    - "50% accuracy for 90% memory"
+  answer: 1
+  explanation: >-
+    One extra forward per segment ≈ +30% time; stored activations fall to
+    ~√n layers' worth. "Impossible on this hardware" becomes "30% slower" —
+    usually a spectacular deal (lab L5.2 measures it).
+  tags: [checkpointing]
+
+- id: m5/q-015
+  lesson: m5/04-memory-tricks
+  type: mcq
+  prompt: "Mixed precision halves activation memory but often disappoints because:"
+  options:
+    - "It halves accuracy too"
+    - "The fp32 master weights and Adam moments survive — the 16-byte/param state doesn't shrink"
+    - "It only works on TPUs"
+    - "Activations were never a memory cost"
+  answer: 1
+  explanation: >-
+    It buys BATCH headroom (the batch-scaled item halves), not MODEL
+    headroom (the fixed state stands). Match the trick to which line item
+    is actually overflowing.
+  tags: [mixed-precision, memory]
+
+- id: m5/q-016
+  lesson: m5/04-memory-tricks
+  type: short
+  prompt: >-
+    Running k small micro-batches, summing their gradients, and stepping the
+    optimizer once — big-batch gradients at small-batch memory. Name the
+    technique. (two words)
+  accept:
+    - "gradient accumulation"
+    - "accumulation"
+  explanation: >-
+    Gradient accumulation: mathematically the large-batch gradient, with
+    only one micro-batch's activations alive at a time. Composes with
+    checkpointing and mixed precision — the standard train-big-on-small
+    stack.
+  tags: [memory, batch-size]

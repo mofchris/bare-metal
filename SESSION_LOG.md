@@ -328,3 +328,18 @@ at the bottom.
 **Next session should start with:** Christopher's Gate B inputs; else M5 authoring.
 **Open questions for Christopher:** unchanged
 **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (seventeenth block — M5 authoring)
+
+**Stage:** B (build complete; gate waiting on Christopher) — curriculum authoring block, no Stage C work touched.
+**Done this session:**
+
+- Authored M5 — Training mechanics, complete (4 lessons, sourced): 01 autodiff (symbolic/numeric/automatic, forward vs reverse mode and why reverse wins at 2–3× forward cost, the tape, why activations must live until backward; Baydin JMLR 2018, Griewank & Walther), 02 the memory bill (four line items, the 16-bytes-per-param Adam rule incl. the mixed-precision version, activations as the batch-scaled item, fragmentation/allocator fine print; ZeRO SC 2020, Korthikanti MLSys 2023), 03 batch size (three dials — throughput-to-saturation, linear memory, diminishing optimization returns per Shallue JMLR 2019; Goyal LR scaling; what it does NOT change), 04 memory tricks (gradient checkpointing O(√n) for +30% per Chen 2016, mixed precision as batch-not-model headroom, gradient accumulation, the memory↔compute exchange-rate pattern)
+- 16 new questions (m5/q-001…q-016) — curriculum now 5 modules, 21 lessons, 86 questions
+- First module with two prereqs (m3 + m4); compiles and orders correctly
+- Verified in browser: M5 on home, memory-bill lesson renders, no console errors
+
+**In progress / half-finished:** nothing half-finished. Remaining v1 authoring: M6 (compression), M7 (serving).
+**Next session should start with:** Christopher's Gate B inputs; else M6 authoring.
+**Open questions for Christopher:** unchanged
+**New DECISIONS.md entries this session:** none
