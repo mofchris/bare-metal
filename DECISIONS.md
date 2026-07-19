@@ -56,8 +56,8 @@ Options considered: everything in v1 (curriculum authoring is the single biggest
 Status: ratified at Gate 0 (2026-07-19).
 
 **D-012** | Stage A | _Public GitHub repo named `bare-metal` (→ live URL mofchris.github.io/bare-metal/)._
-Options considered: `metal` (short but generic — collides with Apple's Metal API in searches); `bare-metal` (matches the local folder, and "bare metal" is the systems term for running close to hardware — on-theme for MLSys). Public from day one: the repo is a portfolio piece and the history should show the whole build. Tradeoff: renaming later breaks the Pages URL and `base` path, so this wants to be settled now. My question to Christopher: veto within Stage A if you want a different name — cost of renaming grows once the URL is shared anywhere.
-Status: pending.
+Options considered: `metal` (short but generic — collides with Apple's Metal API in searches); `bare-metal` (matches the local folder, and "bare metal" is the systems term for running close to hardware — on-theme for MLSys). Public from day one: the repo is a portfolio piece and the history should show the whole build. Tradeoff: renaming later breaks the Pages URL and `base` path, so this wants to be settled now. My question to Christopher: veto within Stage A if you want a different name — cost of renaming grows once the URL is shared anywhere. → Confirmed by Christopher 2026-07-19: `bare-metal`.
+Status: ratified 2026-07-19.
 
 **D-013** | Stage A | _Formatter: Prettier (default config, printWidth 90), enforced in CI. Linter: deferred._
 Options considered: Prettier alone (zero-decision formatting, covers the CLAUDE.md consistency rule; `format:check` gates the deploy); Prettier + ESLint (adds real static analysis, but its value overlaps heavily with TypeScript strict mode in a small codebase — revisit when the codebase or contributor count grows); nothing (style drift, rejected outright). Tradeoff: some bug classes ESLint would catch are left to strict TS + tests for now. My question to Christopher: none.
