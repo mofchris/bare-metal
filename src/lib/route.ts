@@ -6,10 +6,12 @@
 export type Route =
   | { screen: "home" }
   | { screen: "lesson"; lessonId: string }
-  | { screen: "quiz"; lessonId: string };
+  | { screen: "quiz"; lessonId: string }
+  | { screen: "review" };
 
 /** Parse a location.hash value. Anything unrecognized falls back to home. */
 export function parseRoute(hash: string): Route {
+  if (hash === "#/review") return { screen: "review" };
   // Lesson ids contain "/" (e.g. "m1/01-memory-hierarchy"), so everything
   // after the prefix is the id — no further splitting.
   for (const screen of ["lesson", "quiz"] as const) {

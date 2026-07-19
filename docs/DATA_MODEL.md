@@ -117,13 +117,13 @@ already rendered to HTML. The app treats it as read-only and versioned
 Database `metal-progress`, versioned via IndexedDB's own `version` +
 `schemaVersion` in a `meta` store (migrations run on upgrade, loudly).
 
-| Store            | Key          | Value (shape)                                                         |
-| ---------------- | ------------ | --------------------------------------------------------------------- |
-| `attempts`       | auto-id      | `{ questionId, at (ISO), correct, givenAnswer, sessionId }`           |
-| `lessonProgress` | `lessonId`   | `{ status: "not-started"\|"in-progress"\|"done", completedAt? }`      |
-| `srsState`       | `questionId` | `{ dueAt, intervalDays, ease, lapses }` (algorithm chosen in Stage B) |
-| `labResults`     | `labId`      | `{ importedAt, metrics: {...}, passed, runnerVersion }`               |
-| `meta`           | fixed keys   | `{ schemaVersion, lastExportAt, installId }`                          |
+| Store            | Key          | Value (shape)                                                                                                                                       |
+| ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attempts`       | auto-id      | `{ questionId, at (ISO), correct, givenAnswer, sessionId }`                                                                                         |
+| `lessonProgress` | `lessonId`   | `{ status: "not-started"\|"in-progress"\|"done", completedAt? }`                                                                                    |
+| `srsState`       | `questionId` | `{ dueAt, intervalDays, ease, reps, lapses, lastReviewedAt }` — derived, rebuildable by replaying `attempts` through the SM-2-binary engine (D-018) |
+| `labResults`     | `labId`      | `{ importedAt, metrics: {...}, passed, runnerVersion }`                                                                                             |
+| `meta`           | fixed keys   | `{ schemaVersion, lastExportAt, installId }`                                                                                                        |
 
 Design rules:
 

@@ -37,3 +37,12 @@ export function questionsFor(module: Module, lessonId: string): Question[] {
 export function questionCountFor(module: Module, lessonId: string): number {
   return questionsFor(module, lessonId).length;
 }
+
+/** Flat id → question index across all modules (for the review deck). */
+export function questionById(curriculum: Curriculum): Map<string, Question> {
+  const map = new Map<string, Question>();
+  for (const module of curriculum.modules) {
+    for (const question of module.questions) map.set(question.id, question);
+  }
+  return map;
+}

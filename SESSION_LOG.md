@@ -229,3 +229,22 @@ at the bottom.
 **Next session should start with:** Stage B kickoff — but the FIRST thing to ask for is items 1–4 above (10 minutes on the phone settles them), because Gate B's own test is "a week of real daily use logged before sign-off," which cannot be simulated by the agent, rubber-stamped, or skipped without making the whole platform theater. Then: progress dashboard design (derive from attempts store), SRS engine (algorithm decision needed — new D entry), export/restore.
 **Open questions for Christopher:** items 1–6 above
 **New DECISIONS.md entries this session:** none (D-013…D-017 status updates only)
+
+## Session 2026-07-19 (eleventh block — Stage B start: spaced repetition)
+
+**Stage:** B — Memory & Measurement | **Gate status:** Gate B unsigned
+**Done this session:**
+
+- SRS engine `src/lib/srs.ts` (D-018, pending Gate B): binary-grade SM-2 variant — correct: 1 d → 6 d → ×ease (2.5 start); wrong: lapse, ease −0.2 (floor 1.3), relearn at 1 d; intervals capped at 90 d. Pure functions; 7 tests feed fake histories and assert exact resurfacing dates (Gate B automated requirement)
+- Progress DB schema v2: `srsState` store (keyed by questionId); v1→v2 migration rebuilds SRS by replaying the append-only attempts history — derived-state principle proven in a test
+- Every graded answer now also folds into its SRS schedule (lesson quizzes AND review runs)
+- Quiz component generalized (title/back/markDone props) and reused by the new review screen: `#/review` serves all due questions across modules, oldest-due first; home shows a review card ("N due / Review now", or "up to date — next: date")
+- docs/DATA_MODEL.md srsState row updated to as-built
+- **Bug found & fixed during verification:** first quiz answer could race the async DB open and go silently unrecorded (summary would still claim it saved). Fix: app renders no screens until storage settles (open or definitive failure). Verified closed by rapid-firing answers after a wiped DB — both rows present
+- End-to-end verified: miss a question → SRS row with lapse; rewind its dueAt → home shows "1 question is due" → review deck serves exactly it → answer correctly → schedule advances, home returns to "up to date". 40 tests green
+- Test-infra note: the browse daemon restarted mid-session once, invalidating a page context — re-ran the flow, no product impact
+
+**In progress / half-finished:** Stage B ~35%. Remaining: progress dashboard (mastery per topic, trends, streak calendar, weakest areas; must render instantly with 1000+ records), export/backup + restore with lossless round-trip test, weekly export reminder. Gate B also requires Christopher's week of real daily use.
+**Next session should start with:** the dashboard block (derive everything from attempts; add a 1000+ record perf fixture), then export/restore.
+**Open questions for Christopher:** unchanged (Gate A caveat items 1–6, incl. Gate 0 quiz + internet/power note); D-018 ratifies at Gate B
+**New DECISIONS.md entries this session:** D-018 (pending)

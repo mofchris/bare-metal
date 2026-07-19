@@ -15,16 +15,24 @@ import { openProgressDb, type ProgressDb } from "./lib/progress-store";
 import { Home } from "./components/home";
 import { LessonView } from "./components/lesson-view";
 import { Quiz } from "./components/quiz";
+import { Review } from "./components/review";
+import { lessonHref } from "./lib/route";
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; curriculum: Curriculum };
 
+// Storage settles to either an open db or a definitive failure. Screens are
+// not rendered while it's "opening": otherwise a fast first quiz answer can
+// race the async open and be silently unrecorded (found in Stage B testing —
+// the summary would then claim answers were saved that never were).
+type DbState = { status: "opening" } | { status: "ready"; db: ProgressDb | null };
+
 export function App() {
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [route, setRoute] = useState<Route>(() => parseRoute(location.hash));
-  const [db, setDb] = useState<ProgressDb | null>(null);
+  const [dbState, setDbState] = useState<DbState>({ status: "opening" });
   const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,11 +42,14 @@ export function App() {
         setLoad({ status: "error", message: e instanceof Error ? e.message : String(e) }),
       );
     // Progress storage failing (e.g. hard-private browsing modes) must not
-    // brick studying — the app stays usable and says out loud that nothing
-    // is being recorded.
+    // brick studying — the app stays usable (db: null) and says out loud
+    // that nothing is being recorded.
     openProgressDb()
-      .then(setDb)
-      .catch((e: unknown) => setDbError(e instanceof Error ? e.message : String(e)));
+      .then((db) => setDbState({ status: "ready", db }))
+      .catch((e: unknown) => {
+        setDbError(e instanceof Error ? e.message : String(e));
+        setDbState({ status: "ready", db: null });
+      });
   }, []);
 
   useEffect(() => {
@@ -66,7 +77,11 @@ export function App() {
         </p>
       )}
       <main class="shell-main">
-        <Screen load={load} route={route} db={db} />
+        {dbState.status === "opening" ? (
+          <p class="status">Loading…</p>
+        ) : (
+          <Screen load={load} route={route} db={dbState.db} />
+        )}
       </main>
     </div>
   );
@@ -108,14 +123,19 @@ function Screen({
     if (route.screen === "quiz") {
       return (
         <Quiz
-          module={location.module}
-          lesson={location.lesson}
+          title={location.module.title}
+          backHref={lessonHref(location.lesson.id)}
+          backLabel={location.lesson.title}
           questions={questionsFor(location.module, location.lesson.id)}
           db={db}
+          markDoneLessonId={location.lesson.id}
         />
       );
     }
     return <LessonView location={location} />;
+  }
+  if (route.screen === "review") {
+    return <Review curriculum={load.curriculum} db={db} />;
   }
   return <Home curriculum={load.curriculum} db={db} />;
 }

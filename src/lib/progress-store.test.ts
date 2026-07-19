@@ -69,4 +69,36 @@ describe("progress store", () => {
     const statuses = await db.lessonStatuses();
     expect(statuses.size).toBe(0);
   });
+
+  it("folds graded answers into per-question SRS schedules", async () => {
+    const db = await openProgressDb(freshName());
+    const now = new Date("2026-07-19T12:00:00.000Z");
+    await db.updateSrsOnAnswer("m1/q-001", true, now);
+    await db.updateSrsOnAnswer("m1/q-002", false, now);
+    const states = await db.allSrsStates();
+    expect(states).toHaveLength(2);
+    const byId = new Map(states.map((s) => [s.questionId, s]));
+    expect(byId.get("m1/q-001")!.reps).toBe(1);
+    expect(byId.get("m1/q-002")!.lapses).toBe(1);
+    // both resurface exactly one day later (first rung / relearn rung)
+    expect(byId.get("m1/q-001")!.dueAt).toBe("2026-07-20T12:00:00.000Z");
+    expect(byId.get("m1/q-002")!.dueAt).toBe("2026-07-20T12:00:00.000Z");
+  });
+
+  it("rebuilds the full SRS store from attempt history alone (derived state)", async () => {
+    const db = await openProgressDb(freshName());
+    await db.recordAttempt(attempt({ at: "2026-07-01T10:00:00.000Z", correct: true }));
+    await db.recordAttempt(attempt({ at: "2026-07-03T10:00:00.000Z", correct: true }));
+    await db.recordAttempt(
+      attempt({ questionId: "m1/q-002", at: "2026-07-02T10:00:00.000Z", correct: false }),
+    );
+    await db.rebuildSrsFromAttempts();
+    const byId = new Map((await db.allSrsStates()).map((s) => [s.questionId, s]));
+    // q-001: two successes → second rung, 6-day interval from the later attempt
+    expect(byId.get("m1/q-001")!.intervalDays).toBe(6);
+    expect(byId.get("m1/q-001")!.dueAt).toBe("2026-07-09T10:00:00.000Z");
+    // q-002: one miss → relearn rung
+    expect(byId.get("m1/q-002")!.lapses).toBe(1);
+    expect(byId.get("m1/q-002")!.intervalDays).toBe(1);
+  });
 });

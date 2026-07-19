@@ -1,23 +1,29 @@
-// Quiz screen: one question at a time — answer, immediate feedback with the
-// explanation, then a score summary. Depends on: lib/curriculum (types),
-// lib/quiz (grading), lib/route, lib/progress-store. Depended on by: app.tsx.
+// Quiz flow: one question at a time — answer, immediate feedback with the
+// explanation, then a score summary. Serves both per-lesson quizzes and the
+// spaced-review deck (which spans lessons), so context arrives as props.
+// Depends on: lib/curriculum (types), lib/quiz (grading), lib/progress-store.
+// Depended on by: app.tsx, components/review.tsx.
 //
 // Persistence contract (docs/DATA_MODEL.md): every answer is written to the
-// attempts store THE MOMENT it is graded — killing the app mid-quiz loses at
-// most the question currently on screen. If a write fails, the quiz keeps
-// working and the failure is shown, never swallowed.
+// attempts store AND folded into its SRS schedule THE MOMENT it is graded —
+// killing the app mid-quiz loses at most the question currently on screen.
+// If a write fails, the quiz keeps working and the failure is shown, never
+// swallowed.
 
 import { useEffect, useState } from "preact/hooks";
-import type { Lesson, Module, Question } from "../lib/curriculum";
+import type { Question } from "../lib/curriculum";
 import { gradeResponse, type QuizResponse } from "../lib/quiz";
-import { lessonHref } from "../lib/route";
 import type { ProgressDb } from "../lib/progress-store";
 
 interface QuizProps {
-  module: Module;
-  lesson: Lesson;
+  /** Context line above the question counter (module title, or "Spaced review"). */
+  title: string;
+  backHref: string;
+  backLabel: string;
   questions: Question[];
   db: ProgressDb | null;
+  /** Lesson quizzes pass their lesson id: completing the run marks it done. */
+  markDoneLessonId?: string;
 }
 
 interface AnsweredQuestion {
@@ -26,11 +32,18 @@ interface AnsweredQuestion {
   correct: boolean;
 }
 
-export function Quiz({ module, lesson, questions, db }: QuizProps) {
+export function Quiz({
+  title,
+  backHref,
+  backLabel,
+  questions,
+  db,
+  markDoneLessonId,
+}: QuizProps) {
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   // "answering" → inputs live; "feedback" → result + explanation shown.
   const [phase, setPhase] = useState<"answering" | "feedback">("answering");
-  // One id per quiz run, so Stage B can group a run's attempts together.
+  // One id per quiz run, so the dashboard can group a run's attempts together.
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -43,6 +56,7 @@ export function Quiz({ module, lesson, questions, db }: QuizProps) {
     setPhase("feedback");
 
     if (db) {
+      const now = new Date();
       const givenAnswer =
         response.type === "mcq"
           ? (current.type === "mcq" && current.options[response.choice]) ||
@@ -51,14 +65,15 @@ export function Quiz({ module, lesson, questions, db }: QuizProps) {
       const writes = [
         db.recordAttempt({
           questionId: current.id,
-          at: new Date().toISOString(),
+          at: now.toISOString(),
           correct,
           givenAnswer,
           sessionId,
         }),
+        db.updateSrsOnAnswer(current.id, correct, now),
       ];
-      if (answered.length === 0) {
-        writes.push(db.setLessonStatus(lesson.id, "in-progress"));
+      if (answered.length === 0 && markDoneLessonId) {
+        writes.push(db.setLessonStatus(markDoneLessonId, "in-progress"));
       }
       Promise.all(writes).catch((e: unknown) =>
         setSaveError(e instanceof Error ? e.message : String(e)),
@@ -75,9 +90,9 @@ export function Quiz({ module, lesson, questions, db }: QuizProps) {
   if (questions.length === 0) {
     return (
       <div>
-        <p>This lesson has no questions yet.</p>
+        <p>There are no questions here yet.</p>
         <p>
-          <a href={lessonHref(lesson.id)}>Back to the lesson.</a>
+          <a href={backHref}>Back to {backLabel}.</a>
         </p>
       </div>
     );
@@ -87,11 +102,13 @@ export function Quiz({ module, lesson, questions, db }: QuizProps) {
   if (finished) {
     return (
       <Summary
-        lesson={lesson}
+        backHref={backHref}
+        backLabel={backLabel}
         answered={answered}
         onRestart={restart}
         db={db}
         saveError={saveError}
+        markDoneLessonId={markDoneLessonId}
       />
     );
   }
@@ -103,9 +120,9 @@ export function Quiz({ module, lesson, questions, db }: QuizProps) {
   return (
     <div>
       <nav class="crumbs">
-        <a href={lessonHref(lesson.id)}>← {lesson.title}</a>
+        <a href={backHref}>← {backLabel}</a>
       </nav>
-      <p class="lesson-module">{module.title}</p>
+      <p class="lesson-module">{title}</p>
       <h2>
         Question {number} of {questions.length}
       </h2>
@@ -223,26 +240,30 @@ function Feedback({
 /* ---------------- summary ---------------- */
 
 function Summary({
-  lesson,
+  backHref,
+  backLabel,
   answered,
   onRestart,
   db,
   saveError,
+  markDoneLessonId,
 }: {
-  lesson: Lesson;
+  backHref: string;
+  backLabel: string;
   answered: AnsweredQuestion[];
   onRestart: () => void;
   db: ProgressDb | null;
   saveError: string | null;
+  markDoneLessonId?: string;
 }) {
   const correctCount = answered.filter((a) => a.correct).length;
   const [statusError, setStatusError] = useState<string | null>(null);
 
-  // Completing the quiz marks the lesson done — once, on first render of
-  // the summary, not on every re-render.
+  // Completing a lesson quiz marks the lesson done — once, on first render
+  // of the summary, not on every re-render.
   useEffect(() => {
-    if (db && !saveError) {
-      db.setLessonStatus(lesson.id, "done").catch((e: unknown) =>
+    if (db && !saveError && markDoneLessonId) {
+      db.setLessonStatus(markDoneLessonId, "done").catch((e: unknown) =>
         setStatusError(e instanceof Error ? e.message : String(e)),
       );
     }
@@ -250,7 +271,7 @@ function Summary({
   return (
     <div>
       <nav class="crumbs">
-        <a href={lessonHref(lesson.id)}>← {lesson.title}</a>
+        <a href={backHref}>← {backLabel}</a>
       </nav>
       <h2>
         {correctCount} of {answered.length} correct
@@ -267,7 +288,7 @@ function Summary({
         <p class="quiz-note">
           All {answered.length} answers were recorded on this device
           {statusError ? ` (but marking the lesson done failed: ${statusError})` : ""}.
-          The progress dashboard arrives in Stage B.
+          Missed questions resurface on the review schedule.
         </p>
       ) : (
         <p class="quiz-note quiz-note-warn">
@@ -282,7 +303,7 @@ function Summary({
         <button class="btn" onClick={onRestart}>
           Retry quiz
         </button>
-        <a href={lessonHref(lesson.id)}>Back to the lesson</a>
+        <a href={backHref}>Back to {backLabel}</a>
       </div>
     </div>
   );
