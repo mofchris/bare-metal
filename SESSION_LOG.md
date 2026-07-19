@@ -30,3 +30,26 @@ at the bottom.
 - Gate 0 quiz answers (carried over — not optional)
 - Internet/power reliability note (still [to confirm] in BUILD_PLAN.md)
   **New DECISIONS.md entries this session:** D-001…D-011 (all ratified at Gate 0)
+
+## Session 2026-07-19 (second block — Stage A start)
+
+**Stage:** A — Walking Skeleton | **Gate status:** Gate A unsigned (early in stage)
+**Done this session:**
+
+- Created public GitHub repo `mofchris/bare-metal`, pushed full history (7 commits)
+- Scaffolded the app: Vite + TypeScript (strict) + Preact + Vitest + Prettier per D-003…D-006, D-013
+- App shell (`src/app.tsx`): honest placeholder home screen — no fake navigation
+- First real logic + tests: `src/lib/short-answer.ts` (normalize + accept-list matching for the quiz engine), 5 tests passing
+- Deploy pipeline: `.github/workflows/deploy.yml` (format check + tests gate the build), GitHub Pages enabled (workflow mode)
+- **Live and verified:** https://mofchris.github.io/bare-metal/ returns the app (HTTP 200, correct base path)
+- Prettier run across all docs (one-time reformat noise in this commit)
+
+**In progress / half-finished:** Stage A is ~20% done. Missing (nothing broken, just not built): content compiler, curriculum types, lesson renderer, quiz engine UI, IndexedDB persistence (`idb` not yet installed), PWA manifest + service worker, M1 authoring, README v1 setup instructions. The live page is a labeled placeholder.
+**Next session should start with:** the carried-over Gate 0 quiz (still owed), then the content compiler + curriculum schema types (docs/DATA_MODEL.md is the spec) with malformed-content tests — it's the wall every other Stage A piece builds against.
+**Open questions for Christopher:**
+
+- Gate 0 quiz answers (carried over a second time)
+- Internet/power reliability note for BUILD_PLAN MY SETUP
+- D-012: repo name `bare-metal` — veto soon or it sticks
+- D-013: Prettier-only (no ESLint for now) — ok?
+  **New DECISIONS.md entries this session:** D-012, D-013 (both pending)
