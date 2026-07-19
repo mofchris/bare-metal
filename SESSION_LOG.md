@@ -161,3 +161,24 @@ at the bottom.
 - Internet/power reliability note for BUILD_PLAN MY SETUP
 - D-013…D-017 pending batch review
   **New DECISIONS.md entries this session:** none (SW design was already D-008)
+
+## Session 2026-07-19 (eighth block — M1 lessons 02–05)
+
+**Stage:** A — Walking Skeleton | **Gate status:** Gate A unsigned
+**Done this session:**
+
+- Authored M1 lessons 02–05, all genuinely sourced (no stubs): 02 CPU architecture (pipelining, superscalar/OoO, branch prediction, SIMD/FMA, peak-FLOPS formula, the NumPy-vs-Python-loop lesson; H&P + Agner Fog), 03 the three budgets (latency/bandwidth/compute, arithmetic intensity worked by hand for add/dot/matmul, break-even at 4 FLOPs/byte; Williams et al. + Drepper + Horace He), 04 roofline model (formula, ridge point, three positions → three actions, honest limitations; CACM 2009 + H&P), 05 GPUs from 10,000 feet (latency vs throughput machines, SIMT/warps, HBM, what fits and what doesn't; CUDA guide + H&P ch 4)
+- 17 new questions (q-006…q-022; mix of MCQ and short) — M1 bank now 22 questions across 5 lessons
+- module.yaml lists all 5 lessons; compiler validates clean; content version 0906ef57d6207af2
+- Verified in browser: home lists all 5 lessons with counts (lesson 01 "done ✓" badge intact), lesson 04 renders the roofline formula, no console errors
+- Caught and fixed one authoring slip before commit: a garbled sentence in lesson 05's HBM paragraph
+
+**In progress / half-finished:** Stage A ~95% of build work. M1 theory + quiz bank complete. Remaining: README v1 (setup instructions a stranger could follow), then the Gate A manual checklist belongs to Christopher.
+**Next session should start with:** the carried-over Gate 0 quiz, then README v1, then present the Gate A package (automated tests all green; manual items: lesson+quiz on laptop AND phone, PWA install on iPhone, offline check, mid-quiz kill, cold-start ≤2 s measured and recorded in BUILD_PLAN).
+**Open questions for Christopher:**
+
+- Gate 0 quiz answers (carried over — eighth time)
+- Internet/power reliability note for BUILD_PLAN MY SETUP
+- D-013…D-017 pending batch review
+- Scope note needing your ruling at Gate A: BUILD_PLAN Stage A says the first module is authored "theory + labs + quiz bank," but the lab harness is a Stage C deliverable — labs can't exist before it. Proposal (standing rule 2): treat M1 labs as Stage C work, note the edit in BUILD_PLAN at gate sign-off.
+  **New DECISIONS.md entries this session:** none

@@ -1,6 +1,11 @@
 # M1 — Hardware foundations. Outline: docs/CURRICULUM.md.
-# Authoring status: lesson 01 of 5 done; the rest land through Stage A.
+# Theory + quiz bank complete (5 lessons, 22 questions); labs land with the
+# Stage C harness.
 id: m1-hardware-foundations
 title: "Hardware foundations: what code actually runs on"
 lessons:
   - 01-memory-hierarchy
+  - 02-cpu-architecture
+  - 03-three-budgets
+  - 04-roofline-model
+  - 05-gpus-overview

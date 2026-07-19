@@ -77,3 +77,267 @@
     Temporal locality — the same data re-touched soon. Spatial locality would
     be about touching *neighboring* data.
   tags: [memory, locality, ml]
+
+# ---- Lesson 02: CPU architecture ----
+
+- id: m1/q-006
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  prompt: "How many float32 values fit in one 256-bit AVX2 register?"
+  options:
+    - "4"
+    - "8"
+    - "16"
+    - "32"
+  answer: 1
+  explanation: "256 bits ÷ 32 bits per float32 = 8 lanes per instruction."
+  tags: [cpu, simd]
+
+- id: m1/q-007
+  lesson: m1/02-cpu-architecture
+  type: short
+  prompt: >-
+    What is the name for a core executing several independent instructions in
+    the same cycle by having multiple execution units? (one word)
+  accept:
+    - "superscalar"
+    - "superscalar execution"
+  explanation: >-
+    Superscalar execution — several instructions issued per cycle. Pipelining
+    alone only overlaps the *stages* of consecutive instructions.
+  tags: [cpu, ilp]
+
+- id: m1/q-008
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  prompt: "Roughly what does one branch misprediction cost a modern core?"
+  options:
+    - "Nothing measurable — mispredictions are free"
+    - "1–2 cycles"
+    - "15–20 cycles of thrown-away work"
+    - "Thousands of cycles"
+  answer: 2
+  explanation: >-
+    The speculatively executed work is flushed and the pipeline refills —
+    roughly 15–20 cycles. Free it is not; catastrophic it is not either.
+  tags: [cpu, branches]
+
+- id: m1/q-009
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  prompt: >-
+    A Python for-loop summing a million floats is ~100–1000× slower than
+    numpy.sum on the same data. What's the main reason?
+  options:
+    - "Python floats are 64-bit, NumPy's are 32-bit"
+    - "Per-element interpreter dispatch, with no SIMD and unpredictable control flow"
+    - "The Python loop causes cache misses that NumPy avoids entirely"
+    - "NumPy runs on a hidden GPU"
+  answer: 1
+  explanation: >-
+    Each loop iteration pays hundreds of nanoseconds of interpreter overhead
+    per element and never touches the SIMD units; the compiled NumPy loop
+    streams 8 lanes per instruction. The data and dtypes are secondary.
+  tags: [cpu, simd, ml]
+
+- id: m1/q-010
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  prompt: "Which factors multiply together to estimate a CPU's peak fp32 FLOPS?"
+  options:
+    - "cores × SIMD lanes × 2 (FMA) × FMA units × clock"
+    - "cores × cache size × clock"
+    - "SIMD lanes × DRAM bandwidth × clock"
+    - "cores × pipeline depth × branch accuracy"
+  answer: 0
+  explanation: >-
+    Every core, every SIMD lane, 2 FLOPs per FMA, per FMA unit, per cycle.
+    Cache and bandwidth decide whether you can *feed* that peak, not its size.
+  tags: [cpu, flops]
+
+# ---- Lesson 03: the three budgets ----
+
+- id: m1/q-011
+  lesson: m1/03-three-budgets
+  type: short
+  prompt: "FLOPs performed per byte of memory traffic — what is this ratio called?"
+  accept:
+    - "arithmetic intensity"
+    - "operational intensity"
+  explanation: >-
+    Arithmetic (or operational) intensity, in FLOPs per byte — the exchange
+    rate that decides whether compute or memory is your limit.
+  tags: [budgets, intensity]
+
+- id: m1/q-012
+  lesson: m1/03-three-budgets
+  type: mcq
+  prompt: >-
+    Elementwise vector add (1 FLOP per 12 bytes moved) runs on a machine with
+    400 GFLOPS and 100 GB/s. What limits its speed?
+  options:
+    - "Compute — more cores would speed it up"
+    - "Memory bandwidth — extra compute changes nothing"
+    - "DRAM latency — prefetching is impossible for arrays"
+  answer: 1
+  explanation: >-
+    AI ≈ 0.08 FLOP/byte, far below the 4 FLOP/byte break-even. Streaming
+    bandwidth caps it at ~8 GFLOPS; the arithmetic units idle either way.
+  tags: [budgets, intensity]
+
+- id: m1/q-013
+  lesson: m1/03-three-budgets
+  type: mcq
+  prompt: "Why does matrix multiplication's arithmetic intensity GROW with matrix size?"
+  options:
+    - "Bigger matrices have more FLOPs, and FLOPs are all that matters"
+    - "Each loaded value can be reused ~N times — 2N³ FLOPs against ~3N² values"
+    - "Larger matrices compress better in memory"
+  answer: 1
+  explanation: >-
+    O(N³) arithmetic over O(N²) data: reuse per byte scales with N. This is
+    the fact that makes fast matmul kernels — and deep learning — possible.
+  tags: [budgets, matmul]
+
+- id: m1/q-014
+  lesson: m1/03-three-budgets
+  type: mcq
+  prompt: >-
+    A machine peaks at 400 GFLOPS and 100 GB/s. Above what arithmetic
+    intensity can a kernel be compute-bound?
+  options:
+    - "0.25 FLOPs/byte"
+    - "4 FLOPs/byte"
+    - "40 FLOPs/byte"
+    - "100 FLOPs/byte"
+  answer: 1
+  explanation: "The break-even is peak compute ÷ peak bandwidth = 400/100 = 4 FLOPs/byte."
+  tags: [budgets, intensity]
+
+# ---- Lesson 04: the roofline model ----
+
+- id: m1/q-015
+  lesson: m1/04-roofline-model
+  type: mcq
+  prompt: "In the roofline model, attainable performance at intensity AI equals:"
+  options:
+    - "peak compute × AI"
+    - "min(peak compute, AI × peak bandwidth)"
+    - "max(peak compute, AI × peak bandwidth)"
+    - "peak bandwidth ÷ AI"
+  answer: 1
+  explanation: >-
+    Whichever roof is lower wins: the flat compute roof or the slanted
+    bandwidth line AI × BW.
+  tags: [roofline]
+
+- id: m1/q-016
+  lesson: m1/04-roofline-model
+  type: short
+  prompt: >-
+    The corner of the roofline where the bandwidth line meets the compute
+    roof divides memory-bound from compute-bound kernels. What is this corner
+    called? (two words)
+  accept:
+    - "ridge point"
+    - "the ridge point"
+  explanation: >-
+    The ridge point, at intensity = peak compute ÷ peak bandwidth. Left of it
+    memory rules; right of it arithmetic rules.
+  tags: [roofline]
+
+- id: m1/q-017
+  lesson: m1/04-roofline-model
+  type: mcq
+  prompt: >-
+    A kernel with AI = 0.5 FLOP/byte sits under the slanted roof of a machine
+    whose ridge point is 4. Which optimization can actually raise its speed?
+  options:
+    - "Using more cores"
+    - "Raising the clock frequency"
+    - "Moving fewer bytes — fusion, reuse, or a smaller dtype like fp16"
+    - "Enabling wider SIMD instructions"
+  answer: 2
+  explanation: >-
+    Memory-bound means the arithmetic units are already idle. Only reducing
+    bytes (or increasing reuse) moves the limit; fp16 halves the bytes and
+    doubles effective intensity.
+  tags: [roofline, optimization]
+
+- id: m1/q-018
+  lesson: m1/04-roofline-model
+  type: mcq
+  prompt: >-
+    A kernel measures far BELOW both roofs — nowhere near the bandwidth line
+    or the compute ceiling. What does the roofline model tell you?
+  options:
+    - "The hardware is the bottleneck; buy a faster machine"
+    - "Neither hardware limit is being hit — the code itself is the problem"
+    - "The measurement must be wrong"
+  answer: 1
+  explanation: >-
+    Below both roofs, no hardware budget is exhausted: overhead, poor access
+    patterns, or imbalance are wasting the machine. Fix software first.
+  tags: [roofline, optimization]
+
+# ---- Lesson 05: GPUs overview ----
+
+- id: m1/q-019
+  lesson: m1/05-gpus-overview
+  type: mcq
+  prompt: "How does a GPU primarily deal with memory latency?"
+  options:
+    - "Very large caches, like a CPU"
+    - "Keeping far more threads resident than lanes and switching on every stall"
+    - "Faster DRAM with lower latency than CPU memory"
+    - "Speculative out-of-order execution per thread"
+  answer: 1
+  explanation: >-
+    Massive oversubscription: when one warp stalls on memory another runs.
+    The latency is still there — it's just always hidden behind other work.
+  tags: [gpu, latency]
+
+- id: m1/q-020
+  lesson: m1/05-gpus-overview
+  type: short
+  prompt: >-
+    NVIDIA's name for the fixed group of 32 threads that execute one
+    instruction in lockstep? (one word)
+  accept:
+    - "warp"
+    - "a warp"
+  explanation: "A warp — 32 threads, one instruction, SIMT execution."
+  tags: [gpu, simt]
+
+- id: m1/q-021
+  lesson: m1/05-gpus-overview
+  type: mcq
+  prompt: "Which workload is the WORST fit for a GPU?"
+  options:
+    - "Elementwise ops over a 10-million-element tensor"
+    - "Large dense matrix multiplication"
+    - "Branch-heavy sequential parsing with data-dependent control flow"
+    - "Applying the same filter to every pixel of an image"
+  answer: 2
+  explanation: >-
+    Branchy sequential work defeats both pillars of the throughput machine:
+    warps diverge on the branches, and there's too little parallelism to hide
+    latency. The other three are exactly what SIMT wants.
+  tags: [gpu, workloads]
+
+- id: m1/q-022
+  lesson: m1/05-gpus-overview
+  type: mcq
+  prompt: >-
+    Datacenter-GPU memory (HBM) bandwidth compared to laptop DRAM (~100 GB/s)
+    is roughly:
+  options:
+    - "About the same"
+    - "2–3×"
+    - "10–30× (1–3 TB/s)"
+    - "1000×"
+  answer: 2
+  explanation: >-
+    HBM delivers on the order of 1–3 TB/s. Huge — and yet elementwise ops are
+    STILL memory-bound there, because compute scaled up too.
+  tags: [gpu, memory]
