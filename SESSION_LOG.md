@@ -248,3 +248,19 @@ at the bottom.
 **Next session should start with:** the dashboard block (derive everything from attempts; add a 1000+ record perf fixture), then export/restore.
 **Open questions for Christopher:** unchanged (Gate A caveat items 1–6, incl. Gate 0 quiz + internet/power note); D-018 ratifies at Gate B
 **New DECISIONS.md entries this session:** D-018 (pending)
+
+## Session 2026-07-19 (twelfth block — dashboard)
+
+**Stage:** B — Memory & Measurement | **Gate status:** Gate B unsigned
+**Done this session:**
+
+- Dashboard derivations `src/lib/stats.ts` (pure, from the attempts store): mastery per lesson (a question is "known" iff its LATEST attempt was correct — current knowledge, not historical accuracy), weakest-lessons ranking, run history grouped by sessionId, streak with a today-grace rule (an unstudied today doesn't break the streak until midnight)
+- Dashboard screen at `#/dashboard`: 4 stat tiles (streak, current mastery, questions tracked, due for review), last-10-runs single-series column trend (per-run tooltips, direct label on latest only), 8-week study-day calendar grid (today ringed, per-cell titles), weakest-areas panel linking to lessons, full mastery-by-lesson list with bars; dataviz method followed (stat tiles for headlines, one axis, no legend for single series, text in text tokens, color never the only carrier)
+- Persistent shell nav added: Modules / Dashboard / Review
+- 8 new tests: latest-attempt mastery (incl. recovered/regressed cases), weakest ranking, run grouping, streak rules, local-date keys, and a 5000-attempt perf pin (<200 ms budget; typical single-digit ms) — 48 tests total, green
+- **Gate B perf requirement verified in-browser:** seeded 1200 attempts across 40 days/120 sessions into IndexedDB; dashboard rendered in 103 ms — stat tiles, trend, calendar, weakest areas all correct; mobile (414×896) screenshot clean; seeded test data wiped afterwards
+
+**In progress / half-finished:** Stage B ~65%. Remaining: export/backup + restore (lossless round-trip test, merge semantics D-entry) and the weekly export reminder. Then Gate B waits on Christopher's week of real daily use.
+**Next session should start with:** export/restore block — one-file JSON export per docs/DATA_MODEL.md §4, restore with validate + merge (needs a D-entry for merge semantics before implementation), export→wipe→restore automated test, weekly reminder wired to meta.lastExportAt.
+**Open questions for Christopher:** unchanged (Gate A caveats incl. Gate 0 quiz; D-018 at Gate B)
+**New DECISIONS.md entries this session:** none

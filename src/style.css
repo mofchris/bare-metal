@@ -357,3 +357,139 @@ a {
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
 }
+
+/* ---------------- shell nav ---------------- */
+
+.shell-nav {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.9rem;
+}
+
+/* ---------------- dashboard ---------------- */
+
+.dash-section {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin: 1.5rem 0 0.5rem;
+}
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.stat-tile {
+  background: var(--surface-raised);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.stat-label {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+/* single-series column trend: thin marks, rounded data ends, baseline-anchored */
+.run-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 90px;
+  border-bottom: 1px solid var(--surface-raised);
+  padding-bottom: 1px;
+}
+
+.run-col {
+  flex: 1;
+  max-width: 2rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.run-bar {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+}
+
+.run-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* streak calendar: 7 rows (days), columns flow by week */
+.streak-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  grid-auto-flow: column;
+  gap: 3px;
+  justify-content: start;
+}
+
+.streak-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--surface-raised);
+}
+
+.streak-cell.active {
+  background: var(--accent);
+}
+
+.streak-cell.today {
+  outline: 1px solid var(--text-dim);
+}
+
+.mastery-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.mastery-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  flex-wrap: wrap;
+}
+
+.mastery-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mastery-bar-track {
+  display: inline-block;
+  width: 5rem;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.mastery-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}

@@ -21,8 +21,9 @@ describe("parseRoute", () => {
     expect(parseRoute(lessonHref(id))).toEqual({ screen: "lesson", lessonId: id });
   });
 
-  it("parses the review route", () => {
+  it("parses the review and dashboard routes", () => {
     expect(parseRoute("#/review")).toEqual({ screen: "review" });
+    expect(parseRoute("#/dashboard")).toEqual({ screen: "dashboard" });
   });
 
   it("parses quiz routes and treats a bare quiz prefix as home", () => {

@@ -16,6 +16,7 @@ import { Home } from "./components/home";
 import { LessonView } from "./components/lesson-view";
 import { Quiz } from "./components/quiz";
 import { Review } from "./components/review";
+import { Dashboard } from "./components/dashboard";
 import { lessonHref } from "./lib/route";
 
 type LoadState =
@@ -69,6 +70,11 @@ export function App() {
           <a href="#/">Metal</a>
         </h1>
         <p class="tagline">Machine Learning Systems, learned properly.</p>
+        <nav class="shell-nav">
+          <a href="#/">Modules</a>
+          <a href="#/dashboard">Dashboard</a>
+          <a href="#/review">Review</a>
+        </nav>
       </header>
       {dbError && (
         <p class="warn-banner">
@@ -136,6 +142,9 @@ function Screen({
   }
   if (route.screen === "review") {
     return <Review curriculum={load.curriculum} db={db} />;
+  }
+  if (route.screen === "dashboard") {
+    return <Dashboard curriculum={load.curriculum} db={db} />;
   }
   return <Home curriculum={load.curriculum} db={db} />;
 }
