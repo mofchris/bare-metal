@@ -343,3 +343,21 @@ at the bottom.
 **Next session should start with:** Christopher's Gate B inputs; else M6 authoring.
 **Open questions for Christopher:** unchanged
 **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (eighteenth block — design pass, D-020)
+
+**Stage:** B — design pass pulled forward from Stage E at Christopher's explicit request ("I actually want to use the app, not just because I need to"). Logged + ratified as D-020.
+**Done this session:**
+
+- Visual identity designed around the product's own name: a circuit board. Palette: solder-mask green-black (#0d1412 board, #141d18 surfaces, #24312a hairlines), copper (#d08a4a) as the single identity/progress accent, silkscreen ink; LED green/red reserved strictly for quiz correctness. Typography: IBM Plex Mono (display/labels — engineering voice) + IBM Plex Sans (body), self-hosted woff2 vendored from Christopher's own GRE-sim repo with the OFL license file (offline-first: zero external requests; SW precaches fonts automatically)
+- Signature element: the via rail — lesson lists are threaded by a trace; each lesson is a via that fills with copper when done, copper-ringed when started (encodes the real dependency-chain structure). home.tsx passes status classes to drive it
+- Full style.css rewrite (~tokens, shell, banners, home, lesson typography incl. tables/blockquotes, quiz, dashboard, backup); focus-visible outlines, prefers-reduced-motion respected
+- Icons regenerated in board/copper (512/192/apple-touch); manifest + theme-color updated to #0d1412
+- Critique pass with screenshots (home, lesson, quiz feedback, dashboard at 414×896): one revision — dashboard/weakest lesson links quieted from copper-underline to ink (boldness spent in one place); one false alarm (h2s looked copper in PNG; computed style confirmed silkscreen ink)
+- 53 tests green; build clean (one benign Vite note about font URLs resolving at runtime, expected for base-prefixed public paths)
+- Test-env note: the browse daemon's SW cache served a stale build twice; final verification done against the built artifact directly
+
+**In progress / half-finished:** nothing half-finished. Design system is in; DESIGN.md doc not written (tokens are documented in style.css's header comment — a separate DESIGN.md can be Stage E polish if wanted).
+**Next session should start with:** Christopher looking at the live app (hard-refresh once) and reacting — the design is for him; his veto/tweaks welcome. Then Gate B inputs or M6 authoring.
+**Open questions for Christopher:** does the board/copper identity land for you? Any tweaks before it settles?
+**New DECISIONS.md entries this session:** D-020 (ratified — his request)

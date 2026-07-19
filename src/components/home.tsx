@@ -88,8 +88,15 @@ export function Home({
             {module.lessons.map((lesson) => {
               const questions = questionCountFor(module, lesson.id);
               const status = statuses.get(lesson.id)?.status;
+              // The class drives the via-rail marker: done = filled copper,
+              // started = copper ring, absent = hollow.
               return (
-                <li key={lesson.id}>
+                <li
+                  key={lesson.id}
+                  class={
+                    status === "done" ? "done" : status === "in-progress" ? "started" : ""
+                  }
+                >
                   <a href={lessonHref(lesson.id)}>{lesson.title}</a>
                   <span class="lesson-meta">
                     {status === "done" && <span class="badge-done">done ✓ </span>}

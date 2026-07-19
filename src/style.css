@@ -1,20 +1,76 @@
-/* Single stylesheet for the shell. Component-level styles stay here until
-   there's a reason to split — one file is easier to keep consistent, and the
-   app is small (cold-start budget: 2 s, see BUILD_PLAN Stage A tests). */
+/* Metal's visual identity: a circuit board. Solder-mask green-black surfaces,
+   copper for identity/progress (traces), silkscreen white for text, IBM Plex
+   Mono for the engineering voice. LED green/red are RESERVED for quiz
+   correctness — never decoration. The one signature element is the via rail:
+   lesson lists are threaded by a trace whose vias fill with copper as lessons
+   complete (design pass: D-020).
+
+   Fonts are self-hosted (public/fonts, OFL license alongside) — offline-first
+   forbids CDN anything. Paths are absolute under the Pages base, matching
+   index.html's convention (D-012). */
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/bare-metal/fonts/ibm-plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/bare-metal/fonts/ibm-plex-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/bare-metal/fonts/ibm-plex-mono-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/bare-metal/fonts/ibm-plex-sans-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/bare-metal/fonts/ibm-plex-sans-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/bare-metal/fonts/ibm-plex-sans-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/bare-metal/fonts/ibm-plex-sans-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
 
 :root {
-  --bg: #1a1a2e;
-  --surface: #24243c;
-  --surface-raised: #2e2e4a;
-  --text: #e8e8f0;
-  --text-dim: #9a9ab0;
-  --accent: #4cc9a4;
-  --danger: #e07a7a;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  /* the board */
+  --board: #0d1412; /* solder mask, near-black green */
+  --mask: #141d18; /* raised surface */
+  --mask-2: #1a2620; /* hover / inset surface */
+  --hairline: #24312a;
+  /* silkscreen */
+  --ink: #e8ece9;
+  --ink-dim: #91a198;
+  /* copper: identity, progress, interaction */
+  --copper: #d08a4a;
+  --copper-bright: #e2a468;
+  --copper-dark: #8a5a30;
+  /* status LEDs — reserved for correctness, never decoration */
+  --led-ok: #62c084;
+  --led-err: #e07268;
+
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 * {
@@ -23,175 +79,385 @@
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.6;
+  background: var(--board);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
 }
+
+a {
+  color: var(--copper);
+  text-decoration-color: color-mix(in srgb, var(--copper) 45%, transparent);
+  text-underline-offset: 3px;
+  transition: color 120ms ease;
+}
+
+a:hover {
+  color: var(--copper-bright);
+}
+
+:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---------------- shell ---------------- */
 
 .shell {
   max-width: 42rem;
   margin: 0 auto;
-  padding: 1.5rem 1rem;
+  padding: 1.5rem 1rem 3rem;
 }
 
 .shell-header h1 {
-  font-size: 2rem;
-  letter-spacing: 0.02em;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* a copper pad before the wordmark — the board's origin point */
+.shell-header h1::before {
+  content: "";
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--copper);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 2px var(--board),
+    0 0 0 3px var(--copper-dark);
 }
 
 .shell-header h1 a {
-  color: var(--text);
+  color: var(--ink);
   text-decoration: none;
 }
 
 .tagline {
-  color: var(--text-dim);
+  color: var(--ink-dim);
+  font-size: 0.95rem;
+  margin-top: 0.15rem;
+}
+
+.shell-nav {
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  gap: 1.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell-nav a {
+  color: var(--ink-dim);
+  text-decoration: none;
+}
+
+.shell-nav a:hover {
+  color: var(--copper);
 }
 
 .shell-main {
-  margin-top: 2rem;
-  background: var(--surface);
-  border-radius: 0.5rem;
-  padding: 1.25rem;
-}
-
-a {
-  color: var(--accent);
-}
-
-.status {
-  color: var(--text-dim);
-}
-
-.error-block {
-  border-left: 4px solid var(--danger);
-  padding-left: 1rem;
-}
-
-.error-block h2 {
-  color: var(--danger);
-  font-size: 1.1rem;
-}
-
-/* ---------------- home: module cards ---------------- */
-
-.module-card h2 {
-  font-size: 1.25rem;
-}
-
-.module-card + .module-card {
   margin-top: 1.5rem;
 }
 
+.status {
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+/* ---------------- banners & errors ---------------- */
+
+.error-block {
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--led-err);
+  border-radius: 4px;
+  background: var(--mask);
+  padding: 1rem 1.25rem;
+}
+
+.error-block h2 {
+  color: var(--led-err);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.warn-banner {
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--copper);
+  border-radius: 4px;
+  background: var(--mask);
+  padding: 0.6rem 0.9rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.review-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--mask);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ---------------- home: modules + the via rail ---------------- */
+
+.module-card {
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--mask);
+  padding: 1rem 1.25rem 1.1rem;
+}
+
+.module-card + .module-card {
+  margin-top: 1rem;
+}
+
+.module-card h2 {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+/* The signature: a trace runs down the lesson list; each lesson is a via.
+   Hollow ring = untouched, copper ring = started, filled copper = done.
+   The rail encodes the truth that lessons are a dependency chain. */
 .lesson-list {
   list-style: none;
-  padding: 0;
-  margin-top: 0.5rem;
+  padding: 0.25rem 0 0 1.4rem;
+  margin: 0.5rem 0 0;
+  position: relative;
+}
+
+.lesson-list::before {
+  content: "";
+  position: absolute;
+  left: 0.32rem;
+  top: 0.9rem;
+  bottom: 0.9rem;
+  width: 2px;
+  background: var(--hairline);
 }
 
 .lesson-list li {
-  padding: 0.4rem 0;
+  position: relative;
+  padding: 0.45rem 0;
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 1rem;
   flex-wrap: wrap;
 }
 
+.lesson-list li::before {
+  content: "";
+  position: absolute;
+  left: -1.4rem;
+  top: 0.95rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--board);
+  border: 2px solid var(--ink-dim);
+}
+
+.lesson-list li.started::before {
+  border-color: var(--copper);
+}
+
+.lesson-list li.done::before {
+  border-color: var(--copper);
+  background: var(--copper);
+}
+
+.lesson-list a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.lesson-list a:hover {
+  color: var(--copper-bright);
+}
+
 .lesson-meta {
-  color: var(--text-dim);
-  font-size: 0.85rem;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.badge-done {
+  color: var(--copper);
+  font-weight: 600;
+}
+
+.badge-progress {
+  color: var(--ink-dim);
 }
 
 /* ---------------- lesson view ---------------- */
 
 .crumbs {
   margin-bottom: 1rem;
-  font-size: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.crumbs a {
+  color: var(--ink-dim);
+  text-decoration: none;
+}
+
+.crumbs a:hover {
+  color: var(--copper);
 }
 
 .lesson-module {
-  color: var(--text-dim);
-  font-size: 0.85rem;
+  color: var(--copper);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.12em;
+}
+
+article h2,
+.shell-main > div > h2 {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.35rem;
+  line-height: 1.35;
+  margin-top: 0.2rem;
 }
 
 .objectives {
-  background: var(--surface-raised);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-  margin: 1rem 0;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--mask);
+  padding: 0.85rem 1.1rem;
+  margin: 1.1rem 0;
 }
 
 .objectives h3,
-.sources h3 {
-  font-size: 0.85rem;
+.sources h3,
+.dash-section {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-dim);
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
 }
 
 .objectives ul {
-  margin: 0.25rem 0 0;
-  padding-left: 1.25rem;
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
 }
 
-/* Typography for compiler-rendered lesson HTML (headings, tables, code). */
+.objectives li {
+  margin: 0.2rem 0;
+}
 
 .lesson-body {
-  margin-top: 1.25rem;
+  margin-top: 1.4rem;
+  font-size: 1.02rem;
 }
 
 .lesson-body h2 {
-  font-size: 1.15rem;
-  margin: 1.5rem 0 0.5rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 1.05rem;
+  margin: 1.8rem 0 0.6rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--hairline);
 }
 
 .lesson-body p,
 .lesson-body ul,
 .lesson-body ol {
-  margin: 0.75rem 0;
+  margin: 0.8rem 0;
 }
 
 .lesson-body li {
-  margin: 0.25rem 0;
+  margin: 0.3rem 0;
+}
+
+.lesson-body blockquote {
+  border-left: 3px solid var(--copper);
+  margin: 1rem 0;
+  padding: 0.2rem 0 0.2rem 1rem;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
 }
 
 .lesson-body table {
   border-collapse: collapse;
-  margin: 1rem 0;
+  margin: 1.1rem 0;
   width: 100%;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .lesson-body th,
 .lesson-body td {
-  border: 1px solid var(--surface-raised);
-  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--hairline);
+  padding: 0.45rem 0.65rem;
   text-align: left;
 }
 
 .lesson-body th {
-  background: var(--surface-raised);
+  background: var(--mask);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
 }
 
 .lesson-body code {
-  background: var(--surface-raised);
-  border-radius: 0.25rem;
-  padding: 0.1rem 0.35rem;
-  font-size: 0.9em;
+  font-family: var(--font-mono);
+  background: var(--mask);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.88em;
 }
 
 .lesson-footer {
   margin-top: 2rem;
-  border-top: 1px solid var(--surface-raised);
+  border-top: 1px solid var(--hairline);
   padding-top: 1rem;
 }
 
 .sources ul {
-  margin: 0.25rem 0 0;
-  padding-left: 1.25rem;
-  color: var(--text-dim);
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--ink-dim);
   font-size: 0.85rem;
 }
 
@@ -204,15 +470,23 @@ a {
 
 .btn {
   display: inline-block;
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--copper);
+  color: var(--board);
   border: none;
-  border-radius: 0.4rem;
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
+  border-radius: 3px;
+  padding: 0.55rem 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
   cursor: pointer;
   text-decoration: none;
+  transition: background 120ms ease;
+}
+
+.btn:hover {
+  background: var(--copper-bright);
+  color: var(--board);
 }
 
 .quiz-cta {
@@ -230,18 +504,23 @@ a {
 }
 
 .quiz-option {
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid transparent;
-  border-radius: 0.4rem;
-  padding: 0.6rem 0.9rem;
+  background: var(--mask);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0.65rem 0.95rem;
+  font-family: var(--font-sans);
   font-size: 1rem;
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
 }
 
 .quiz-option:hover {
-  border-color: var(--accent);
+  border-color: var(--copper);
+  background: var(--mask-2);
 }
 
 .quiz-short {
@@ -253,36 +532,47 @@ a {
 .quiz-short input {
   flex: 1;
   min-width: 12rem;
-  background: var(--surface-raised);
-  color: var(--text);
-  border: 1px solid var(--text-dim);
-  border-radius: 0.4rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 1rem;
+  background: var(--mask);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0.55rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.quiz-short input:focus {
+  border-color: var(--copper);
+  outline: none;
 }
 
 .quiz-result {
-  font-weight: 700;
-  font-size: 1.1rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   margin: 1rem 0 0.5rem;
 }
 
 .quiz-result.correct {
-  color: var(--accent);
+  color: var(--led-ok);
 }
 
 .quiz-result.incorrect {
-  color: var(--danger);
+  color: var(--led-err);
 }
 
 .quiz-given {
-  color: var(--text-dim);
+  color: var(--ink-dim);
 }
 
 .quiz-explanation {
-  background: var(--surface-raised);
-  border-radius: 0.4rem;
-  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--copper);
+  border-radius: 4px;
+  background: var(--mask);
+  padding: 0.7rem 1rem;
   margin: 0.75rem 0 1rem;
 }
 
@@ -299,20 +589,25 @@ a {
 .quiz-review-mark {
   display: inline-block;
   width: 1.5rem;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-weight: 600;
 }
 
 .quiz-review li.correct .quiz-review-mark {
-  color: var(--accent);
+  color: var(--led-ok);
 }
 
 .quiz-review li.incorrect .quiz-review-mark {
-  color: var(--danger);
+  color: var(--led-err);
 }
 
 .quiz-note {
-  color: var(--text-dim);
+  color: var(--ink-dim);
   font-size: 0.9rem;
+}
+
+.quiz-note-warn {
+  color: var(--led-err);
 }
 
 .quiz-actions {
@@ -322,93 +617,46 @@ a {
   align-items: center;
 }
 
-.quiz-note-warn {
-  color: var(--danger);
-}
-
-/* ---------------- progress ---------------- */
-
-.warn-banner {
-  background: var(--surface);
-  border-left: 4px solid var(--danger);
-  border-radius: 0.4rem;
-  padding: 0.6rem 0.9rem;
-  margin-top: 1rem;
-  font-size: 0.9rem;
-}
-
-.badge-done {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.badge-progress {
-  color: var(--text-dim);
-}
-
-.review-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  background: var(--surface-raised);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.5rem;
-}
-
-/* ---------------- shell nav ---------------- */
-
-.shell-nav {
-  margin-top: 0.5rem;
-  display: flex;
-  gap: 1.25rem;
-  font-size: 0.9rem;
-}
-
 /* ---------------- dashboard ---------------- */
 
 .dash-section {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-dim);
-  margin: 1.5rem 0 0.5rem;
+  margin: 1.6rem 0 0.6rem;
 }
 
 .stat-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
   gap: 0.5rem;
   margin-top: 1rem;
 }
 
 .stat-tile {
-  background: var(--surface-raised);
-  border-radius: 0.5rem;
-  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--mask);
+  padding: 0.65rem 0.85rem;
   display: flex;
   flex-direction: column;
 }
 
 .stat-value {
+  font-family: var(--font-mono);
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
-  color: var(--text-dim);
-  font-size: 0.8rem;
+  color: var(--ink-dim);
+  font-size: 0.78rem;
 }
 
-/* single-series column trend: thin marks, rounded data ends, baseline-anchored */
 .run-trend {
   display: flex;
   align-items: flex-end;
   gap: 6px;
   height: 90px;
-  border-bottom: 1px solid var(--surface-raised);
+  border-bottom: 1px solid var(--hairline);
   padding-bottom: 1px;
 }
 
@@ -425,16 +673,16 @@ a {
 
 .run-bar {
   width: 100%;
-  background: var(--accent);
-  border-radius: 4px 4px 0 0;
+  background: var(--copper);
+  border-radius: 3px 3px 0 0;
 }
 
 .run-label {
-  font-size: 0.75rem;
-  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-dim);
 }
 
-/* streak calendar: 7 rows (days), columns flow by week */
 .streak-grid {
   display: grid;
   grid-template-rows: repeat(7, 12px);
@@ -447,15 +695,15 @@ a {
   width: 12px;
   height: 12px;
   border-radius: 3px;
-  background: var(--surface-raised);
+  background: var(--mask-2);
 }
 
 .streak-cell.active {
-  background: var(--accent);
+  background: var(--copper);
 }
 
 .streak-cell.today {
-  outline: 1px solid var(--text-dim);
+  outline: 1px solid var(--ink-dim);
 }
 
 .mastery-list {
@@ -469,8 +717,23 @@ a {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.35rem 0;
+  padding: 0.4rem 0;
   flex-wrap: wrap;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.mastery-list li:last-child {
+  border-bottom: none;
+}
+
+/* quiet links: identity lives in the bars, not in a wall of copper text */
+.mastery-list a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.mastery-list a:hover {
+  color: var(--copper-bright);
 }
 
 .mastery-cell {
@@ -484,12 +747,12 @@ a {
   width: 5rem;
   height: 6px;
   border-radius: 3px;
-  background: var(--surface-raised);
+  background: var(--mask-2);
   overflow: hidden;
 }
 
 .mastery-bar-fill {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--copper);
 }
