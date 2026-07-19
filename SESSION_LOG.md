@@ -283,3 +283,18 @@ at the bottom.
 **Next session should start with:** nothing to build for Stage B. The gate waits on: (1) Christopher's week of real daily use, logged here per BUILD_PLAN; (2) D-018 + D-019 ratification; (3) the standing Gate A caveat items (incl. Gate 0 quiz, internet/power note). Only after Gate B signs: Stage C (lab harness + first 3 labs).
 **Open questions for Christopher:** start the week of real use — the app is complete enough to be your actual daily study tool now
 **New DECISIONS.md entries this session:** D-019 (pending)
+
+## Session 2026-07-19 (fourteenth block — M2 authoring)
+
+**Stage:** B (build complete; gate waiting on Christopher) — this block is curriculum authoring, which belongs to every stage (RISKS.md R2 mitigation). No Stage C work was touched.
+**Done this session:**
+
+- Authored M2 — Measurement, complete (4 lessons, sourced): 01 why timing is hard (warmup, thermal throttling, measurement bias per Mytkowicz ASPLOS 2009, perf_counter, the labs' checklist), 02 statistics for benchmarks (right-skew, mean/median/min as different questions, IQR noise floor, interleaved A/B comparison, outliers-are-data; Georges OOPSLA 2007, Kalibera & Jones), 03 profiling (sampling vs instrumentation, self vs cumulative, flame graphs, Amdahl cap; Gregg), 04 benchmarking ML (throughput↔latency dial, p50/p99 + goodput, coordinated omission per Tene, compilation warmup, async-execution sync trap; MLPerf)
+- 16 new questions (m2/q-001…q-016) — bank now 38 questions across 9 lessons, 2 modules
+- First multi-module compile: prereqs (`m2 → m1`) validated and topologically ordered by the compiler; verified on home (M1 listed before M2, all lessons + counts, no console errors)
+- The module deliberately teaches the exact methodology the Stage C harness will implement (checklist, IQR noise floor, interleaving, results-file-as-specification) — lab L2.x specs will cite these lessons
+
+**In progress / half-finished:** nothing half-finished. M3 (numerics) is the next authoring target if gate-waiting continues.
+**Next session should start with:** Christopher's Gate B inputs (week-of-use log, D-018/D-019, standing carried items). If still waiting: author M3.
+**Open questions for Christopher:** unchanged
+**New DECISIONS.md entries this session:** none

@@ -1,0 +1,11 @@
+# M2 — Measurement. Outline: docs/CURRICULUM.md. First module with a prereq:
+# every numeric claim in later modules leans on the methodology taught here.
+id: m2-measurement
+title: "Measurement: how to time things without lying to yourself"
+prereqs:
+  - m1-hardware-foundations
+lessons:
+  - 01-why-timing-is-hard
+  - 02-benchmark-statistics
+  - 03-profiling
+  - 04-benchmarking-ml
