@@ -2,7 +2,7 @@
 // when the last export happened. Depends on: lib/backup, lib/progress-store.
 // Depended on by: app.tsx.
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import {
   buildBackup,
   restoreBackup,
@@ -17,6 +17,7 @@ export function Backup({ db }: { db: ProgressDb | null }) {
   const [lastExportAt, setLastExportAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!db) return;
@@ -107,14 +108,24 @@ export function Backup({ db }: { db: ProgressDb | null }) {
           Merges the file into this device's history — nothing local is deleted or
           overwritten. Safe to restore the same file twice.
         </p>
+        {/* The native file input is unstylable, so it stays hidden and a
+            themed button proxies the click. */}
         <input
+          ref={fileInput}
           type="file"
           accept="application/json,.json"
+          class="hidden-file-input"
           onChange={(e) => {
             const file = (e.target as HTMLInputElement).files?.[0];
             if (file) void doRestore(file);
+            (e.target as HTMLInputElement).value = "";
           }}
         />
+        <p>
+          <button class="btn-quiet" onClick={() => fileInput.current?.click()}>
+            Choose backup file…
+          </button>
+        </p>
       </section>
 
       {message && <p class="quiz-note">{message}</p>}
