@@ -298,3 +298,18 @@ at the bottom.
 **Next session should start with:** Christopher's Gate B inputs (week-of-use log, D-018/D-019, standing carried items). If still waiting: author M3.
 **Open questions for Christopher:** unchanged
 **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (fifteenth block — M3 authoring)
+
+**Stage:** B (build complete; gate waiting on Christopher) — curriculum authoring block, no Stage C work touched.
+**Done this session:**
+
+- Authored M3 — Numerics, complete (4 lessons, sourced): 01 IEEE 754 from the bits up (1/8/23 split, why 0.1 doesn't exist, spacing/machine epsilon, rounding, specials; Goldberg 1991), 02 fp16 vs bf16 (range-vs-precision split, why bf16 won training, store-narrow/accumulate-wide, roofline tie-in; Micikevicius ICLR 2018), 03 int8 quantization (affine map, scale/zero-point, calibration + clipping tension, the three wins, int32 accumulators; Jacob CVPR 2018, Nagel 2021), 04 failure modes (overflow/underflow/absorption/cancellation, non-associativity → parallel non-determinism, NaN debugging, loss scaling; Higham)
+- 16 new questions (m3/q-001…q-016) — curriculum now 3 modules, 13 lessons, 54 questions, all compiling clean
+- Verified in browser (after clearing the test daemon's stale SW — recurring test-env nuisance, not a product bug): M3 on home, lesson renders, no console errors
+- Deliberate cross-links: M3 leans on M1's roofline (precision as a bandwidth dial) and sets up M6 (quantization) and the L3.x labs
+
+**In progress / half-finished:** nothing half-finished. M1–M3 are the complete "toolkit" arc (hardware, measurement, numerics); M4 (data pipelines) is the next authoring target.
+**Next session should start with:** Christopher's Gate B inputs; else M4 authoring.
+**Open questions for Christopher:** unchanged
+**New DECISIONS.md entries this session:** none

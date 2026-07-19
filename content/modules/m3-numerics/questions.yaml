@@ -1,0 +1,253 @@
+# M3 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+
+# ---- Lesson 01: IEEE 754 ----
+
+- id: m3/q-001
+  lesson: m3/01-ieee-754
+  type: mcq
+  prompt: "How are float32's 32 bits divided?"
+  options:
+    - "1 sign, 8 exponent, 23 mantissa"
+    - "1 sign, 11 exponent, 20 mantissa"
+    - "8 sign, 8 exponent, 16 mantissa"
+    - "1 sign, 15 exponent, 16 mantissa"
+  answer: 0
+  explanation: >-
+    1/8/23. The exponent's 8 bits set the range (~10^±38); the 23 stored
+    mantissa bits (plus the implicit leading 1) give ~7 decimal digits.
+  tags: [numerics, ieee754]
+
+- id: m3/q-002
+  lesson: m3/01-ieee-754
+  type: mcq
+  prompt: "Why is 0.1 + 0.2 == 0.3 false in floating point?"
+  options:
+    - "A known hardware bug never fixed for compatibility"
+    - "1/10 is a repeating fraction in binary, so 0.1 is stored as a nearby value"
+    - "Addition randomly loses the last bit"
+  answer: 1
+  explanation: >-
+    Like 1/3 in decimal, 1/10 repeats forever in binary. Each constant is
+    rounded, the sum rounds again — compare with a tolerance, never with ==.
+  tags: [numerics, representation]
+
+- id: m3/q-003
+  lesson: m3/01-ieee-754
+  type: short
+  prompt: >-
+    The gap between 1.0 and the next representable float32 (~1.2×10⁻⁷) has a
+    standard name. What is it? (two words)
+  accept:
+    - "machine epsilon"
+    - "epsilon"
+  explanation: >-
+    Machine epsilon. Add anything much smaller than it to 1.0 and the answer
+    is still 1.0 — absorption, the seed of lesson 04's failures.
+  tags: [numerics, precision]
+
+- id: m3/q-004
+  lesson: m3/01-ieee-754
+  type: mcq
+  prompt: "How many float32 values lie between 1024 and 2048, compared to between 1 and 2?"
+  options:
+    - "Far fewer — big numbers are sparse"
+    - "Exactly the same count"
+    - "Far more — big numbers need more coverage"
+  answer: 1
+  explanation: >-
+    The mantissa gives a fixed number of steps per power of two, so every
+    [2^k, 2^(k+1)) interval holds the same count — absolute spacing grows
+    with magnitude.
+  tags: [numerics, representation]
+
+# ---- Lesson 02: fp16 / bf16 ----
+
+- id: m3/q-005
+  lesson: m3/02-fp16-bf16
+  type: mcq
+  prompt: "What distinguishes bf16 from fp16?"
+  options:
+    - "bf16 keeps fp32's 8-bit exponent (same range) with a 7-bit mantissa; fp16 trades range for a 10-bit mantissa"
+    - "bf16 is 18 bits wide"
+    - "fp16 has the larger range, bf16 the higher precision"
+    - "They are two names for the same format"
+  answer: 0
+  explanation: >-
+    Same 16 bits, opposite splits: fp16 = 5-bit exponent (max 65504) with
+    more precision; bf16 = fp32's range with coarse precision.
+  tags: [numerics, formats]
+
+- id: m3/q-006
+  lesson: m3/02-fp16-bf16
+  type: mcq
+  prompt: "Why did bf16 become the training default over fp16?"
+  options:
+    - "It's more precise than fp16"
+    - "Its fp32-sized range means gradients don't overflow/underflow, so no loss-scaling machinery is needed"
+    - "It's faster to convert to int8"
+    - "fp16 is patent-encumbered"
+  answer: 1
+  explanation: >-
+    Gradients span wild magnitudes; range is what saves them. Gradient noise
+    already exceeds bf16's rounding error, so the lost precision is cheap.
+  tags: [numerics, training]
+
+- id: m3/q-007
+  lesson: m3/02-fp16-bf16
+  type: mcq
+  prompt: >-
+    A memory-bound elementwise op switches tensors from fp32 to bf16. On the
+    roofline (M1), what happens?
+  options:
+    - "Nothing — the FLOPs are unchanged"
+    - "Bytes halve, so arithmetic intensity doubles and the bandwidth-bound speed limit doubles"
+    - "It becomes slower due to conversion costs"
+  answer: 1
+  explanation: >-
+    Half the bytes per element at the same FLOPs slides the op right on the
+    roofline: the AI × bandwidth ceiling doubles. This is why precision is a
+    systems dial, not just an accuracy dial.
+  tags: [numerics, roofline]
+
+- id: m3/q-008
+  lesson: m3/02-fp16-bf16
+  type: short
+  prompt: >-
+    The standard mixed-precision pattern: store and move tensors narrow, but
+    do sums in a wider type. Complete the slogan: "store narrow, ______ wide."
+  accept:
+    - "accumulate"
+    - "accumulate wide"
+  explanation: >-
+    Accumulate wide — matmul units sum bf16/fp16 products into fp32;
+    int8 products sum into int32. Protect the accumulations.
+  tags: [numerics, patterns]
+
+# ---- Lesson 03: int8 quantization ----
+
+- id: m3/q-009
+  lesson: m3/03-int8-quantization
+  type: mcq
+  prompt: "In affine quantization, real ≈ scale × (int − zero_point). What is `scale`?"
+  options:
+    - "The tensor's largest value"
+    - "The real-valued width of one integer step"
+    - "The number of bits used"
+    - "A random seed for rounding"
+  answer: 1
+  explanation: >-
+    Scale is the tick width of the 256-tick ruler: the tensor's measured
+    range divided by 255. Zero-point pins which tick means real 0.0.
+  tags: [numerics, quantization]
+
+- id: m3/q-010
+  lesson: m3/03-int8-quantization
+  type: mcq
+  prompt: "What does calibration do in post-training quantization?"
+  options:
+    - "Retrains the model at 8-bit precision"
+    - "Runs sample data to measure each tensor's real value range, from which scales are chosen"
+    - "Rounds all weights to the nearest integer"
+    - "Verifies accuracy after quantization"
+  answer: 1
+  explanation: >-
+    The scale must stretch the ruler over the range values actually occupy —
+    weights are known statically, activations need representative data. Too
+    wide → coarse ticks; too tight → clipping.
+  tags: [numerics, quantization]
+
+- id: m3/q-011
+  lesson: m3/03-int8-quantization
+  type: mcq
+  prompt: >-
+    For bandwidth-bound LLM decode, int8 weights (vs fp32) buy roughly what
+    speedup, before any other optimization?
+  options:
+    - "None — decode is compute-bound"
+    - "~1.3×"
+    - "~4×, because 4× fewer bytes stream through the memory system"
+    - "~100×"
+  answer: 2
+  explanation: >-
+    Decode streams the weights past the compute for every token; at 1/4 the
+    bytes, the memory-bound ceiling rises ~4×. M1's roofline doing money work.
+  tags: [numerics, quantization, roofline]
+
+- id: m3/q-012
+  lesson: m3/03-int8-quantization
+  type: mcq
+  prompt: "Why are int8 × int8 products accumulated in int32?"
+  options:
+    - "Hardware has no int8 adders"
+    - "Hundreds of summed ±127×±127 products would overflow 8 bits almost immediately"
+    - "int32 is faster than int8"
+    - "For compatibility with Python integers"
+  answer: 1
+  explanation: >-
+    A single product can reach ~16K; a dot product sums hundreds of them.
+    Accumulate wide (int32), then re-quantize — the module's standing pattern.
+  tags: [numerics, quantization]
+
+# ---- Lesson 04: failure modes ----
+
+- id: m3/q-013
+  lesson: m3/04-failure-modes
+  type: short
+  prompt: >-
+    Subtracting two nearly equal numbers cancels their accurate leading
+    digits and promotes rounding noise. What is this failure called? (two words)
+  accept:
+    - "catastrophic cancellation"
+    - "cancellation"
+  explanation: >-
+    Catastrophic cancellation — the classic case is variance via
+    E[x²] − E[x]². Restructure the algorithm; don't just add precision.
+  tags: [numerics, failures]
+
+- id: m3/q-014
+  lesson: m3/04-failure-modes
+  type: mcq
+  prompt: >-
+    The same model trains to slightly different losses on 4 GPUs vs 8. A
+    legitimate (non-bug) explanation:
+  options:
+    - "Floating-point addition isn't associative — different reduction orders round differently"
+    - "More GPUs are inherently less accurate"
+    - "The learning rate scales with GPU count automatically"
+  answer: 0
+  explanation: >-
+    Parallel sums group terms differently, and (a+b)+c ≠ a+(b+c) in floats.
+    Fixed reduction orders or wider accumulators buy reproducibility.
+  tags: [numerics, failures, distributed]
+
+- id: m3/q-015
+  lesson: m3/04-failure-modes
+  type: mcq
+  prompt: "What does loss scaling do in fp16 mixed-precision training?"
+  options:
+    - "Normalizes the loss to [0, 1] for stability"
+    - "Multiplies the loss by S so all gradients ride through backprop at magnitudes above fp16's underflow floor, then unscales before the update"
+    - "Clips exploding gradients to a maximum norm"
+    - "Reduces the learning rate when the loss spikes"
+  answer: 1
+  explanation: >-
+    By linearity, scaling the loss scales every gradient — lifting small ones
+    out of the silent-death zone. Divide by S (in fp32) before updating.
+    bf16 made the whole dance unnecessary.
+  tags: [numerics, training]
+
+- id: m3/q-016
+  lesson: m3/04-failure-modes
+  type: mcq
+  prompt: "A training loss suddenly reads NaN. The most likely story is:"
+  options:
+    - "The dataset contains a corrupted label"
+    - "An overflow (inf) or invalid operation upstream propagated through the graph to the loss"
+    - "The random seed was reused"
+    - "NaN means training converged"
+  answer: 1
+  explanation: >-
+    NaN is a symptom that flows: an activation spike overflowed (fp16's 65504
+    is nearby) or an inf−inf/0÷0 occurred, layers earlier. Debug at layer
+    boundaries, suspect the narrowest format first.
+  tags: [numerics, failures, training]

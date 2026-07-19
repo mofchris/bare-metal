@@ -1,0 +1,11 @@
+# M3 — Numerics. Outline: docs/CURRICULUM.md. Precision-as-a-dial is half of
+# modern training/inference economics; M6 (compression) builds directly on it.
+id: m3-numerics
+title: "Numerics: floating point, and precision as a dial"
+prereqs:
+  - m1-hardware-foundations
+lessons:
+  - 01-ieee-754
+  - 02-fp16-bf16
+  - 03-int8-quantization
+  - 04-failure-modes
