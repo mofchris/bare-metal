@@ -140,3 +140,24 @@ at the bottom.
 - Internet/power reliability note for BUILD_PLAN MY SETUP
 - D-013…D-017 pending batch review
   **New DECISIONS.md entries this session:** D-017 (pending)
+
+## Session 2026-07-19 (seventh block — PWA layer)
+
+**Stage:** A — Walking Skeleton | **Gate status:** Gate A unsigned
+**Done this session:**
+
+- Hand-rolled service worker (D-008) via `tools/sw/`: generator scans dist/, emits sw.js with the full precache list + a content-hash cache version; precache-on-install, cache-first, navigations fall back to the cached app shell, old caches deleted on activate; `npm run build:sw` is the last build step
+- PWA manifest (`public/manifest.webmanifest`): standalone display, scoped to /bare-metal/; icons generated from `tools/icons/icon-source.html` (committed PNGs: 512 maskable, 192, apple-touch 180); index.html carries manifest + apple-touch-icon + iOS meta
+- SW registration in main.tsx — production builds only (dev stays uncached on purpose)
+- 3 new generator tests (precache list correctness, version-changes-only-on-content-change, refuses unbuilt dist) — 30 tests total, green
+- **Offline verified end-to-end:** installed SW in headless browser, killed the preview server, reloaded — full lesson AND quiz render with zero console errors, server confirmed dead
+- **Bug found & fixed during verification (the reason we hand-roll):** crossorigin-attributed loads (module JS + stylesheet) send an Origin header, and the Cache API's default Vary matching made exactly those two lookups miss offline. Fix: `ignoreVary` in cache matches — correct since all cached entries are same-origin static assets keyed by URL. First offline attempt failed empty; diagnosis via network log (the two failures were precisely the two crossorigin resources)
+
+**In progress / half-finished:** Stage A ~85%. Remaining: M1 lessons 02–05 + their questions (largest chunk), README v1 setup instructions, then Gate A manual tests (Christopher: install on iPhone from live URL, offline check, mid-quiz kill on both devices, cold-start ≤2 s measurement). PWA install on real iOS is UNVERIFIED — headless Chromium ≠ iOS Safari; that's a Gate A manual item.
+**Next session should start with:** the carried-over Gate 0 quiz, then authoring M1 lessons 02–05 (curriculum outline in docs/CURRICULUM.md; format proven by lesson 01), then README v1.
+**Open questions for Christopher:**
+
+- Gate 0 quiz answers (carried over — seventh time)
+- Internet/power reliability note for BUILD_PLAN MY SETUP
+- D-013…D-017 pending batch review
+  **New DECISIONS.md entries this session:** none (SW design was already D-008)

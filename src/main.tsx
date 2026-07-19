@@ -12,3 +12,19 @@ if (!root) {
   throw new Error("Metal: #app mount element not found in index.html");
 }
 render(<App />, root);
+
+// Offline support (D-008): sw.js is generated into dist/ by the build
+// (tools/sw), so it only exists in production builds — the dev server runs
+// uncached on purpose, otherwise every edit would fight the cache.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`)
+      .catch((e: unknown) => {
+        // No UI for this: the app works identically without the worker, it
+        // just won't be available offline. The console entry keeps it loud
+        // enough to notice while debugging.
+        console.error("Metal: service worker registration failed", e);
+      });
+  });
+}

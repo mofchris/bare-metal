@@ -8,6 +8,13 @@
       name="description"
       content="Metal — a self-contained, offline-capable MLSys learning platform"
     />
+    <!-- PWA: paths are absolute under the GitHub Pages base (matches
+         vite.config.ts base, D-012) because Vite doesn't rewrite public/
+         references in HTML. -->
+    <link rel="manifest" href="/bare-metal/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/bare-metal/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Metal" />
     <title>Metal</title>
   </head>
   <body>

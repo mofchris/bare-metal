@@ -1,0 +1,23 @@
+{
+  "name": "Metal — MLSys Learning",
+  "short_name": "Metal",
+  "description": "A self-contained, offline-capable Machine Learning Systems learning platform",
+  "start_url": "/bare-metal/",
+  "scope": "/bare-metal/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "npm run build:content && vite",
     "build:content": "node tools/content-compiler/cli.ts",
-    "build": "npm run build:content && tsc --noEmit && vite build",
+    "build:sw": "node tools/sw/cli.ts",
+    "build": "npm run build:content && tsc --noEmit && vite build && npm run build:sw",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
