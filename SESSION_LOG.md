@@ -75,3 +75,24 @@ at the bottom.
 - Internet/power reliability note for BUILD_PLAN MY SETUP
 - D-013, D-014, D-015 pending your ok (batched, none urgent)
   **New DECISIONS.md entries this session:** D-014, D-015 (pending); D-012 ratified
+
+## Session 2026-07-19 (fourth block — lesson renderer)
+
+**Stage:** A — Walking Skeleton | **Gate status:** Gate A unsigned
+**Done this session:**
+
+- App now loads and renders the curriculum: `src/lib/load-curriculum.ts` (fetch + shape check with actionable error messages), `src/lib/route.ts` (hash routing, D-016), `src/lib/lookup.ts` (lesson lookup + next-lesson nav)
+- Screens: `components/home.tsx` (module TOC with per-lesson question counts), `components/lesson-view.tsx` (objectives, compiler-rendered HTML body, sources, next-lesson link); `app.tsx` rewritten with explicit loading/error/not-found states
+- Lesson typography in style.css (tables, code, headings — the M1 latency table renders properly)
+- 8 new tests (route parsing, curriculum shape validation, lesson lookup) — 18 total, all passing
+- End-to-end verified in a real headless browser: home → click lesson → full lesson renders, zero console errors; checked at iPhone-XR viewport (414×896) with screenshot — layout clean
+- The deployed placeholder text is gone: the live site now shows actual curriculum
+
+**In progress / half-finished:** Stage A ~50%. Not built yet: quiz engine UI (grading logic exists in lib/short-answer.ts but no screen uses it), IndexedDB persistence, PWA manifest + service worker, M1 lessons 02–05, README v1. Nothing half-broken — every built screen is complete.
+**Next session should start with:** the carried-over Gate 0 quiz, then the quiz engine UI (MCQ + short answer, per-lesson quiz flow using the existing grading lib), which unblocks persistence right after.
+**Open questions for Christopher:**
+
+- Gate 0 quiz answers (carried over — fourth time)
+- Internet/power reliability note for BUILD_PLAN MY SETUP
+- D-013…D-016 pending batch review
+  **New DECISIONS.md entries this session:** D-016 (pending)

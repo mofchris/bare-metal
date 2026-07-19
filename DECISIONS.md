@@ -70,3 +70,7 @@ Status: pending.
 **D-015** | Stage A | _Compiler runs via Node's native TypeScript type-stripping (`node cli.ts`); validation is hand-rolled, not a schema library._
 Options considered: tsx/ts-node to execute TS tools (extra dependency doing what Node ≥ 22.18 now does natively — our Node 24 runs .ts directly); compiling tools with tsc first (build-step bookkeeping for no gain). Validation: zod (nice API, but a ~14 KB dependency to express ~15 checks) vs hand-rolled validators with error accumulation (plain conditionals a stranger can read; every problem reported in one pass, tagged with the offending file). Tradeoff: hand-rolled checks must be updated by hand as the schema grows — acceptable, the schema is ours and small. Constraint accepted: type-stripping requires `.ts` extensions on relative imports in tools/ (`allowImportingTsExtensions`). My question to Christopher: none.
 Status: pending.
+
+**D-016** | Stage A | _Navigation uses hash routing (`#/lesson/<id>`), not the history API._
+Options considered: history-API routes like `/lesson/m1/x` (cleaner URLs, but GitHub Pages is a static file server — refreshing or direct-linking such a URL 404s unless we add a 404.html redirect hack); hash routes (the fragment never reaches the server, so refresh, bookmarks, PWA launches, and offline all work with zero server config). Tradeoff: URLs are slightly uglier; irrelevant for a personal study app. Implementation is ~20 lines in `src/lib/route.ts` — no router dependency. My question to Christopher: none.
+Status: pending.

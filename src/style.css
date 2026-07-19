@@ -5,9 +5,11 @@
 :root {
   --bg: #1a1a2e;
   --surface: #24243c;
+  --surface-raised: #2e2e4a;
   --text: #e8e8f0;
   --text-dim: #9a9ab0;
   --accent: #4cc9a4;
+  --danger: #e07a7a;
   font-family:
     system-ui,
     -apple-system,
@@ -37,6 +39,11 @@ body {
   letter-spacing: 0.02em;
 }
 
+.shell-header h1 a {
+  color: var(--text);
+  text-decoration: none;
+}
+
 .tagline {
   color: var(--text-dim);
 }
@@ -50,4 +57,145 @@ body {
 
 a {
   color: var(--accent);
+}
+
+.status {
+  color: var(--text-dim);
+}
+
+.error-block {
+  border-left: 4px solid var(--danger);
+  padding-left: 1rem;
+}
+
+.error-block h2 {
+  color: var(--danger);
+  font-size: 1.1rem;
+}
+
+/* ---------------- home: module cards ---------------- */
+
+.module-card h2 {
+  font-size: 1.25rem;
+}
+
+.module-card + .module-card {
+  margin-top: 1.5rem;
+}
+
+.lesson-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 0.5rem;
+}
+
+.lesson-list li {
+  padding: 0.4rem 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.lesson-meta {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* ---------------- lesson view ---------------- */
+
+.crumbs {
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.lesson-module {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.objectives {
+  background: var(--surface-raised);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+}
+
+.objectives h3,
+.sources h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.objectives ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+/* Typography for compiler-rendered lesson HTML (headings, tables, code). */
+
+.lesson-body {
+  margin-top: 1.25rem;
+}
+
+.lesson-body h2 {
+  font-size: 1.15rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.lesson-body p,
+.lesson-body ul,
+.lesson-body ol {
+  margin: 0.75rem 0;
+}
+
+.lesson-body li {
+  margin: 0.25rem 0;
+}
+
+.lesson-body table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.lesson-body th,
+.lesson-body td {
+  border: 1px solid var(--surface-raised);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+.lesson-body th {
+  background: var(--surface-raised);
+}
+
+.lesson-body code {
+  background: var(--surface-raised);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.9em;
+}
+
+.lesson-footer {
+  margin-top: 2rem;
+  border-top: 1px solid var(--surface-raised);
+  padding-top: 1rem;
+}
+
+.sources ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.next-lesson {
+  margin-top: 1rem;
+  text-align: right;
 }
