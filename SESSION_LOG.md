@@ -182,3 +182,26 @@ at the bottom.
 - D-013…D-017 pending batch review
 - Scope note needing your ruling at Gate A: BUILD_PLAN Stage A says the first module is authored "theory + labs + quiz bank," but the lab harness is a Stage C deliverable — labs can't exist before it. Proposal (standing rule 2): treat M1 labs as Stage C work, note the edit in BUILD_PLAN at gate sign-off.
   **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (ninth block — README v1, Gate A package)
+
+**Stage:** A — Walking Skeleton | **Gate status:** unsigned — package presented, awaiting Christopher's manual tests + sign-off
+**Done this session:**
+
+- README v1 rewritten: live URL at top, what-works-today list, stranger-proof setup instructions, architecture diagram updated to as-built (content compiler + sw generator), repo layout, docs table
+- Setup instructions verified by running them exactly: `npm ci` → 30/30 tests → clean build, from the locked dependency state
+- Cold start measured on this laptop (headless Chromium, localhost preview, uncached): **183 ms total load / 131 ms DOM interactive** — >10× inside the 2 s budget. Preliminary: Christopher's own measurement on the live URL fills the BUILD_PLAN blank at the gate
+- All Stage A build deliverables now complete; remaining gate items are manual and Christopher's
+
+**In progress / half-finished:** nothing half-finished. Design pass deliberately deferred (Stage E per plan; noted in chat 2026-07-19 — current styling is functional, not designed).
+**Next session should start with:** Christopher's Gate A results — the manual checklist below, the Gate 0 quiz (still owed), the labs-scope ruling, D-013…D-017 batch, internet/power note. No Stage B work before Gate A signs.
+**Gate A manual checklist for Christopher (from BUILD_PLAN):**
+
+1. Complete one full lesson + quiz on the laptop, from the live URL
+2. Same on the iPhone; install to home screen (Share → Add to Home Screen)
+3. Kill the app mid-quiz on either device; confirm answered questions survived
+4. Airplane mode / wifi off; confirm lessons + quizzes fully work offline
+5. Measure cold start on the laptop; write the number into BUILD_PLAN Stage A
+6. Then: "APPROVED + date" on Gate A, or the list of what failed
+   **Open questions for Christopher:** Gate 0 quiz (ninth time), internet/power note, D-013…D-017, labs-scope ruling (above)
+   **New DECISIONS.md entries this session:** none

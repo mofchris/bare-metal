@@ -1,81 +1,97 @@
 # Metal — a self-contained MLSys learning platform
 
-A study tool I'm building for myself: an offline-capable web app that teaches
-Machine Learning Systems through lessons, quizzes with spaced repetition,
-hands-on labs measured on my own laptop, and in-browser simulators for the
-hardware I don't have. Built ahead of a US MSc (Fall 2027).
+**Live app: https://mofchris.github.io/bare-metal/** — open it on a phone,
+"Add to Home Screen," and it works fully offline after the first load.
 
-**Status: Stage 0 — Discovery & Design.** No code yet; this stage produces the
-design documents below. The build process (stages, approval gates, decision
-log) is defined in [BUILD_PLAN.md](BUILD_PLAN.md).
+Metal is a study tool I'm building for myself: an offline-capable web app
+that teaches Machine Learning Systems through sourced lessons, quizzes with
+immediate feedback (spaced repetition arriving in Stage B), hands-on labs
+measured on my own laptop (Stage C), and in-browser simulators for the
+hardware I don't have (Stage D). Built ahead of a US MSc (Fall 2027).
 
-## Design documents
+It is also, deliberately, a portfolio piece: the repo's history, decision log,
+and session log show how it was actually built, gate by gate.
 
-| Document                                 | What it covers                                                   |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| [BUILD_PLAN.md](BUILD_PLAN.md)           | Stages, deliverables, approval gates                             |
-| [DECISIONS.md](DECISIONS.md)             | Every non-trivial decision, numbered, with rejected alternatives |
-| [docs/CURRICULUM.md](docs/CURRICULUM.md) | Full module → lesson → lab outline, dependency-ordered           |
-| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Curriculum format, question bank format, progress schema         |
-| [docs/RISKS.md](docs/RISKS.md)           | Top 5 risks and mitigations                                      |
-| [SESSION_LOG.md](SESSION_LOG.md)         | Append-only log of every working session                         |
+## What works today (Stage A)
 
-## Architecture overview
+- **Module 1 — Hardware foundations**: 5 authored lessons (memory hierarchy,
+  CPU architecture, the three budgets, the roofline model, GPUs), every
+  lesson carrying sources; 22-question quiz bank
+- **Quiz engine**: MCQ + short answer, immediate feedback with explanations
+- **Progress persistence**: every answer is written to IndexedDB the moment
+  it's graded — killing the app mid-quiz loses nothing
+- **Offline-first PWA**: a hand-rolled ~60-line service worker precaches the
+  app and content; installable on iOS/Android home screens
 
-The whole system is three parts: a **static web app** (the study tool), a
-**content pipeline** (turns Markdown lessons into validated JSON at build
-time), and a **lab-runner** (Python scripts that run experiments on my laptop
-and hand results back to the app as a file).
+## Running it yourself
 
-There is no server at runtime. GitHub Pages serves static files; everything
-else happens on my devices.
+Prerequisites: [Node.js](https://nodejs.org) ≥ 22.18 (the build runs
+TypeScript tools with Node's native type-stripping). Any OS.
+
+```bash
+git clone https://github.com/mofchris/bare-metal.git
+cd bare-metal
+npm ci          # install exact locked dependencies
+npm test        # 30 tests: grading, content validation, persistence, SW generation
+npm run dev     # compile content + start dev server (URL printed; append /bare-metal/)
+npm run build   # full production build into dist/ (content → typecheck → bundle → sw)
+npm run preview # serve the production build locally
+```
+
+If `npm run build` fails with "Content compilation failed," that's the
+content compiler doing its job — the message names the file and the problem.
+
+## How it's put together
+
+Three parts; no server exists at runtime anywhere:
 
 ```mermaid
 flowchart TB
     subgraph repo["This repo"]
-        content["content/ — lessons (Markdown+YAML),<br/>question banks, lab specs"]
-        compiler["Content compiler (build time):<br/>validates + emits JSON.<br/>Malformed content fails the build loudly."]
-        app["Web app (TypeScript + Preact):<br/>lesson renderer, quiz engine,<br/>dashboard, simulators, service worker"]
-        labrunner["lab-runner/ — Python+PyTorch harness:<br/>runs labs locally, measures, verifies targets"]
+        content["content/ — lessons (Markdown+YAML),<br/>question banks"]
+        compiler["tools/content-compiler (build time):<br/>validates + renders → curriculum.json.<br/>Malformed content fails the build loudly."]
+        app["src/ — web app (TypeScript + Preact):<br/>lesson renderer, quiz engine, hash router"]
+        sw["tools/sw (build time):<br/>generates precache service worker"]
     end
 
     pages["GitHub Pages (static hosting)"]
-    laptop["Laptop browser (PWA, offline)"]
-    phone["iPhone XR Safari (PWA, offline)"]
-    idb[("IndexedDB:<br/>attempts, progress,<br/>spaced-repetition state")]
-    backup["One-file JSON export/backup<br/>(insurance against browser data loss,<br/>and the laptop↔phone bridge)"]
-    results["Lab results file (JSON)"]
+    devices["Laptop + iPhone browsers (PWA, offline)"]
+    idb[("IndexedDB: append-only attempts,<br/>lesson progress")]
 
     content --> compiler --> app
-    app -->|"GitHub Actions build"| pages
-    pages --> laptop
-    pages --> phone
-    laptop <--> idb
-    phone <--> idb
-    idb <-->|"export / restore"| backup
-    labrunner -->|"import"| results --> laptop
+    app --> sw -->|"GitHub Actions build"| pages
+    pages --> devices
+    devices <--> idb
 ```
 
-### How data flows
+1. **Authoring**: lessons and questions live in `content/` as Markdown + YAML
+   — human-writable, git-diffable, every lesson forced to cite sources.
+2. **Build**: the content compiler validates everything against
+   [docs/DATA_MODEL.md](docs/DATA_MODEL.md) and emits pre-rendered JSON. A
+   typo in a question bank breaks the build, not a study session. CI runs
+   format check + tests before every deploy.
+3. **Study**: fully client-side; the service worker makes it work offline.
+   Quiz attempts append to IndexedDB immediately (that's why mid-quiz crashes
+   lose nothing). Lab results (Stage C) will arrive as imported JSON files —
+   still no server.
 
-1. **Authoring:** lessons, questions, and lab specs live in `content/` as
-   Markdown + YAML — human-writable, git-diffable.
-2. **Build:** the content compiler validates everything against the schemas in
-   [docs/DATA_MODEL.md](docs/DATA_MODEL.md) and emits JSON the app loads.
-   A typo in a question bank breaks the build, not a study session.
-3. **Study:** the app runs entirely client-side. A hand-rolled service worker
-   precaches the app and content on first load, so it works with no internet.
-4. **Progress:** every quiz attempt and lesson completion is written to
-   IndexedDB. A one-file export/restore is the safety net (browsers — iOS
-   Safari especially — can evict local data) and the way progress moves
-   between laptop and phone in v1.
-5. **Labs:** the lab-runner runs experiments locally (real timing, real
-   memory), writes a results JSON, and the app imports it — no server needed.
+## Project documents
 
-### Why these choices
+| Document                                 | What it covers                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| [BUILD_PLAN.md](BUILD_PLAN.md)           | Stages, deliverables, approval gates — the process contract      |
+| [DECISIONS.md](DECISIONS.md)             | Every non-trivial decision, numbered, with rejected alternatives |
+| [SESSION_LOG.md](SESSION_LOG.md)         | Append-only log of every working session                         |
+| [docs/CURRICULUM.md](docs/CURRICULUM.md) | Full module → lesson → lab outline (M1–M10)                      |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Content formats and the progress schema                          |
+| [docs/RISKS.md](docs/RISKS.md)           | Top 5 risks and mitigations                                      |
 
-Each stack choice, with the alternatives it beat and why, is a numbered entry
-in [DECISIONS.md](DECISIONS.md) (D-001 through D-010). Short version: fewest
-moving parts that satisfy four hard constraints — static hosting, offline
-after first load, a 16 GB laptop with no discrete GPU, and an iPhone XR as
-the second screen.
+## Repo layout
+
+```
+content/   curriculum sources (Markdown lessons, YAML question banks)
+src/       the app: components/ (screens), lib/ (routing, grading, storage)
+tools/     build-time tools: content-compiler/, sw/ (service worker), icons/
+docs/      design documents
+public/    static assets (manifest, icons) + generated curriculum.json
+```
