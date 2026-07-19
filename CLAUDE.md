@@ -42,16 +42,16 @@ what's safe to build on.
 
 ## THE PROCESS CONTRACT
 
-* `BUILD_PLAN.md` is binding. Its approval gates override any urge to keep
+- `BUILD_PLAN.md` is binding. Its approval gates override any urge to keep
   building. Never start a later stage while an earlier gate is unsigned.
-* Every non-trivial decision gets a numbered DECISIONS.md entry (format is
+- Every non-trivial decision gets a numbered DECISIONS.md entry (format is
   defined in BUILD\_PLAN.md). Decisions Christopher hasn't ratified are marked
   "pending."
-* Christopher is a participant, not a spectator: explain what you're doing as
+- Christopher is a participant, not a spectator: explain what you're doing as
   you do it, in plain language. When he asks why, the answer must reference or
   create a DECISIONS.md entry. Brief quizzes and explain-backs required at
   gates are part of the build, not optional extras.
-* Never fabricate: no invented benchmarks, no fake test results, no
+- Never fabricate: no invented benchmarks, no fake test results, no
   placeholder content presented as real curriculum. If something is stubbed,
   it is loudly labeled STUB in code and in the session log.
 
@@ -61,39 +61,39 @@ The test for every file: could a competent stranger (a professor skimming, a
 future collaborator, a different AI agent) understand it without you in the
 room?
 
-* **Clarity over cleverness.** Boring, readable code beats smart, dense code.
+- **Clarity over cleverness.** Boring, readable code beats smart, dense code.
   If a clever approach is genuinely warranted (performance-critical path),
   justify it in a comment and in DECISIONS.md.
-* **Small units.** Short functions with one job, meaningful names (no
+- **Small units.** Short functions with one job, meaningful names (no
   abbreviations that only make sense mid-conversation), modules organized so
   the folder structure tells the story of the app.
-* **Comments explain WHY, not what.** Assume the reader can read code; tell
+- **Comments explain WHY, not what.** Assume the reader can read code; tell
   them the intent, the constraint, the tradeoff. Every non-obvious constant
   gets a comment (e.g., why 2s startup budget, why this decay schedule).
-* **Each module gets a header comment**: what this module does, what depends
+- **Each module gets a header comment**: what this module does, what depends
   on it, what it depends on.
-* **Consistency everywhere**: one formatting style, one naming convention, one
+- **Consistency everywhere**: one formatting style, one naming convention, one
   error-handling pattern, enforced by a formatter/linter configured in the
   repo (set up in Stage A, run before every commit).
-* **Errors fail loudly and helpfully** — messages say what went wrong and what
+- **Errors fail loudly and helpfully** — messages say what went wrong and what
   to check. Silent failures are bugs by definition.
-* **No dead code, no commented-out blocks, no TODO without a D-number or
+- **No dead code, no commented-out blocks, no TODO without a D-number or
   session-log reference.**
-* **Dependencies are liabilities**: every added dependency needs a DECISIONS.md
+- **Dependencies are liabilities**: every added dependency needs a DECISIONS.md
   entry (what it does, why not hand-roll, size/maintenance cost). Prefer few,
   boring, well-maintained libraries. The app must stay lightweight and
   offline-capable (see BUILD\_PLAN.md deployment decision).
-* **Tests are documentation too**: test names describe behavior in plain
+- **Tests are documentation too**: test names describe behavior in plain
   language ("resurfaces missed question after decay interval", not "test\_sr\_1").
 
 ## GIT DISCIPLINE
 
-* Small, frequent commits; each message says what and why in one line, plus
+- Small, frequent commits; each message says what and why in one line, plus
   the stage ("A: add quiz grading for short answers — needed before gate
   tests").
-* Commit at every natural stopping point — the repo's history is part of the
+- Commit at every natural stopping point — the repo's history is part of the
   portfolio story (it shows how the project was actually built over months).
-* Never commit broken states to main without a WIP flag in the message and a
+- Never commit broken states to main without a WIP flag in the message and a
   session-log note.
 
 ## TONE WITH CHRISTOPHER

@@ -11,14 +11,14 @@ log) is defined in [BUILD_PLAN.md](BUILD_PLAN.md).
 
 ## Design documents
 
-| Document | What it covers |
-|---|---|
-| [BUILD_PLAN.md](BUILD_PLAN.md) | Stages, deliverables, approval gates |
-| [DECISIONS.md](DECISIONS.md) | Every non-trivial decision, numbered, with rejected alternatives |
-| [docs/CURRICULUM.md](docs/CURRICULUM.md) | Full module → lesson → lab outline, dependency-ordered |
-| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Curriculum format, question bank format, progress schema |
-| [docs/RISKS.md](docs/RISKS.md) | Top 5 risks and mitigations |
-| [SESSION_LOG.md](SESSION_LOG.md) | Append-only log of every working session |
+| Document                                 | What it covers                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| [BUILD_PLAN.md](BUILD_PLAN.md)           | Stages, deliverables, approval gates                             |
+| [DECISIONS.md](DECISIONS.md)             | Every non-trivial decision, numbered, with rejected alternatives |
+| [docs/CURRICULUM.md](docs/CURRICULUM.md) | Full module → lesson → lab outline, dependency-ordered           |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Curriculum format, question bank format, progress schema         |
+| [docs/RISKS.md](docs/RISKS.md)           | Top 5 risks and mitigations                                      |
+| [SESSION_LOG.md](SESSION_LOG.md)         | Append-only log of every working session                         |
 
 ## Architecture overview
 

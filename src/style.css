@@ -1,0 +1,53 @@
+/* Single stylesheet for the shell. Component-level styles stay here until
+   there's a reason to split — one file is easier to keep consistent, and the
+   app is small (cold-start budget: 2 s, see BUILD_PLAN Stage A tests). */
+
+:root {
+  --bg: #1a1a2e;
+  --surface: #24243c;
+  --text: #e8e8f0;
+  --text-dim: #9a9ab0;
+  --accent: #4cc9a4;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.shell {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.shell-header h1 {
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+}
+
+.tagline {
+  color: var(--text-dim);
+}
+
+.shell-main {
+  margin-top: 2rem;
+  background: var(--surface);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+}
+
+a {
+  color: var(--accent);
+}

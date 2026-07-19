@@ -2,11 +2,11 @@
 
 Three data domains, three very different lifetimes:
 
-| Domain | Lives in | Written by | Read by |
-|---|---|---|---|
-| Curriculum content | `content/` (Markdown+YAML in git) | authors (us) | content compiler |
-| Compiled content | JSON emitted at build time | content compiler | web app |
-| Progress data | IndexedDB in the browser | web app | web app, export file |
+| Domain             | Lives in                          | Written by       | Read by              |
+| ------------------ | --------------------------------- | ---------------- | -------------------- |
+| Curriculum content | `content/` (Markdown+YAML in git) | authors (us)     | content compiler     |
+| Compiled content   | JSON emitted at build time        | content compiler | web app              |
+| Progress data      | IndexedDB in the browser          | web app          | web app, export file |
 
 The content compiler is the wall between "human-friendly" and
 "machine-trusted": everything in `content/` is validated at build time, so the
@@ -36,10 +36,10 @@ content/
 ### module.yaml
 
 ```yaml
-id: m1-hardware-foundations   # kebab-case, globally unique, stable forever
+id: m1-hardware-foundations # kebab-case, globally unique, stable forever
 title: "Hardware foundations: what code actually runs on"
-prereqs: []                   # module ids; compiler rejects cycles/unknowns
-lessons:                      # explicit order (filenames don't encode order)
+prereqs: [] # module ids; compiler rejects cycles/unknowns
+lessons: # explicit order (filenames don't encode order)
   - 01-memory-hierarchy
   - 02-cpu-architecture
 labs:
@@ -50,11 +50,11 @@ labs:
 
 ```markdown
 ---
-id: m1/01-memory-hierarchy    # module-qualified, stable — progress refs this
+id: m1/01-memory-hierarchy # module-qualified, stable — progress refs this
 title: "The memory hierarchy"
-objectives:                   # what you can do after, not what the text covers
+objectives: # what you can do after, not what the text covers
   - "Rank the memory levels by latency within an order of magnitude"
-sources:                      # required — see RISKS.md R4 (content quality)
+sources: # required — see RISKS.md R4 (content quality)
   - "Hennessy & Patterson, Computer Architecture, 6th ed., ch. 2"
 ---
 
@@ -64,21 +64,21 @@ Lesson body in plain Markdown…
 ### questions.yaml
 
 ```yaml
-- id: m1/q-001                # stable forever; progress history refs this
+- id: m1/q-001 # stable forever; progress history refs this
   lesson: m1/01-memory-hierarchy
-  type: mcq                   # mcq | short
+  type: mcq # mcq | short
   prompt: "Roughly how much slower is a DRAM access than an L1 hit?"
-  options:                    # mcq only; 2–6 entries
+  options: # mcq only; 2–6 entries
     - "~2x"
     - "~20x"
     - "~200x"
-  answer: 2                   # index into options
-  explanation: "L1 ~1ns vs DRAM ~100ns…"   # shown after answering — required
+  answer: 2 # index into options
+  explanation: "L1 ~1ns vs DRAM ~100ns…" # shown after answering — required
   tags: [memory, latency]
 
 - id: m1/q-002
   lesson: m1/01-memory-hierarchy
-  type: short                 # graded by normalized match against accept list
+  type: short # graded by normalized match against accept list
   prompt: "What principle makes caches effective despite their tiny size?"
   accept: ["locality", "locality of reference", "temporal and spatial locality"]
   explanation: "…"
@@ -94,9 +94,9 @@ non-empty for short; `explanation` and `sources` present; no orphan lessons
 ```yaml
 id: m1/l1-1-memory-hierarchy
 title: "Measure the memory hierarchy"
-mode: runnable                # runnable | simulated
+mode: runnable # runnable | simulated
 measures: ["latency_ns per stride/size point"]
-targets:                      # what the harness verifies
+targets: # what the harness verifies
   - "latency cliff detected within 2x of this laptop's L2 size"
 limitations: "Timing noise from thermal throttling; see M2/L2.2 noise floor."
 ```
@@ -117,15 +117,16 @@ already rendered to HTML. The app treats it as read-only and versioned
 Database `metal-progress`, versioned via IndexedDB's own `version` +
 `schemaVersion` in a `meta` store (migrations run on upgrade, loudly).
 
-| Store | Key | Value (shape) |
-|---|---|---|
-| `attempts` | auto-id | `{ questionId, at (ISO), correct, givenAnswer, sessionId }` |
-| `lessonProgress` | `lessonId` | `{ status: "not-started"\|"in-progress"\|"done", completedAt? }` |
-| `srsState` | `questionId` | `{ dueAt, intervalDays, ease, lapses }` (algorithm chosen in Stage B) |
-| `labResults` | `labId` | `{ importedAt, metrics: {...}, passed, runnerVersion }` |
-| `meta` | fixed keys | `{ schemaVersion, lastExportAt, installId }` |
+| Store            | Key          | Value (shape)                                                         |
+| ---------------- | ------------ | --------------------------------------------------------------------- |
+| `attempts`       | auto-id      | `{ questionId, at (ISO), correct, givenAnswer, sessionId }`           |
+| `lessonProgress` | `lessonId`   | `{ status: "not-started"\|"in-progress"\|"done", completedAt? }`      |
+| `srsState`       | `questionId` | `{ dueAt, intervalDays, ease, lapses }` (algorithm chosen in Stage B) |
+| `labResults`     | `labId`      | `{ importedAt, metrics: {...}, passed, runnerVersion }`               |
+| `meta`           | fixed keys   | `{ schemaVersion, lastExportAt, installId }`                          |
 
 Design rules:
+
 - **Append-only history** (`attempts`) is the ground truth; dashboard numbers
   and SRS state are derived and can always be recomputed from it. This is what
   makes export→wipe→restore lossless (Gate B test).

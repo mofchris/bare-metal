@@ -19,7 +19,7 @@ The code is weeks of work; a good curriculum (39 lessons, 23 labs) is months.
 The likeliest failure mode of this whole build is a polished empty shell —
 which is worthless both as a study tool and as a portfolio piece.
 **Mitigation:** M1 authored completely in Stage A (proves the format and the
-effort estimate with real data); curriculum work scheduled *inside* every
+effort estimate with real data); curriculum work scheduled _inside_ every
 later stage rather than "at the end"; scope already cut once (D-010: M8–M10
 deferred).
 **Residual risk:** estimates still too optimistic → cut modules at gates, in
@@ -30,7 +30,7 @@ the open, via DECISIONS.md.
 Christopher's actual goal is learning MLSys by ~Fall 2027. Every hour on the
 app is an hour not studying — the app must start paying rent early.
 **Mitigation:** walking skeleton (Stage A) makes real studying possible within
-weeks; Gate B *requires* a week of real daily study before sign-off; gates
+weeks; Gate B _requires_ a week of real daily study before sign-off; gates
 block gold-plating by definition.
 **Residual risk:** tinkering disguised as "polish" — the session log makes it
 visible; call it out at gates.
