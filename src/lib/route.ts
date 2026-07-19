@@ -8,12 +8,14 @@ export type Route =
   | { screen: "lesson"; lessonId: string }
   | { screen: "quiz"; lessonId: string }
   | { screen: "review" }
-  | { screen: "dashboard" };
+  | { screen: "dashboard" }
+  | { screen: "backup" };
 
 /** Parse a location.hash value. Anything unrecognized falls back to home. */
 export function parseRoute(hash: string): Route {
   if (hash === "#/review") return { screen: "review" };
   if (hash === "#/dashboard") return { screen: "dashboard" };
+  if (hash === "#/backup") return { screen: "backup" };
   // Lesson ids contain "/" (e.g. "m1/01-memory-hierarchy"), so everything
   // after the prefix is the id — no further splitting.
   for (const screen of ["lesson", "quiz"] as const) {

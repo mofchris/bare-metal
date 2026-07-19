@@ -264,3 +264,22 @@ at the bottom.
 **Next session should start with:** export/restore block — one-file JSON export per docs/DATA_MODEL.md §4, restore with validate + merge (needs a D-entry for merge semantics before implementation), export→wipe→restore automated test, weekly reminder wired to meta.lastExportAt.
 **Open questions for Christopher:** unchanged (Gate A caveats incl. Gate 0 quiz; D-018 at Gate B)
 **New DECISIONS.md entries this session:** none
+
+## Session 2026-07-19 (thirteenth block — export/backup/restore)
+
+**Stage:** B — Memory & Measurement | **Gate status:** Gate B unsigned — ALL build deliverables complete; gate now waits on Christopher's week of real use
+**Done this session:**
+
+- D-019 logged (merge semantics) before implementation, per DATA_MODEL's requirement: restore MERGES — attempts union by (questionId, at, sessionId) identity; lessonProgress by rank (done > in-progress, earliest completedAt wins); srsState never merged, always rebuilt from merged attempts; meta stays local
+- `src/lib/backup.ts`: buildBackup / validateBackup (loud, specific rejections incl. newer-schema files) / restoreBackup / exportReminder — all pure or db-parameterized
+- ProgressDb: addAttemptsIfMissing (dedup union), putLessonProgress (preserves original completedAt), getMeta/setMeta
+- Backup screen at `#/backup` (+ shell nav entry): export downloads `metal-backup-YYYY-MM-DD.json` and stamps meta.lastExportAt; restore via file picker, reports "N new attempts, M lessons updated"
+- Weekly reminder on home (BUILD_PLAN deliverable): warns when never-exported (with history) or export ≥7 days old, links to #/backup; pure rule unit-tested
+- 5 new test groups incl. **the Gate B round-trip: export → indexedDB.deleteDatabase (real data-loss simulation) → restore → byte-equal stores**; cross-device merge idempotence; lessonProgress rank rules — 53 tests total, green
+- Browser-verified end-to-end: fresh history → "never been backed up" banner on home → export (message + timestamp) → uploaded a crafted other-device backup → "Restore merged: 1 new attempts, 1 lesson records updated" → merged lesson shows done ✓ on home
+- One TS strictness fix (unknown narrowing in validateBackup); one test-env recurrence of the stale-SW cache serving an old build during verification (cleared, re-verified — no product bug)
+
+**In progress / half-finished:** nothing half-finished. Stage B build work is DONE: dashboard ✓, SRS ✓, export/restore ✓, weekly reminder ✓, all three automated Gate B test requirements ✓ (progress math, SRS scheduling with fake histories, lossless round-trip).
+**Next session should start with:** nothing to build for Stage B. The gate waits on: (1) Christopher's week of real daily use, logged here per BUILD_PLAN; (2) D-018 + D-019 ratification; (3) the standing Gate A caveat items (incl. Gate 0 quiz, internet/power note). Only after Gate B signs: Stage C (lab harness + first 3 labs).
+**Open questions for Christopher:** start the week of real use — the app is complete enough to be your actual daily study tool now
+**New DECISIONS.md entries this session:** D-019 (pending)

@@ -8,6 +8,7 @@ import type { Curriculum } from "../lib/curriculum";
 import { lessonHref } from "../lib/route";
 import { questionCountFor } from "../lib/lookup";
 import { dueQuestionIds, nextDueAt } from "../lib/srs";
+import { exportReminder, type ReminderState } from "../lib/backup";
 import type { LessonProgressRecord, ProgressDb } from "../lib/progress-store";
 
 export function Home({
@@ -22,11 +23,19 @@ export function Home({
   const [review, setReview] = useState<{ due: number; nextDue: string | null } | null>(
     null,
   );
+  const [reminder, setReminder] = useState<ReminderState | null>(null);
 
   useEffect(() => {
     if (!db) return;
     db.lessonStatuses()
       .then(setStatuses)
+      .catch((e: unknown) => setStatusError(e instanceof Error ? e.message : String(e)));
+    Promise.all([db.getMeta("lastExportAt"), db.allAttempts()])
+      .then(([lastExportAt, attempts]) =>
+        setReminder(
+          exportReminder(lastExportAt ?? null, attempts.length > 0, new Date()),
+        ),
+      )
       .catch((e: unknown) => setStatusError(e instanceof Error ? e.message : String(e)));
     db.allSrsStates()
       .then((states) => {
@@ -43,6 +52,15 @@ export function Home({
     <div>
       {statusError && (
         <p class="warn-banner">Couldn't read progress records: {statusError}</p>
+      )}
+      {reminder?.overdue && (
+        <p class="warn-banner">
+          {reminder.daysSinceExport === null
+            ? "Your progress has never been backed up on this device."
+            : `Last backup was ${reminder.daysSinceExport} days ago.`}{" "}
+          Browser storage can be wiped without warning —{" "}
+          <a href="#/backup">export a backup file now</a>.
+        </p>
       )}
       {review && (review.due > 0 || review.nextDue) && (
         <section class="review-card">

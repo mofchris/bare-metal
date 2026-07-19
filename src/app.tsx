@@ -17,6 +17,7 @@ import { LessonView } from "./components/lesson-view";
 import { Quiz } from "./components/quiz";
 import { Review } from "./components/review";
 import { Dashboard } from "./components/dashboard";
+import { Backup } from "./components/backup";
 import { lessonHref } from "./lib/route";
 
 type LoadState =
@@ -74,6 +75,7 @@ export function App() {
           <a href="#/">Modules</a>
           <a href="#/dashboard">Dashboard</a>
           <a href="#/review">Review</a>
+          <a href="#/backup">Backup</a>
         </nav>
       </header>
       {dbError && (
@@ -145,6 +147,9 @@ function Screen({
   }
   if (route.screen === "dashboard") {
     return <Dashboard curriculum={load.curriculum} db={db} />;
+  }
+  if (route.screen === "backup") {
+    return <Backup db={db} />;
   }
   return <Home curriculum={load.curriculum} db={db} />;
 }
