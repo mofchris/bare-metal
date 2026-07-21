@@ -13,60 +13,79 @@ sources:
 
 ## Layout is destiny (disk edition)
 
-M1 taught that walking memory along its layout is fast and across it is
-slow. Storage has the same law with bigger constants: **sequential reads**
-stream at full device bandwidth; random seeks pay per-access overhead. So
-the question "how should a dataset be laid out?" is really "what will the
+M1 taught that walking memory along the order it's laid out in is fast, and
+walking across that order is slow. Storage has the same law with much bigger
+constants: **sequential reads** — asking for bytes in the order they physically
+sit — stream at the device's full bandwidth, while random **seeks** — jumping
+to an unrelated position — pay a fixed overhead per access before any data
+arrives.
+
+So the question "how should a dataset be laid out?" is really "what will the
 access pattern be?" — and ML training's pattern is peculiar: read _whole
 samples_, all fields at once, in _randomized order_, epoch after epoch.
 
 ## Row vs column
 
-**Row-oriented** layouts store each record contiguously — read one sample,
-get everything about it in one touch. **Columnar** layouts (Parquet, Arrow)
-store each _field_ contiguously — read one column across a million rows
-without touching the rest, which is why analytics ("average price by
-month") loves them, per Abadi's classic comparison. Columnar also
-compresses better: similar values sit together.
+**Row-oriented** layouts store each record contiguously — all of sample 1,
+then all of sample 2. Read one sample and everything about it arrives in one
+touch.
+
+**Columnar** layouts (Parquet, Arrow) store each _field_ contiguously instead
+— every record's first field together, then every record's second field. That
+lets you read one column across a million rows without touching the rest,
+which is why analytics ("average price by month") loves them, per Abadi's
+classic comparison. Columnar also compresses better, because similar values
+end up sitting next to each other.
 
 Training reads whole samples, which is row-shaped — hence TFRecord and
-WebDataset are row-oriented containers. But tabular ML blurs the line:
-feature engineering reads columns (columnar wins), then training reads
-sample rows. Parquet's answer is **row groups** — column layout _within_
-chunks of rows — giving batch readers reasonable sequential behavior both
-ways. The honest rule: name the dominant access pattern first; the format
-follows.
+WebDataset are row-oriented containers. But tabular ML blurs the line: feature
+engineering reads columns (columnar wins), then training reads sample rows.
+Parquet's answer is **row groups** — column layout _within_ chunks of rows —
+so a reader pulling a batch of rows still gets reasonable sequential behavior
+either way. The honest rule: name the dominant access pattern first; the
+format follows.
 
 ## The small-file trap
 
 The naive layout — one file per sample, a million JPEGs in folders — is a
-pipeline disaster out of proportion to its innocence: every file costs a
-metadata lookup (open, stat, close) before the first byte, random placement
-turns reading into seeking, and object stores bill and throttle per
-request. The fix is **sharding**: pack samples into a few hundred large
-archive files (WebDataset literally uses tar files; TFRecord its own
-framing). Readers stream shards sequentially — full-bandwidth reads — and
-"random order" is approximated cheaply: shuffle _which_ shards each epoch,
-and shuffle _within_ a memory buffer as samples stream (the
-shuffle-buffer compromise: approximate randomness at sequential-read
-prices).
+pipeline disaster out of all proportion to its innocence. Every file costs a
+**metadata lookup** first: the OS must find the file, check permissions, and
+set up a handle (`open`, `stat`, `close`) before a single byte of content
+arrives. Random placement across the disk turns reading into seeking. And
+object stores (cloud storage like S3) bill and rate-limit _per request_, not
+per byte.
+
+The fix is **sharding**: pack the samples into a few hundred large archive
+files instead. WebDataset literally uses `tar` archives; TFRecord uses its own
+framing. Readers then stream each shard start to finish — full-bandwidth
+sequential reads — and "random order" gets approximated cheaply by two tricks
+instead of true random access: shuffle _which_ shards you read each epoch, and
+shuffle _within_ a buffer of samples held in memory as they stream past. That
+shuffle-buffer compromise buys approximate randomness at sequential-read
+prices.
 
 ## Compression: spend CPU to buy bandwidth
 
-Compressed data moves fewer bytes (disk, network — often the scarce
-resource) but must be decompressed by the CPU — the same CPU the pipeline
-is already starving (lesson 01). On slow storage, compression wins
-outright. On a fast local NVMe, heavy compression can _invert_: the drive
-delivers bytes faster than the CPU can inflate them, and decompression
-becomes the bottleneck stage. That's why pipeline-oriented formats default
-to cheap, fast codecs (snappy, zstd at low levels, or none for
-already-compressed JPEGs) rather than maximum-ratio ones. It's a roofline
-argument with "storage bandwidth" on one axis and "decode CPU" on the other
-— and like every trade in this curriculum, it ends with _measure it_ (M2),
-because the answer flips with the hardware.
+Compressed data moves fewer bytes (over disk or network — often the scarce
+resource) but must be decompressed by the CPU, which is the same CPU the
+pipeline is already starving (lesson 01).
+
+On slow storage, compression wins outright. On a fast local **NVMe** drive —
+an SSD connected straight to the high-speed bus rather than through an older
+disk interface — heavy compression can _invert_ the tradeoff: the drive
+delivers bytes faster than the CPU can inflate them, and decompression becomes
+the new bottleneck stage.
+
+That's why pipeline-oriented formats default to cheap, fast codecs (snappy, or
+zstd at low settings — both tuned for decompression speed over maximum size
+reduction) rather than maximum-ratio ones, and use none at all for data that's
+already compressed, like JPEGs. It's a roofline argument with "storage
+bandwidth" on one axis and "decode CPU" on the other — and like every trade in
+this curriculum, it ends with _measure it_ (M2), because the answer flips with
+the hardware.
 
 ## What this laptop teaches
 
-Lab L4.1's dataset ships both ways — a folder of small files and packed
-shards — and the first exercise is simply timing an epoch of each. The gap
-(often several-fold, even on NVMe) is the whole lesson, felt.
+Lab L4.1's dataset ships both ways — a folder of small files and packed shards
+— and the first exercise is simply timing an epoch of each. The gap (often
+several-fold, even on NVMe) is the whole lesson, felt.

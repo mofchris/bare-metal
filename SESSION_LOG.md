@@ -457,3 +457,33 @@ at the bottom.
 ## Session 2026-07-19 (twenty-third block — header sync indicator)
 
 **Done:** GRE/Net+-style account chip in the header (all screens): signed-out = hollow-dot "not synced" linking to the Sync page; signed-in = copper dot + username + live status (syncing… / relative last-sync time / sync failed with red dot). syncNow now emits start/done window events so background, manual, and login-triggered syncs all drive the chip; a minute ticker keeps "2m ago" honest. Verified in browser in both states. 67 tests green.
+
+## Session 2026-07-21 (twenty-fourth block — the "no naked terms" content pass, D-025)
+
+**Stage:** B | **Gate status:** Gate B unsigned
+**Trigger:** Christopher screenshotted m1/02 on his phone: "pieces of information are just thrown around like i am supposed to know them already... what is simd what do you mean the registers are wider than the numbers... where did the flops come from what cycles... what are all these things even measured in". He asked for inline explanation as terms appear — explicitly NOT a basics module bolted on the front.
+
+**Done this session:**
+
+- **Reviewed all 21 lessons.** Found three distinct problems, not one:
+  1. _Naked first use_ — m1/02 used register, bit-width, float32, lane, FMA, FLOP, cycle, clock/GHz, issue, port: ten terms grounded nowhere, then multiplied four of them into 380 GFLOPS.
+  2. _Forward references that never resolve_ (the worse bug, found by grep not opinion): `kernel` first used m1/01 and explained NOWHERE across 6 lessons — and it collides with "OS kernel"; `tensor` m1/01, nowhere, 6 lessons; `epoch` m4/02, nowhere; `accelerator` m2/04, nowhere; `activation` m1/03 → explained m5/01, 7 lessons late; `gradient` m3/02 → m5/01, 4 late. m3/02 built a whole argument on "training's problem children are gradients" four lessons before anything said what a gradient is.
+  3. _Units never anchored_ — his literal question. ns/GB/s/GFLOPS/FLOPs-per-byte/GHz/TB/s/IOPS quoted throughout; only m1/03 had a units column, and nothing said the bridge sentence (3 GHz = 3 billion ticks/s = one cycle every 0.33 ns, so a 100 ns DRAM trip is ~300 wasted cycles).
+  - Severity was UNEVEN, which was the real finding: m1/01 and m2/02 already taught properly. The job was making the other 19 behave like those two.
+- **Two decisions taken with him before writing** (AskUserQuestion, with previews of the same paragraph written three ways): gloss style = inline prose clause, no UI/no tappable glossary; floor = his CS degree (bits/bytes, binary, arrays/loops/functions, compiler vs interpreter, RAM, basic calculus assumed).
+- **D-025 logged and ratified** — the "no naked terms" convention.
+- **`content/GLOSSARY.md` created** — authoring ledger, NOT shipped to the app: term → agreed gloss → the lesson that owns first grounding. ~90 rows. It is the enforcement mechanism for the ordering bug above.
+- **All 21 lessons rewritten.** Facts, numbers, sources, and objectives unchanged throughout — grounding added only. 1,493 → 2,001 lines (+34%). Per module: M1 364→542, M2 294→365, M3 286→387, M4 273→340, M5 276→367.
+- 67 tests green; compiler clean (86 questions still resolve); all 21 lessons verified to render real HTML.
+
+**THE IMPORTANT PART — the rule got sharpened by me breaking it.** First draft of m1/02 defined "instruction-level parallelism" as _"parallelism the chip extracts from one ordinary single-threaded program"_ — circular (defines parallelism with parallelism), and leaning on "thread," which the lesson never introduced. Christopher had to leave the app and Google it, and sent the screenshot. That is exactly the failure the whole pass exists to prevent, reintroduced one level down. Auditing after he caught it turned up four more of the same in my own rewrite (execution unit used 2 sections before its gloss; "instruction-set extension" explaining AVX2; Trick 2 never stating its actual payoff). Rule 2 became: **a gloss may not contain a term that itself needs a gloss** — abstract nouns are the tell (parallelism, execution, concurrency, extraction, utilization).
+
+**I am the wrong instrument to detect this failure.** I know what the words mean, so the gap is invisible from where I stand; he caught in thirty seconds what my own audit missed entirely. The acceptance test is therefore his and stated as such in D-025: **if a sentence sends him to Google, that sentence is a bug.**
+
+The ledger proved itself mid-session: while writing m4/02 I introduced "epoch" in m4/01's augmentation gloss while the ledger said m4/01 didn't own it — caught, grounding moved to m4/01, ledger updated. Also caught a real rendering bug: prettier reflowed the mixed-precision sum in m5/02 so a `+` landed at line-start and became a markdown bullet; reworded to prose, verified absent from the compiled HTML.
+
+**In progress / half-finished:** nothing half-finished. All 21 lessons compile, render, and are formatted.
+**Next session should start with:** Christopher's read-through, phone-first. Expect more Google-trip bug reports, especially in M3 and M5 where the terms are densest — that is the loop working, not a regression. Fix what he flags before anything else.
+**Open questions for Christopher:** none pending a decision — the outstanding item is his reading pass.
+**Deferred, deliberately:** a compiler check failing the build when a term appears before its declared first-grounding lesson. Cheap to add (each GLOSSARY row already declares the lesson), and it would have caught the gradient bug automatically — but it earns its keep when M6–M10 are authored, not now. Recorded in D-025.
+**New DECISIONS.md entries this session:** D-025 (ratified — his direction)
