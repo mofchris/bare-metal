@@ -45,8 +45,9 @@ bytes per parameter** before a single activation exists.
 
 The standard mixed-precision recipe lands at exactly the same total: 2 bytes
 (fp16 weight) plus 2 (fp16 gradient) plus 4 (fp32 master weight) plus 4
-(fp32 m) plus 4 (fp32 v) = 16 — the ZeRO paper's famous figure. The savings
-from mixed precision show up in activations and in speed, not in this state.
+(fp32 m) plus 4 (fp32 v) = 16 — the famous figure from the ZeRO paper, whose
+whole subject is how to survive this bill on huge models (M9 takes it up). The
+savings from mixed precision show up in activations and in speed, not here.
 
 Apply it: a 1-billion-parameter model needs **16 GB of optimizer-adjacent
 state** — your 16 GB laptop is full before the first batch arrives. A

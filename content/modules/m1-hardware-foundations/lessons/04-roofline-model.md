@@ -75,7 +75,8 @@ from marketing numbers is a ceiling you'll never touch.
 ## Where you'll meet it again
 
 Every serious performance discussion in this curriculum stands on this plot:
-data loading (M4), quantization's speedups (M6 — smaller dtypes shift
-intensity), why generating text from a large language model is bandwidth-bound
+data loading (M4), the speedups from quantization (M6 — storing numbers in
+smaller dtypes, which shifts intensity rightward), why generating text from a
+large language model is bandwidth-bound
 (M7), and GPU kernel tuning (M8). If you can place a workload on a roofline
 and name the binding budget, you already think like an MLSys engineer.

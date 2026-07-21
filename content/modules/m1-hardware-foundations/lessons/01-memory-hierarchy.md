@@ -13,12 +13,14 @@ sources:
 
 ## The one fact this lesson exists for
 
-A processor can execute an instruction in well under a nanosecond, but fetching
-a value from main memory takes on the order of **100 nanoseconds**. Main
-memory is the gigabytes of RAM in your laptop — the hardware people call
-**DRAM** — and it sits physically far from the processor, on separate chips.
-If the CPU had to wait for DRAM on every access, it would spend roughly 99% of
-its time doing nothing.
+A processor can execute an **instruction** — one primitive step of machine
+work, like adding two numbers together — in well under a nanosecond. But
+fetching a value from main memory takes on the order of **100 nanoseconds**,
+and that wait is called **latency**: the time between asking for a value and
+having it in hand. Main memory is the gigabytes of RAM in your laptop — the
+hardware people call **DRAM** — and it sits physically far from the processor,
+on separate chips. If the CPU had to wait for DRAM on every access, it would
+spend roughly 99% of its time doing nothing.
 
 Almost everything strange-looking about hardware is a response to this single
 gap: caches, prefetchers (hardware that notices your access pattern and starts
@@ -36,13 +38,13 @@ its arithmetic in, the only place the maths actually happens. Below them sit
 three levels of **cache**, numbered by distance from the core: L1 is closest
 and smallest, L3 furthest and largest.
 
-| Level     | Typical size (per core)   | Typical latency   |
-| --------- | ------------------------- | ----------------- |
-| Registers | ~a few hundred bytes      | none (same cycle) |
-| L1 cache  | 32–64 KB                  | ~1 ns             |
-| L2 cache  | 0.25–2 MB                 | ~3–10 ns          |
-| L3 cache  | 8–36 MB (shared by cores) | ~10–40 ns         |
-| DRAM      | gigabytes                 | ~60–100 ns        |
+| Level     | Typical size (per core)   | Typical latency  |
+| --------- | ------------------------- | ---------------- |
+| Registers | ~a few hundred bytes      | none (immediate) |
+| L1 cache  | 32–64 KB                  | ~1 ns            |
+| L2 cache  | 0.25–2 MB                 | ~3–10 ns         |
+| L3 cache  | 8–36 MB (shared by cores) | ~10–40 ns        |
+| DRAM      | gigabytes                 | ~60–100 ns       |
 
 Sizes and exact latencies vary by chip — what stays constant is the _shape_:
 each level is roughly an order of magnitude slower and much larger than the one
