@@ -42,9 +42,15 @@ GFLOPS. Lesson 02 derived about 380 GFLOPS for a chip of this class.
 | Bandwidth | bytes delivered per second | GB/s        | ~100 GB/s   |
 | Compute   | operations done per second | GFLOPS      | ~380 GFLOPS |
 
-Latency and bandwidth are easy to confuse because both concern memory. They
-answer different questions. Latency asks how long the first value takes to
-arrive. Bandwidth asks how fast values keep arriving after that.
+Bandwidth and compute are both examples of one general idea. **Throughput**
+means the amount of work finished per unit of time, whatever the work happens
+to be. Bandwidth is throughput measured in bytes, and compute is throughput
+measured in operations.
+
+Latency is not a throughput, and confusing the two causes real mistakes.
+Latency asks how long one item takes from start to finish. Throughput asks how
+many items finish per second. A machine can be excellent at one and poor at the
+other, which is why every performance claim needs to say which it is reporting.
 
 ## Why can't more bandwidth fix latency?
 

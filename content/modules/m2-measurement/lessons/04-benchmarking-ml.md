@@ -11,93 +11,143 @@ sources:
   - "PyTorch docs: torch.cuda.synchronize and CUDA semantics (pytorch.org/docs)"
 ---
 
-## Two metrics, one tension
+## What this lesson answers
 
-- **Throughput**: work per unit time — samples/second in training, requests
-  or tokens/second in serving.
-- **Latency**: time for one unit of work, start to finish.
+Lessons 01 to 03 apply to any program. Machine learning adds three things on
+top: two metrics that people routinely confuse, a part of the results
+distribution that matters more than the middle, and two traps that produce
+numbers which are not merely wrong but impossible.
 
-They are not reciprocals. Batching (M1's temporal locality, industrialized)
-raises throughput — the fixed costs of a pass are shared across the batch —
-while _raising_ each request's latency, because a request now waits for the
-batch to fill up before anything happens to it, then travels with the group.
-Every serving system lives on this dial; M7 builds a simulator for it. A
-number without its pair is half a claim: "5000 samples/s" at what latency?
-"12 ms" at what load?
+## Why can't you improve both throughput and latency at once?
 
-## The tail is the product
+Lesson M1/03 defined throughput as work finished per unit of time, and latency
+as the time one item takes from start to finish. In serving a model,
+**throughput** is requests or tokens per second, and **latency** is the time
+one request waits from arrival to answer.
 
-Report latency as **percentiles**. A percentile is the value a given
-proportion of your runs come in under: p50 is the value half the runs beat —
-the median from lesson 02 — and **p99** is the value 99% come in under, so
-only the slowest 1% exceed it. It is a way of describing the bad end of the
-distribution without being at the mercy of the single worst run.
+They are not reciprocals, and **batching** is where they pull apart. Batching
+means collecting several requests and running the model over all of them
+together.
 
-Why care about the slowest 1%? Because real usage makes many requests: a user
-session touching a service 100 times will experience the p99 roughly once per
-session — the _tail_ is what users actually remember. So **SLOs** (service
-level objectives — the performance promise a team commits to, like "95% of
-requests under 200 ms") are written against percentiles, and capacity planning
-is done against the throughput sustainable while _meeting_ them. That number
-has its own name: **goodput**, throughput that also hits the SLO.
+Batching raises throughput for a reason M1 established: a batch of 32 turns 32
+small matrix multiplications into one large one, which has higher arithmetic
+intensity and spreads each step's fixed costs across 32 samples.
 
-Tene's warning when _load testing_ deserves its name — **coordinated
-omission**: if your test client sends a request, waits for the reply, then
-sends the next, a slow reply delays the next request, so the system's worst
-moments suppress the very measurements that would expose them. You end up
-sampling the system least often exactly when it is worst. Fixed-rate load
-generation (send on schedule regardless of replies) avoids lying to yourself;
-it's also exactly the interleaving discipline of lesson 02 wearing serving
-clothes.
+Batching raises latency for a different and equally concrete reason. A request
+arriving when the batch is empty must wait for 31 more requests before anything
+happens to it, then travels with the group. The waiting is pure addition to
+that request's latency.
 
-## Trap 1: the first iterations are compilation
+So the batch size is a dial between the two, and neither end is correct in
+general. This is why a performance claim needs both numbers. "5000 samples per
+second" is unfinished without saying at what latency, and "12 ms" is unfinished
+without saying at what load.
 
-ML frameworks compile on first contact. `torch.compile` watches your model run
-once, records the operations, and generates optimized kernels for them. cuDNN
-(NVIDIA's neural-network library) **autotunes**: it tries several algorithms
-for your convolution at your exact tensor sizes and keeps whichever won.
-Caches fill. The result is that the first iterations can be 10–1000× slower
-than steady state.
+## Why report the slowest 1% rather than the average?
 
-Warmup (lesson 01) isn't optional hygiene here — it's the difference between
-benchmarking your model and benchmarking the compiler. Measure and report
-steady state, and if cold start _is_ your question (serverless inference,
-where a model may be loaded fresh to serve one request), measure it as its own
-number, deliberately.
+Report latency as **percentiles**. A percentile is the value that a given
+proportion of measurements fall below. The 50th percentile, written p50, is the
+median from lesson 02. The 99th percentile, written **p99**, is the value that
+99% of requests come in under, so only the slowest 1% exceed it.
 
-## Trap 2: the accelerator runs behind your back
+The reason to care about that slowest 1% is arithmetic about sessions rather
+than about requests. Consider a user whose single session makes 100 requests to
+your service. If 1% of requests exceed p99, then that user expects to hit
+roughly one of them per session. The rare case is not rare from where the user
+is sitting; it is what they remember about your product.
 
-GPU execution is **asynchronous**: when your Python code calls a GPU
-operation, the framework adds the work to a queue and returns immediately,
-before the GPU has done any of it. Your program races ahead while the device
-churns through the backlog. Stop a CPU-side timer after that return and you've
-measured how fast you can _ask_ for work, not how fast it gets _done_ — a
-classic way to "measure" physically impossible speeds.
+This is why performance promises are written against percentiles. An **SLO**,
+or service level objective, is a commitment such as "95% of requests complete
+under 200 ms". Capacity planning then measures the throughput a system can
+sustain while still meeting that promise, and that quantity has its own name:
+**goodput**.
 
-The fix is one line: synchronize with the device (`torch.cuda.synchronize()`,
-which blocks until the queue is actually empty) before reading the clock,
-every time, at both ends of the measurement. On this laptop the labs are
-CPU-bound so the trap stays theoretical until M8's simulators — but it's the
-single most common real-world ML benchmarking bug, so it gets learned now.
+## How does a load test hide the problem it exists to find?
 
-## Why MLPerf exists
+Gil Tene named this failure **coordinated omission**, and the mechanism is
+worth following slowly, because the flaw looks like correct code.
 
-Vendors used to benchmark whatever flattered them — different models, batch
-sizes, number formats, warmup policies — making the published numbers
-incomparable. MLPerf (run by the MLCommons consortium) fixes the workload, the
-quality target ("train until accuracy X", "serve within latency Y"), and the
-measurement rules, so systems compete on the same question.
+Write the obvious load-testing client. Send a request, wait for the reply,
+record the time, send the next request. Repeat.
 
-The lesson transfers to your own work directly: **a benchmark is a
-specification** — workload, metric, statistic, warmup policy, machine state —
-and the labs' harness writes that specification into every results file it
-emits, so future-you can trust past-you's numbers.
+Now suppose the system stalls for one second. Your client is blocked waiting on
+the reply, so it does not send any requests during the stall. When the reply
+finally lands, you record one slow measurement and continue.
 
-## The module in one paragraph
+Count what should have happened. If you were sending 100 requests per second,
+then 100 requests should have hit that stall, and all 100 should have been
+slow. You recorded one. Your client stopped sampling exactly when the system
+was at its worst, so the stall is almost entirely absent from your results, and
+your p99 looks fine.
 
-Machines vary (L01), so results are distributions (L02); profiles say where
-time goes before you spend effort (L03); and ML adds a moving dial
-(throughput↔latency), a tail that matters more than the middle, and two
-traps — compilation and asynchrony — that fake numbers for the unwary (L04).
-That's the complete measurement discipline the rest of this curriculum
-stands on. Next stop: using it, in the Stage C labs.
+The fix is to send on a fixed schedule regardless of whether replies have
+arrived, so that a stall produces the pile-up of slow measurements it actually
+caused.
+
+## Trap 1: what are you measuring in the first iterations?
+
+Machine learning frameworks do substantial work the first time a model runs.
+
+`torch.compile` watches the model execute once, records the operations, and
+generates optimized code for them. NVIDIA's cuDNN library autotunes, meaning it
+tries several algorithms for your convolution at your exact tensor shapes and
+keeps whichever proved fastest. Caches fill.
+
+The size of this effect dwarfs the ordinary warmup of lesson 01. First
+iterations can run 10 to 1000 times slower than steady state, so including them
+in an average means reporting the compiler's speed rather than the model's.
+
+Discard them, and state how many you discarded. If cold start genuinely is your
+question, which happens when a model is loaded fresh to serve a single request,
+then measure it deliberately and report it as its own number rather than mixing
+it in.
+
+## Trap 2: why can a GPU appear to be infinitely fast?
+
+GPU execution is **asynchronous**. When your Python code calls a GPU operation,
+the framework places the work on a queue and returns immediately, before the
+GPU has performed any of it.
+
+Follow what that does to a naive timer. You start the clock, call the
+operation, and stop the clock. The clock stopped when the work was _queued_,
+not when it was _done_, so you measured how fast Python can ask for work. On a
+large matrix multiply this reports a speed the hardware could not physically
+achieve.
+
+The fix is one line: call `torch.cuda.synchronize()`, which blocks until the
+queue is genuinely empty, before reading the clock at both ends of the
+measurement.
+
+This is the most common real benchmarking bug in machine learning, and it is
+worth learning before you have a GPU, because the first time you see an
+implausibly good number this should be your first suspicion.
+
+## Why does a shared benchmark suite exist?
+
+Before MLPerf, vendors published numbers measured on whichever model, batch
+size, number format and warmup policy flattered their hardware. Two such
+numbers could not be compared, because they answered different questions.
+
+MLPerf, run by the MLCommons consortium, fixes the workload, fixes the quality
+target such as "train until this accuracy", and fixes the measurement rules.
+Systems then compete on one question instead of on the choice of question.
+
+The transferable lesson is that a benchmark is a specification. It is not a
+number; it is the workload, the metric, the summary statistic, the warmup
+policy, and the machine state, all recorded together. A result missing any of
+those cannot be reproduced, including by you in six months.
+
+## Check your understanding
+
+An engineer reports that their inference server does 8000 requests per second
+with a mean latency of 15 ms. Their load-test client sends one request, waits
+for the reply, then sends the next. Their benchmark ran for 200 iterations from
+a cold process.
+
+Name three separate problems with this result. A correct answer names at least
+three of: throughput is reported without the batch size or the latency it was
+achieved at, so the pair is incomplete; the mean hides the tail and the figure
+that matters for users is p99; the closed-loop client causes coordinated
+omission, so any stall is under-sampled and the latency figures are optimistic;
+and starting from a cold process means the first iterations measured
+compilation and autotuning rather than steady-state serving.

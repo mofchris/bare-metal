@@ -11,89 +11,120 @@ sources:
   - "Higham, Accuracy and Stability of Numerical Algorithms, 2nd ed., ch. 1–4"
 ---
 
-## The rogues' gallery
+## What this lesson answers
 
-Four ways float arithmetic goes wrong, each with a distinct signature:
+Lessons 01 to 03 built the formats. This lesson covers the four specific ways
+those formats lose information, how each one looks from the outside, and the
+technique that makes fp16 training survivable.
 
-- **Overflow**: the result exceeds the format's maximum → **±inf**, and inf
-  contaminates everything downstream (inf − inf = NaN). In fp16 this starts at
-  65504 — one activation spike away.
-- **Underflow**: the result is smaller than the smallest representable value →
-  flushed toward **0**. Silent: no error is raised, the information is simply
-  gone. Small fp16 gradients die this way, and the weights they belonged to
-  simply stop learning.
-- **Absorption**: adding a small number to a large one discards the small one
-  entirely (1.0 + 1e−9 = 1.0 in fp32 — lesson 01's spacing at work, since 1e−9
-  is far below machine epsilon). A long sum of small terms into a large running
-  total can lose _most of its inputs_, one by one, each vanishing on arrival.
-- **Catastrophic cancellation**: subtracting two nearly equal numbers. Their
-  leading digits — the ones known accurately — cancel to zero, which promotes
-  whatever rounding noise was hiding in the trailing digits to the front of the
-  result. You're left with a small number made almost entirely of error.
-  Computing variance as E[x²] − E[x]² is the classic own-goal: for data with a
-  large mean, those two quantities are nearly equal and their difference is
-  mostly garbage. Lab L3.1 has you detonate it deliberately.
+Three of the four fail silently, which is what makes them worth memorising. No
+error is raised and no value looks obviously wrong.
 
-## Addition is not associative
+## What are the four ways arithmetic goes wrong?
 
-In ordinary maths, (a + b) + c = a + (b + c) — that property is called
-**associativity**, and it means grouping doesn't matter. In floats it fails,
-because each grouping rounds at different moments and therefore rounds
-differently.
+**Overflow** happens when a result exceeds the format's largest value. It
+becomes infinity, and infinity spreads: any arithmetic touching it produces
+infinity or NaN, and inf minus inf is NaN. In fp16 this begins at 65504, which
+one large activation can reach.
 
-The consequence has real teeth. Summing a large array in parallel means
-splitting it across cores, summing the pieces separately, then combining — an
-operation called a **reduction**. That produces a different grouping than a
-single serial loop, so the "same" computation on a different core count (or a
-different GPU) legitimately produces different bits. Run-to-run
-non-determinism in training loss is often exactly this, not a bug.
+**Underflow** happens when a result is smaller than the smallest value the
+format can express. It is flushed to zero. Nothing is raised and nothing looks
+broken; the information is simply gone. This is how small fp16 gradients die,
+and the weights they belonged to then stop being updated.
 
-The mitigations: ordering discipline (fix the reduction structure so it's the
-same every run, when reproducibility matters), wider accumulators (the
-standing theme of this module), or compensated algorithms like **Kahan
-summation**, which keeps a second variable tracking the error that each
-addition threw away and feeds it back into the next one.
+**Absorption** happens when a small number is added to a much larger one.
+Lesson 01 showed the mechanism: machine epsilon for float32 is about 1.2 × 10⁻⁷,
+so adding 10⁻⁹ to 1.0 gives exactly 1.0, because the true sum falls between two
+representable floats and rounds back.
 
-## Symptoms at training scale
+Absorption compounds in a way worth seeing. Sum a million small values into one
+large running total, and each addition individually disappears once the total
+has grown large enough. The sum can lose most of its inputs, one at a time,
+while appearing to work.
 
-A loss curve that goes **NaN** is an overflow or cancellation event somewhere
-upstream — by the time NaN reaches the loss it has already flowed through the
-model, so the visible symptom is far from the cause. A loss that quietly
-plateaus while small gradients underflow is subtler and nastier: nothing
-_looks_ broken at all.
+**Catastrophic cancellation** happens when two nearly equal numbers are
+subtracted. Follow it carefully, because it is the least intuitive of the four.
+Each number carries about 7 accurate digits plus rounding noise below them.
+Subtracting them cancels the leading digits, which were the accurate ones. What
+survives is dominated by the noise that was previously harmless, promoted to
+the front of the result.
 
-Debug numerically: check for infs and NaNs at layer boundaries to find where
-they first appear, watch the distribution of gradient magnitudes across
-training (a **gradient-norm histogram** — how many gradients are large,
-middling, or nearly zero), and suspect the narrowest format in the pipeline
-first.
+The classic example is computing variance as E[x²] − E[x]². For data with a
+large mean, those two quantities are nearly equal, their difference is small,
+and almost all of that small difference is error. Computing variance by
+subtracting the mean first avoids the cancellation entirely.
 
-## Loss scaling: the fp16 survival trick
+## Why do two identical runs produce different numbers?
 
-The fp16 problem from lesson 02, now with its solution. Small gradients
-underflow fp16's floor (~6×10⁻⁵ for normal values).
+In ordinary arithmetic, (a + b) + c equals a + (b + c). That property is called
+**associativity**, and it means the grouping of a sum does not matter.
 
-**Loss scaling** multiplies the _loss_ by a factor S (say 2¹⁰ = 1024) before
-the backward pass. Because differentiation is linear — scaling the thing you
-differentiate scales all its derivatives by the same factor — every gradient
-then arrives multiplied by S, lifted bodily out of the underflow zone. The
-gradients are divided by S again (in fp32) before the weights are updated.
-Nothing about the mathematics changes; the values just travel through the
-dangerous stretch of the pipeline at a survivable magnitude.
+Floating-point addition is not associative, because each grouping rounds at
+different moments and therefore rounds differently.
 
-Dynamic loss scaling automates the tuning: grow S until infs start appearing,
-throw away that step and shrink S, repeat. That machinery — checking every
-single step for infs — is why fp16 training feels fragile, and why bf16's
-"just have fp32's range" won (lesson 02).
+Now connect that to hardware. Summing a large array in parallel means splitting
+it across cores, summing each piece separately, and combining the partial
+totals. That operation is called a **reduction**, and it produces a different
+grouping than a single sequential loop would.
 
-## The module's one-paragraph residue
+The consequence has real teeth. The same computation on a different number of
+cores, or on a different GPU, legitimately produces different bits. Run-to-run
+variation in training loss is frequently this and not a bug.
 
-Floats are scientific notation with fixed bits: range from the exponent,
-precision from the mantissa (L01). Sixteen-bit formats split those budgets
-differently, and training chose range — bf16 (L02). Below that, integers
-plus a measured scale beat floating point at its own game (L03). And all of
-it fails in four characteristic ways, tamed by the same two habits:
-**accumulate wider than you store**, and **assume every equality and every
-sum ordering is approximate** (L04). With M1's hardware picture, M2's
-measurement discipline, and M3's numerics, you now hold the complete toolkit
-the hands-on modules spend.
+Three responses exist. Fix the reduction structure so the grouping is identical
+every run, when reproducibility matters more than speed. Use wider
+accumulators, which is this module's recurring answer. Or use a compensated
+algorithm such as **Kahan summation**, which keeps a second variable holding
+the error each addition discarded and adds it back into the next one.
+
+## What do these failures look like in a real training run?
+
+A loss that becomes **NaN** is an overflow or a cancellation that happened
+somewhere upstream. By the time NaN reaches the loss it has flowed through many
+layers, so the visible symptom is far from the cause. Find the cause by checking
+for infs and NaNs at each layer's boundary to see where they first appear.
+
+A loss that quietly stops improving, while nothing looks broken, is the harder
+case. Underflow produces exactly this: gradients reaching zero, weights
+receiving no update, and no error anywhere. Diagnose it by watching the
+distribution of gradient magnitudes across training, and suspect the narrowest
+format in the pipeline first.
+
+## How does loss scaling keep fp16 alive?
+
+Lesson 02 left fp16 with one unresolved problem: small gradients underflow its
+floor of about 6 × 10⁻⁵ and become zero.
+
+**Loss scaling** solves it by moving the values rather than changing the
+format. Before the backward pass, the loss is multiplied by a factor S, for
+example 1024.
+
+The reason this works is that differentiation is linear. Scaling the quantity
+you differentiate scales every derivative computed from it by the same factor.
+So every gradient arrives multiplied by 1024, which lifts a gradient of 10⁻⁷,
+well below fp16's floor, up to about 10⁻⁴, safely inside the representable
+range.
+
+The gradients are then divided by S again, in float32, before the weights are
+updated. The mathematics is unchanged from end to end. The values simply travel
+through the dangerous part of the pipeline at a magnitude the format can hold.
+
+Choosing S is itself automated. Dynamic loss scaling raises S until infinities
+start appearing, then discards that step, halves S, and continues. That
+machinery, checking every step for infinities, is why fp16 training feels
+fragile, and it is the concrete reason bf16's simple "just have float32's
+range" won the argument in lesson 02.
+
+## Check your understanding
+
+You compute the variance of a million sensor readings that are all close to
+10,000, using the formula E[x²] − E[x]² in float32. The answer comes back
+negative, which is impossible for a variance.
+
+Explain the mechanism, and give a fix. A correct answer identifies
+catastrophic cancellation: E[x²] and E[x]² are both near 10⁸ and nearly equal,
+each carries only about 7 accurate decimal digits so their absolute error is
+around 10, and their true difference is far smaller than that error, so the
+result is dominated by rounding noise and can come out negative. The fix is to
+subtract the mean from each value before squaring, so the quantities being
+subtracted are no longer nearly equal.

@@ -11,82 +11,129 @@ sources:
   - "Hoefler & Belli, Scientific Benchmarking of Parallel Computing Systems, SC15"
 ---
 
-## A benchmark result is a distribution
+## What this lesson answers
 
-Run a benchmark 30 times and you don't have a number — you have a
-**distribution**: the full set of results and how often each value showed up.
-Picture the runs sorted into buckets by duration, forming a shape.
+Lesson 01 established that repeated runs disagree. This lesson decides what to
+do with the disagreement: which single number to publish, what to publish
+alongside it, and how to tell a real improvement from noise.
 
-Everything in lesson 01 (the OS taking your core, throttling, cache state)
-adds _only in one direction_: noise makes runs **slower**, never faster.
-Nothing in the universe makes your code finish before it's done. So the shape
-is lopsided — a tight cluster of fast runs bunched against a hard floor, with
-a straggling tail of slow ones trailing off to the right. Statisticians call
-that **right-skewed** (the tail points toward the larger values).
+## Why is the shape of the results lopsided?
 
-That one fact drives all the advice here.
+Run a benchmark 30 times and you hold 30 numbers. Together they form a
+**distribution**, meaning the full set of results and how often each value
+occurred. Picture the runs sorted into buckets by duration.
 
-## Mean, median, minimum — three different questions
+Now look at what lesson 01 listed. The scheduler taking your core, thermal
+throttling, and a cold cache all make a run take longer. Nothing in that list
+can make a run take less time than the work requires.
 
-- **Mean** (the ordinary average): total time ÷ runs. Every straggler drags it
-  upward, so it mixes "how fast is the code" with "how noisy was the machine
-  today." Legitimate when total cost over many executions is the actual
-  question (batch jobs, cloud bills).
-- **Median**: sort the runs and take the middle one. That makes it the typical
-  run, and robust to tail events — half the runs beat it regardless of how bad
-  the stragglers were, because one catastrophic run only moves the middle by
-  one position. The default headline number for the labs in this app.
-- **Minimum**: the run with the least interference. For a pure CPU-bound
-  microbenchmark — a tiny, isolated piece of code timed on its own — noise
-  only slows runs down, so the fastest observed run is the best estimate of
-  the code's _intrinsic_ cost. This is why Python's `timeit` documentation
-  recommends it. But for anything involving disk or network waits, memory
-  allocation, or real concurrency, the minimum is a fantasy case that will
-  never repeat in production; don't headline it.
+That asymmetry decides the shape. There is a hard floor, the time the work
+actually takes with no interference, and most runs cluster just above it. There
+is no ceiling, so unlucky runs trail off upward with no limit. The result is a
+tight cluster on the left and a thin tail stretching right.
 
-State which one you report and why. Changing the statistic changes the
-conclusion, and readers can't audit what you don't disclose.
+Statisticians call that shape **right-skewed**, because the tail points toward
+the larger values. Every recommendation below follows from it.
 
-## Spread is part of the result
+## Which single number should you report?
 
-A median without spread hides whether the machine was steady. Report an
-interval — the **interquartile range** (IQR) is robust and simple. Sort your
-runs and chop them into four equal groups; the IQR is the span covering the
-middle 50%, from the boundary at 25% to the boundary at 75%. It ignores the
-extremes at both ends by construction, which is exactly what you want when the
-extremes are the machine misbehaving.
+Three summaries are defensible, and they answer different questions.
 
-Lab L2.2 measures this laptop's noise floor as an IQR, and every later lab
-quotes it: a "speedup" smaller than the noise floor is not a finding, it's
-weather.
+The **mean** is the ordinary average: add the runs and divide by how many. Its
+weakness follows directly from the skew. One run that took ten times as long as
+the others drags the mean upward, so the mean mixes "how fast is this code"
+with "how disturbed was this machine". The mean is the right choice when total
+cost across many executions is genuinely the question, as with a batch job's
+total cloud bill.
 
-## How many runs?
+The **median** is the middle value once the runs are sorted. It describes a
+typical run. Its strength also follows from the skew: a catastrophic outlier
+moves the middle by one position regardless of how catastrophic it was, so the
+tail cannot distort it. This is the default headline number for measurements in
+this curriculum.
 
-Rules of thumb that hold up in the literature above: warm up first (lesson
-01), then take **enough runs that the summary stabilizes** — for quiet
-CPU-bound microbenchmarks, 10–30 measured runs usually do; noisy or long
-benchmarks need more. The test is operational: rerun the whole experiment;
-if your headline number moves by more than your reported spread, you didn't
-take enough runs (or your machine isn't in a measurable state).
+The **minimum** is the fastest observed run, meaning the run with the least
+interference. For a **microbenchmark**, meaning a small isolated piece of code
+timed on its own, this is a reasonable estimate of the code's intrinsic cost,
+because interference only ever adds time. Python's `timeit` documentation
+recommends it for exactly this reason.
 
-## Comparing A and B honestly
+The minimum becomes misleading as soon as the work involves waiting on a disk,
+a network, or memory allocation. Those waits are part of the real cost rather
+than interference, so the luckiest run describes a situation that will never
+repeat in production.
 
-The cardinal sin: one run of A, one run of B, subtract, publish. When the two
-distributions overlap — when A's slow runs land in the same range as B's fast
-ones — that comparison flips sign from day to day depending on which sample
-you happened to catch.
+Whichever you choose, state which one you chose. Changing the summary changes
+the conclusion, and a reader cannot audit a choice you did not disclose.
 
-The honest procedure: interleave runs of A and B (so drift over time hits
-both), compare medians, and check the distributions actually separate — if
-their IQRs overlap substantially, say "no measurable difference," which is a
-perfectly good experimental result. When stakes are higher, use a proper
-interval method (Kalibera & Jones give one); for these labs, non-overlapping
-IQRs with interleaved runs is the bar.
+## Why is one number never enough?
 
-## Outliers are data
+A median on its own hides whether the machine was steady. Two benchmarks can
+share a median while one was rock solid and the other swung wildly, and those
+are different results.
 
-An **outlier** — a run wildly out of line with the rest, say 10× slower than
-the median — is telling you something happened: antivirus scan, thermal event,
-the OS swapping memory out to disk. Investigate it or report it; deleting it
-silently is how "clean" results get manufactured. The labs' harness will flag
-outliers, not eat them.
+Report an interval alongside it. The **interquartile range**, written IQR, is
+the simplest robust choice. Sort the runs, cut them into four equal groups, and
+the IQR is the span from the boundary at 25% to the boundary at 75%, covering
+the middle half of the runs.
+
+The IQR ignores both extremes by construction, which is what you want when the
+extremes are the machine misbehaving rather than the code varying.
+
+Measure your own machine's IQR on a benchmark that does nothing interesting,
+and you have its noise floor. Any speedup smaller than that floor is not a
+finding.
+
+## How many runs are enough?
+
+The rule that survives in the literature is to run until the summary stops
+moving. For a quiet, CPU-bound microbenchmark, 10 to 30 measured runs usually
+suffice. Noisy or long-running benchmarks need more.
+
+That rule can be tested rather than assumed. Run the entire experiment a second
+time. If your headline number moves by more than the spread you reported, then
+you did not take enough runs, or the machine is not in a state where it can be
+measured at all.
+
+## How do you tell two results apart?
+
+The common mistake is to run A once, run B once, subtract, and publish.
+
+Here is why that fails. Each version produces a distribution, not a value. If
+A's slower runs overlap B's faster runs, then which version "wins" depends
+entirely on which sample you happened to catch, and the comparison changes sign
+from day to day.
+
+The honest procedure has three parts. Interleave the runs of A and B so drift
+over time hits both. Compare medians rather than single runs. Then check
+whether the distributions actually separate: if the IQRs overlap substantially,
+report that there is no measurable difference.
+
+That last outcome is a real experimental result, not a failure. "No measurable
+difference on this machine" is more useful than a fabricated 3%.
+
+## What should you do with an extreme run?
+
+An **outlier** is a run far out of line with the rest, such as one taking ten
+times the median.
+
+An outlier is evidence that something happened: a virus scan started, the chip
+hit a thermal limit, the operating system moved memory to disk. Investigate it,
+or report it and say you could not explain it.
+
+Deleting outliers silently is how clean-looking results get manufactured, and
+it destroys the one signal telling you the machine was not in a measurable
+state.
+
+## Check your understanding
+
+You benchmark two sorting implementations, 30 interleaved runs each. Version A
+has a median of 100 ms and an IQR from 98 to 104 ms. Version B has a median of
+97 ms and an IQR from 94 to 112 ms. Version B also has one run at 340 ms.
+
+Say whether B is faster than A, justify it from the intervals, and say what to
+do about the 340 ms run. A correct answer observes that the IQRs overlap
+substantially, 98 to 104 against 94 to 112, so the 3 ms difference in medians
+is inside the noise and the honest conclusion is no measurable difference; and
+that the 340 ms run should be investigated and reported rather than deleted,
+because it is evidence about the machine or about a worst case in B.
