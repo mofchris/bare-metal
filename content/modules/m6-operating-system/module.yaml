@@ -1,0 +1,14 @@
+# M6 — The operating system underneath. Outline: docs/CURRICULUM.md.
+# M2 blames "the scheduler took your core" and M4 leans on the GIL and the
+# page cache, both as asides. This module gives those ideas a home, and M12
+# needs its sockets and concurrency material.
+id: m6-operating-system
+title: "The operating system underneath"
+prereqs:
+  - m1-hardware-foundations
+lessons:
+  - 01-processes-and-scheduling
+  - 02-virtual-memory
+  - 03-files-and-sockets
+  - 04-cpu-affinity
+  - 05-watching-a-running-system

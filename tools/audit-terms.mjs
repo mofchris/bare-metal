@@ -1,39 +1,43 @@
 // One-off audit (not shipped): does any lesson use a GLOSSARY term BEFORE the
 // lesson that owns its grounding? This is the check D-025 deferred from the
 // compiler, run by hand against the finished content pass.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const ROOT = "C:/Users/mofch/OneDrive/Desktop/Projects/BARE METAL/content";
 
-// Curriculum reading order — the sequence a learner actually walks.
-const ORDER = [
-  ["m1/01", "m1-hardware-foundations/lessons/01-memory-hierarchy.md"],
-  ["m1/02", "m1-hardware-foundations/lessons/02-cpu-architecture.md"],
-  ["m1/03", "m1-hardware-foundations/lessons/03-three-budgets.md"],
-  ["m1/04", "m1-hardware-foundations/lessons/04-roofline-model.md"],
-  ["m1/05", "m1-hardware-foundations/lessons/05-gpus-overview.md"],
-  ["m2/01", "m2-measurement/lessons/01-why-timing-is-hard.md"],
-  ["m2/02", "m2-measurement/lessons/02-benchmark-statistics.md"],
-  ["m2/03", "m2-measurement/lessons/03-profiling.md"],
-  ["m2/04", "m2-measurement/lessons/04-benchmarking-ml.md"],
-  ["m3/01", "m3-numerics/lessons/01-ieee-754.md"],
-  ["m3/02", "m3-numerics/lessons/02-fp16-bf16.md"],
-  ["m3/03", "m3-numerics/lessons/03-int8-quantization.md"],
-  ["m3/04", "m3-numerics/lessons/04-failure-modes.md"],
-  ["m4/01", "m4-data-pipelines/lessons/01-input-pipeline.md"],
-  ["m4/02", "m4-data-pipelines/lessons/02-overlap.md"],
-  ["m4/03", "m4-data-pipelines/lessons/03-storage-formats.md"],
-  ["m4/04", "m4-data-pipelines/lessons/04-pipeline-health.md"],
-  ["m5/01", "m5-training-mechanics/lessons/01-autodiff.md"],
-  ["m5/02", "m5-training-mechanics/lessons/02-memory-bill.md"],
-  ["m5/03", "m5-training-mechanics/lessons/03-batch-size.md"],
-  ["m5/04", "m5-training-mechanics/lessons/04-memory-tricks.md"],
-];
+// Curriculum reading order — the sequence a learner actually walks. Derived
+// from module.yaml rather than hardcoded, so adding a module needs no edit
+// here. (It was hardcoded once, and every M6 row reported "bad owner".)
+
+const MODULES_DIR = `${ROOT}/modules`;
+
+/** Module directories in curriculum order — the m<N>- prefix is that order. */
+function modulesInOrder() {
+  return readdirSync(MODULES_DIR)
+    .filter((name) => /^m\d+-/.test(name))
+    .sort((a, b) => Number(a.match(/^m(\d+)/)[1]) - Number(b.match(/^m(\d+)/)[1]));
+}
+
+/** Lesson order inside a module is the explicit `lessons:` list in its yaml. */
+function lessonsOf(moduleDir) {
+  const yaml = readFileSync(`${MODULES_DIR}/${moduleDir}/module.yaml`, "utf8");
+  const list = yaml.slice(yaml.indexOf("lessons:"));
+  return [...list.matchAll(/^\s*-\s*(\S+)\s*$/gm)].map((m) => m[1]);
+}
+
+const ORDER = modulesInOrder().flatMap((dir) => {
+  const moduleNumber = dir.match(/^m(\d+)/)[1];
+  return lessonsOf(dir).map((slug) => [
+    // Short id used in the ledger's "First grounded" column, e.g. "m6/02".
+    `m${moduleNumber}/${slug.slice(0, 2)}`,
+    `${dir}/lessons/${slug}.md`,
+  ]);
+});
 
 const position = new Map(ORDER.map(([id], i) => [id, i]));
 const bodies = ORDER.map(([id, rel]) => [
   id,
-  readFileSync(`${ROOT}/modules/${rel}`, "utf8"),
+  readFileSync(`${MODULES_DIR}/${rel}`, "utf8"),
 ]);
 
 // Parse the ledger's tables: | term | m3/02 | gloss |
@@ -43,7 +47,7 @@ const ledger = readFileSync(`${ROOT}/GLOSSARY.md`, "utf8");
 const rows = ledger
   .slice(ledger.indexOf("## Hardware and systems terms"))
   .split("\n")
-  .map((line) => line.match(/^\|([^|]+)\|\s*(m\d\/\d\d)\s*\|/))
+  .map((line) => line.match(/^\|([^|]+)\|\s*(m\d+\/\d\d)\s*\|/))
   .filter(Boolean)
   .map((m) => ({ cell: m[1].trim(), owner: m[2] }));
 
@@ -68,6 +72,8 @@ const SKIP = new Set([
   "derivative",
   "chain rule",
   "generalization",
+  "process",
+  "page",
 ]);
 
 const findings = [];

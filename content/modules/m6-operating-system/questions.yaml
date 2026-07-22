@@ -1,0 +1,505 @@
+# M6 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
+
+# ---- Lesson 01: processes and scheduling ----
+
+- id: m6/q-001
+  lesson: m6/01-processes-and-scheduling
+  type: mcq
+  prompt: "What is the defining difference between two threads and two processes?"
+  options:
+    - "Threads run on one core; processes run on separate cores"
+    - "Threads share the process's memory; separate processes cannot see each other's memory"
+    - "Threads are managed by the program; processes are managed by the operating system"
+    - "Processes are faster to create than threads"
+  answer: 1
+  explanation: >-
+    Shared memory is the whole distinction, and it cuts both ways. Sharing makes
+    communication free, since two threads exchange data by writing the same
+    variable with no copying. It also makes correctness hard, because two
+    threads writing that variable at once can interleave unpredictably. Separate
+    processes cannot have that bug and cannot have that convenience.
+  tags: [os, processes]
+
+- id: m6/q-002
+  lesson: m6/01-processes-and-scheduling
+  type: mcq
+  prompt: >-
+    You add 8 Python threads to a script doing pure-Python image loops on an
+    8-core laptop. It gets very slightly slower. Why?
+  options:
+    - "Eight threads is more than the operating system can schedule efficiently"
+    - "The GIL lets only one thread execute Python instructions, so there is no parallelism, and switching between eight of them costs"
+    - "Python threads are limited to one core by design"
+    - "The images are too small to benefit"
+  answer: 1
+  explanation: >-
+    CPython has one global interpreter lock, and a thread must hold it to
+    execute Python instructions, so only one runs at a time however many cores
+    exist. The slight slowdown is the overhead of context switching between
+    eight threads that cannot proceed simultaneously, including cache refill
+    after each switch. Separate processes, or C library code that releases the
+    lock, would give real parallelism.
+  tags: [os, python, threads]
+
+- id: m6/q-003
+  lesson: m6/01-processes-and-scheduling
+  type: short
+  prompt: >-
+    Stopping one thread and starting another on a core has a standard name.
+    What is it? (two words)
+  accept:
+    - "context switch"
+    - "a context switch"
+    - "context switching"
+  explanation: >-
+    A context switch. Its direct cost is saving and restoring registers, around
+    a microsecond. Its larger cost is indirect: the incoming thread's data is not
+    in the caches, so it pays roughly 100 ns per miss until its working set is
+    loaded again. The switch is cheap; refilling the caches after it is not.
+  tags: [os, scheduling]
+
+- id: m6/q-004
+  lesson: m6/01-processes-and-scheduling
+  type: mcq
+  prompt: >-
+    Why does a benchmark on an otherwise idle laptop still produce occasional
+    much-slower runs?
+  options:
+    - "Timers lose accuracy over long benchmark sessions"
+    - "Background threads exist even when idle, and when one is scheduled onto your core your work stops and then resumes with cold caches"
+    - "The CPU randomly varies its speed for no reason"
+    - "Memory allocation is nondeterministic"
+  answer: 1
+  explanation: >-
+    Idle is not idle: indexing, update checks and telemetry are all runnable
+    threads the scheduler may place on your core. Note that this explains the
+    one-directional shape M2/02 derived. The scheduler can take time away from
+    your benchmark, but it has no mechanism for giving your benchmark time it
+    did not use, so noise only ever adds.
+  tags: [os, scheduling, measurement]
+
+- id: m6/q-005
+  lesson: m6/01-processes-and-scheduling
+  type: mcq
+  prompt: >-
+    Python threads are useless for parallel Python arithmetic. When are they
+    still worth using?
+  options:
+    - "Never; threads should always be replaced by processes"
+    - "When threads wait on disk or network, or when C library code releases the lock while computing"
+    - "Only when the machine has a single core"
+    - "When the program needs deterministic ordering"
+  answer: 1
+  explanation: >-
+    A thread waiting on I/O is not executing Python instructions, so it releases
+    the lock and another thread proceeds. And library code written in C, which
+    NumPy and PyTorch largely are, can release the lock while computing because
+    it has stopped touching Python objects. Both cases give real overlap; only
+    pure-Python computation is blocked.
+  tags: [os, python, threads]
+
+# ---- Lesson 02: virtual memory ----
+
+- id: m6/q-006
+  lesson: m6/02-virtual-memory
+  type: mcq
+  prompt: "Two processes both use the address 0x1000 and get different data. Why?"
+  options:
+    - "The operating system copies one process's memory out of the way"
+    - "Every address a program uses is virtual, and each process has its own page table translating it to a different physical location"
+    - "The second process is silently given a different address"
+    - "Only one process may use an address at a time"
+  answer: 1
+  explanation: >-
+    An address in your program is not a location in RAM. Hardware translates it
+    on every access, in fixed blocks called pages, using a page table that the
+    operating system builds per process. Since the two tables map that virtual
+    address to different physical pages, the processes never collide, and the
+    isolation is enforced by hardware rather than by good behaviour.
+  tags: [os, virtual-memory]
+
+- id: m6/q-007
+  lesson: m6/02-virtual-memory
+  type: mcq
+  prompt: >-
+    Allocating a 4 GB array returns instantly and uses almost no memory until
+    you write to it. Why?
+  options:
+    - "The allocation failed silently and will error later"
+    - "Pages are mapped lazily: the mapping exists but physical memory is only committed when a page is first touched"
+    - "The array is compressed until first use"
+    - "The operating system rounds small allocations up and large ones down"
+  answer: 1
+  explanation: >-
+    This is called overcommit. The process believes it has the memory because
+    the mapping exists, but no physical page is assigned until the first touch.
+    It has a measurement consequence worth remembering: a benchmark that
+    allocates inside its timed region may be measuring page assignment spread
+    across the loop that first fills the array, rather than the work itself.
+  tags: [os, virtual-memory]
+
+- id: m6/q-008
+  lesson: m6/02-virtual-memory
+  type: short
+  prompt: >-
+    The small cache inside the core that holds recent virtual-to-physical
+    address translations. What is it called? (abbreviation accepted)
+  accept:
+    - "TLB"
+    - "translation lookaside buffer"
+    - "the TLB"
+  explanation: >-
+    The translation lookaside buffer. Without it every memory access would need
+    a page-table read first, and the page table is itself in memory, so each
+    access would become two or more. A TLB hit translates in essentially no
+    time; a miss costs a page-table walk of tens to hundreds of cycles before
+    the access you wanted can even begin.
+  tags: [os, virtual-memory]
+
+- id: m6/q-009
+  lesson: m6/02-virtual-memory
+  type: mcq
+  prompt: >-
+    Random access across a 64 MB array is slower than M1's cache arithmetic
+    alone predicts. What is the second effect?
+  options:
+    - "The array does not fit in DRAM"
+    - "TLB misses: 64 MB is about 16,000 pages of 4 KB, far more than the roughly 1500 to 3000 translations a TLB holds"
+    - "Random access disables the memory controller"
+    - "float32 values are misaligned when accessed randomly"
+  answer: 1
+  explanation: >-
+    A TLB covers only about 6 to 12 MB at 4 KB pages, so random access to a much
+    larger region misses it on most accesses. Each miss costs a page-table walk
+    on top of whatever cache miss the access itself causes, so you pay two
+    independent misses per access. Walking in order avoids it, because
+    consecutive elements share a page and one translation serves about a
+    thousand float32 values.
+  tags: [os, virtual-memory, memory]
+
+- id: m6/q-010
+  lesson: m6/02-virtual-memory
+  type: mcq
+  prompt: "Roughly how much worse is a page fault served from an SSD than a cache miss?"
+  options:
+    - "About 10 times"
+    - "About 100 times"
+    - "About 1000 times"
+    - "They cost about the same"
+  answer: 2
+  explanation: >-
+    A cache miss costs about 100 nanoseconds. A page fault requiring a read from
+    an SSD costs on the order of 100 microseconds, which is 1000 times more. This
+    is why a machine short of memory does not merely run slowly: when nearly all
+    of its time goes to moving pages, which is called thrashing, it stops
+    responding.
+  tags: [os, virtual-memory]
+
+# ---- Lesson 03: files and sockets ----
+
+- id: m6/q-011
+  lesson: m6/03-files-and-sockets
+  type: mcq
+  prompt: "What is a file descriptor?"
+  options:
+    - "The file's location on disk"
+    - "A small integer indexing a per-process kernel table that holds the real state of an open file, socket or pipe"
+    - "A copy of the file's contents in memory"
+    - "The file's permissions and owner"
+  answer: 1
+  explanation: >-
+    It is a handle, not the file. The entry it indexes holds which file, the
+    position you have read to, and what you may do. What matters most is what
+    else gets one: network connections, pipes and the terminal all do, so they
+    are all read and written through the same operations, and code that handles
+    one often handles the others.
+  tags: [os, files]
+
+- id: m6/q-012
+  lesson: m6/03-files-and-sockets
+  type: mcq
+  prompt: >-
+    Roughly what does one system call cost, and what does that explain?
+  options:
+    - "About 1 nanosecond; nothing in particular"
+    - "About 1 to 2 microseconds, which is why libraries buffer rather than reading a byte at a time"
+    - "About 1 millisecond, which is why files are opened once"
+    - "It is free; only the disk access costs anything"
+  answer: 1
+  explanation: >-
+    A system call switches privilege level, saves state, enters kernel code and
+    reverses all of it, costing 1 to 2 microseconds, which is several thousand
+    cycles at 3 GHz and roughly ten times a DRAM access. Reading a byte at a time
+    would pay that per byte, so file libraries request a 4 to 64 KB block, keep
+    it in the process's own memory, and serve thousands of small reads from
+    there.
+  tags: [os, syscalls]
+
+- id: m6/q-013
+  lesson: m6/03-files-and-sockets
+  type: mcq
+  prompt: >-
+    The same `read` call can cost a few microseconds or hundreds. What decides
+    which?
+  options:
+    - "The size of the file"
+    - "Whether the page cache already holds that part of the file, so the kernel copies from RAM instead of going to the drive"
+    - "Whether the file was opened for reading or writing"
+    - "The programming language making the call"
+  answer: 1
+  explanation: >-
+    The system call happens either way; what differs is what the kernel does
+    inside it. A cached page is copied from RAM in a few microseconds, while an
+    uncached one requires a drive read costing tens to hundreds. So the same
+    line of code differs by more than an order of magnitude based on something
+    your program never sees, which is the mechanism behind M4/04's warning that
+    epoch one and epoch two measure different things.
+  tags: [os, files, measurement]
+
+- id: m6/q-014
+  lesson: m6/03-files-and-sockets
+  type: mcq
+  prompt: >-
+    What makes reading from a socket fundamentally harder than reading from a
+    file?
+  options:
+    - "Sockets transfer data more slowly"
+    - "A file's data already exists and has an end; a socket's bytes may not have arrived, and may never"
+    - "Sockets cannot be buffered"
+    - "Sockets require a different system call"
+  answer: 1
+  explanation: >-
+    That uncertainty forces a design decision a file never forces: what should a
+    read do when nothing has arrived? Blocking waits, which is simple to write
+    and parks a whole thread per idle connection. Non-blocking returns
+    immediately saying nothing yet, which keeps the thread free but requires your
+    program to remember what it was doing for every connection.
+  tags: [os, sockets]
+
+- id: m6/q-015
+  lesson: m6/03-files-and-sockets
+  type: mcq
+  prompt: >-
+    One thread serves 5000 mostly-idle connections. Which operating-system
+    facility makes that possible?
+  options:
+    - "A faster network card"
+    - "A call that takes many descriptors and blocks until any one of them is ready, then reports which"
+    - "Checking every connection in a loop as fast as possible"
+    - "One background thread per connection, hidden by the runtime"
+  answer: 1
+  explanation: >-
+    Non-blocking sockets alone would leave you polling every connection in a
+    loop, which burns a core for nothing. The readiness call — `epoll` on Linux,
+    I/O completion ports on Windows — waits once for all descriptors and wakes
+    only when there is real work. Every asynchronous framework, and the serving
+    systems in M12, is built on this.
+  tags: [os, sockets, concurrency]
+
+# ---- Lesson 04: CPU affinity ----
+
+- id: m6/q-016
+  lesson: m6/04-cpu-affinity
+  type: short
+  prompt: >-
+    Restricting a thread so the scheduler may only run it on chosen cores. What
+    is that restriction called? (two words, or the verb for doing it)
+  accept:
+    - "cpu affinity"
+    - "affinity"
+    - "processor affinity"
+    - "pinning"
+    - "cpu pinning"
+  explanation: >-
+    CPU affinity, and setting it is called pinning. It removes one specific
+    source of variance: by default the scheduler moves threads between cores to
+    balance load, and a moved thread finds the new core's L1 and L2 caches full
+    of someone else's data, so it pays misses until its working set reloads.
+  tags: [os, affinity]
+
+- id: m6/q-017
+  lesson: m6/04-cpu-affinity
+  type: mcq
+  prompt: >-
+    Why does running 16 threads of dense arithmetic on 8 hyper-threaded physical
+    cores usually not double throughput?
+  options:
+    - "The operating system cannot schedule more than 8 threads at once"
+    - "The two logical cores share the physical core's execution units, and dense arithmetic wants those units continuously"
+    - "Hyper-threading only works for integer arithmetic"
+    - "The second thread on each core runs at a lower clock speed"
+  answer: 1
+  explanation: >-
+    Hyper-threading duplicates register state, not execution units, so the two
+    logical cores share the same FMA units and the same L1 and L2. It helps when
+    one thread stalls on memory and its sibling can use the idle units. Two
+    threads doing dense arithmetic both want those units at once, so each runs at
+    roughly half speed, no more total work is done, and each gets half the cache.
+  tags: [os, affinity, cpu]
+
+- id: m6/q-018
+  lesson: m6/04-cpu-affinity
+  type: mcq
+  prompt: >-
+    You are asking "is algorithm B faster than algorithm A?" Should you pin both
+    to a fixed core?
+  options:
+    - "No, because pinning produces artificial numbers"
+    - "Yes, and state that you pinned: migration and P-core versus E-core placement are noise relative to that question"
+    - "Only pin the slower one, to give it a fair chance"
+    - "Pinning makes no measurable difference on modern hardware"
+  answer: 1
+  explanation: >-
+    The question is about the code, so scheduling effects are noise you are
+    entitled to remove, provided you disclose it. The opposite question, "how
+    will this behave deployed on a busy laptop", makes migration and core
+    sharing part of the answer, and pinning would then produce a number the real
+    system never achieves. This is M2/01's discipline again: decide which
+    question you are asking, then say which.
+  tags: [os, affinity, measurement]
+
+- id: m6/q-019
+  lesson: m6/04-cpu-affinity
+  type: mcq
+  prompt: >-
+    Why is a modern laptop's advertised core count misleading for a
+    compute-bound benchmark?
+  options:
+    - "Manufacturers overstate the number"
+    - "It counts logical cores from hyper-threading, and mixes large P-cores with small slow E-cores"
+    - "Some cores are reserved permanently for the operating system"
+    - "Cores are disabled when running on battery"
+  answer: 1
+  explanation: >-
+    Two complications sit between the number on the box and the number that
+    matters. Hyper-threading presents one physical core as two logical ones that
+    share execution units, so the useful figure for dense arithmetic is physical
+    cores. And a P-core and an E-core run the same code at different speeds, so a
+    benchmark landing on different core types across runs varies for reasons
+    unrelated to the code.
+  tags: [os, affinity, cpu]
+
+- id: m6/q-020
+  lesson: m6/04-cpu-affinity
+  type: mcq
+  prompt: >-
+    Pinning your benchmark changes its median substantially. What have you
+    learned, even if you then unpin?
+  options:
+    - "That the pinned number is the only valid one"
+    - "That scheduling was materially affecting the measurement, which is worth knowing about the earlier results"
+    - "That the machine is faulty"
+    - "Nothing; pinning always changes numbers"
+  answer: 1
+  explanation: >-
+    Pinning is useful as a diagnostic and not only as a control. A large change
+    tells you that core migration or core-type placement was part of what you
+    were measuring, which casts doubt on unpinned comparisons taken earlier. A
+    negligible change tells you scheduling was not a factor, which is equally
+    worth knowing before you spend effort controlling it.
+  tags: [os, affinity, measurement]
+
+# ---- Lesson 05: watching a running system ----
+
+- id: m6/q-021
+  lesson: m6/05-watching-a-running-system
+  type: mcq
+  prompt: >-
+    A program is slow. Why check system-level resources before running a
+    function profiler?
+  options:
+    - "Profilers are unreliable on modern hardware"
+    - "A profile attributes time to functions, and cannot tell you the program was waiting on paging, disk or another process"
+    - "System checks are more accurate than profilers"
+    - "Profilers cannot run on a busy machine"
+  answer: 1
+  explanation: >-
+    A function-level profile answers "which of my functions is slow" and is
+    silent on "is my program even the problem". If the machine is paging, or the
+    disk is saturated, or another process is taking the core, then no amount of
+    function attribution points at the cause. Three of the four system checks
+    take one glance each, and each eliminates a whole class of explanation.
+  tags: [os, diagnosis]
+
+- id: m6/q-022
+  lesson: m6/05-watching-a-running-system
+  type: mcq
+  prompt: >-
+    Two functions each take 10 ms. One retires 30 million instructions with few
+    cache misses; the other retires 2 million with 400,000 cache misses. What
+    does this tell you that a sampling profiler cannot?
+  options:
+    - "Which function is called more often"
+    - "Why each is slow: the first is doing too much work, the second is waiting on memory"
+    - "Which function has more lines of code"
+    - "Nothing a profiler could not also report"
+  answer: 1
+  explanation: >-
+    A sampling profiler interrupts and asks where execution is, so it reports
+    which function consumed the time and is silent on why. Hardware performance
+    counters count cycles, instructions retired, cache misses and branch
+    mispredictions as they happen, which separates "too much work" from
+    "stalled". To a profiler these two functions look identical.
+  tags: [os, counters, profiling]
+
+- id: m6/q-023
+  lesson: m6/05-watching-a-running-system
+  type: mcq
+  prompt: >-
+    A workload shows an IPC (instructions per cycle) of about 0.3 on a
+    superscalar core. What does that suggest?
+  options:
+    - "The code is well optimized and using the core fully"
+    - "The core is mostly stalled, since a superscalar core can retire several instructions per cycle"
+    - "The measurement is wrong, since IPC cannot be below 1"
+    - "The program is using too many instructions"
+  answer: 1
+  explanation: >-
+    M1/02 established that a superscalar core fetches and decodes 4 to 6
+    instructions per cycle and runs them on separate execution units, so healthy
+    compute-bound code retires several per cycle. An IPC near 0.3 means most
+    cycles retire nothing, which points at stalls. Pairing it with a cache-miss
+    rate tells you whether memory is the reason, confirming rather than assuming
+    a position on M1/04's roofline.
+  tags: [os, counters]
+
+- id: m6/q-024
+  lesson: m6/05-watching-a-running-system
+  type: mcq
+  prompt: >-
+    Which statement about tooling on this laptop is accurate?
+  options:
+    - "`perf` is available, since it ships with all modern operating systems"
+    - "`perf` is Linux-only, so on Windows 11 the equivalents are Resource Monitor, the Windows Performance Toolkit and VTune"
+    - "Hardware counters cannot be read on Windows at all"
+    - "Task Manager reads hardware performance counters directly"
+  answer: 1
+  explanation: >-
+    `perf` is Linux-specific and this laptop runs Windows 11. Task Manager and
+    Resource Monitor cover the four-resource check, the Windows Performance
+    Toolkit and Intel VTune read hardware counters on this Intel chip, and WSL2
+    can run `perf` with the caveat that counter access under virtualization is
+    restricted, so treat those numbers as indicative rather than as measurements
+    of the bare machine.
+  tags: [os, tooling]
+
+- id: m6/q-025
+  lesson: m6/05-watching-a-running-system
+  type: mcq
+  prompt: >-
+    A training script is slow. One core sits at 100%, eleven are idle, there is
+    no paging and the disk is inactive. What is the diagnosis?
+  options:
+    - "The disk is the bottleneck"
+    - "Single-threaded compute-bound work: the job is not using the available parallelism"
+    - "The machine is short of memory"
+    - "Another process is stealing time"
+  answer: 1
+  explanation: >-
+    No paging rules out memory, no disk activity rules out I/O, and eleven idle
+    cores rule out interference. One core pegged with the rest idle means the
+    work is happening in a single thread. Likely causes are a DataLoader with no
+    worker processes (M4/01) or Python-level work confined by the GIL (M6/01),
+    and the next step is a profile (M2/03) to find which function holds the core.
+  tags: [os, diagnosis]

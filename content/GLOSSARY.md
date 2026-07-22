@@ -39,44 +39,57 @@ the drift this ledger prevents:
 
 ## Hardware and systems terms
 
-| Term                    | First grounded | The agreed gloss                                                                                                         |
-| ----------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| cache, hit, miss        | m1/01          | a small fast copy of recently used memory; hit = found there, miss = fall through to the next                            |
-| cache line              | m1/01          | memory moves in fixed 64-byte blocks, never single bytes                                                                 |
-| locality                | m1/01          | temporal = touched again soon; spatial = neighbours touched soon                                                         |
-| register                | m1/01          | the handful of bytes the core does its arithmetic in — fastest storage on the chip                                       |
-| DRAM                    | m1/01          | main memory — the gigabytes; slow, far from the core                                                                     |
-| kernel (ML sense)       | m1/01          | one routine doing one specific piece of array maths (a matmul, a convolution). **Not** the OS kernel                     |
-| clock, cycle, GHz       | m1/02          | clock ticks at a fixed rate; one tick = one cycle; 3 GHz = 3 billion ticks/s = 0.33 ns each                              |
-| instruction             | m1/01          | one primitive step of machine work — add these, load that, jump if zero                                                  |
-| pipelining              | m1/02          | assembly line: five stages each busy with a different instruction                                                        |
-| execution unit          | m1/02          | the separate pieces of circuitry that do the actual work — one for whole numbers, others for decimals, others for memory |
-| superscalar, ILP        | m1/02          | several instructions from one ordinary program running at the same instant                                               |
-| out-of-order            | m1/02          | starts whichever instructions have their inputs ready, reorders results at the end                                       |
-| branch, prediction      | m1/02          | branch = can go one of two ways; the chip bets on history, ~15–20 cycles lost when wrong                                 |
-| register width, lane    | m1/02          | a 256-bit register holds 8 float32 side by side; each slot is a lane                                                     |
-| SIMD                    | m1/02          | one instruction, all lanes at once                                                                                       |
-| FMA                     | m1/02          | fused multiply-add: `a×b + c` in one step = 2 operations                                                                 |
-| FLOP vs FLOPS           | m1/02          | FLOP = one floating-point operation (a count). FLOPS = per second (a rate)                                               |
-| issue                   | m1/02          | to start an instruction                                                                                                  |
-| P-core / E-core         | m1/02          | performance cores are the big fast ones; efficiency cores are small and don't count to peak                              |
-| latency                 | m1/01          | time for one round trip — measured in nanoseconds                                                                        |
-| bandwidth               | m1/03          | bytes moved per second while streaming — measured in GB/s                                                                |
-| throughput              | m1/03          | work finished per unit time (contrast: latency = time for one item)                                                      |
-| arithmetic intensity    | m1/03          | FLOPs done per byte moved — which budget the code lives on                                                               |
-| memory-/compute-bound   | m1/03          | which of the two is the actual ceiling                                                                                   |
-| roofline, ridge point   | m1/04          | the plot; ridge = where the memory limit and compute limit cross                                                         |
-| dtype                   | m1/04          | which number format a tensor's elements are stored in (fp32, fp16, int8)                                                 |
-| thread                  | m1/05          | one independent sequence of instructions the hardware can run                                                            |
-| SIMT, warp              | m1/05          | 32 threads locked in step running the same instruction on different data                                                 |
-| accelerator             | m1/05          | the general word for a GPU or any chip bought to do the maths faster than a CPU                                          |
-| HBM, TB/s               | m1/05          | GPU memory; terabytes per second — a thousand GB/s                                                                       |
-| bytecode                | m2/01          | the intermediate instructions Python compiles your source to before running it                                           |
-| warmup                  | m2/01          | discarded early runs; you are choosing to measure the steady state                                                       |
-| percentile, p50/p95/p99 | m2/04          | p99 = the value 99% of runs come in under                                                                                |
-| host, device            | m4/01          | host = the CPU and its RAM; device = the accelerator and its own memory                                                  |
-| epoch                   | m4/01          | one full pass over the whole dataset                                                                                     |
-| shard                   | m4/03          | one large archive file packing many samples, read as a stream                                                            |
+| Term                                                   | First grounded | The agreed gloss                                                                                                         |
+| ------------------------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| cache, hit, miss                                       | m1/01          | a small fast copy of recently used memory; hit = found there, miss = fall through to the next                            |
+| cache line                                             | m1/01          | memory moves in fixed 64-byte blocks, never single bytes                                                                 |
+| locality                                               | m1/01          | temporal = touched again soon; spatial = neighbours touched soon                                                         |
+| register                                               | m1/01          | the handful of bytes the core does its arithmetic in — fastest storage on the chip                                       |
+| DRAM                                                   | m1/01          | main memory — the gigabytes; slow, far from the core                                                                     |
+| kernel (ML sense)                                      | m1/01          | one routine doing one specific piece of array maths (a matmul, a convolution). **Not** the OS kernel                     |
+| clock, cycle, GHz                                      | m1/02          | clock ticks at a fixed rate; one tick = one cycle; 3 GHz = 3 billion ticks/s = 0.33 ns each                              |
+| instruction                                            | m1/01          | one primitive step of machine work — add these, load that, jump if zero                                                  |
+| pipelining                                             | m1/02          | assembly line: five stages each busy with a different instruction                                                        |
+| execution unit                                         | m1/02          | the separate pieces of circuitry that do the actual work — one for whole numbers, others for decimals, others for memory |
+| superscalar, ILP                                       | m1/02          | several instructions from one ordinary program running at the same instant                                               |
+| out-of-order                                           | m1/02          | starts whichever instructions have their inputs ready, reorders results at the end                                       |
+| branch, prediction                                     | m1/02          | branch = can go one of two ways; the chip bets on history, ~15–20 cycles lost when wrong                                 |
+| register width, lane                                   | m1/02          | a 256-bit register holds 8 float32 side by side; each slot is a lane                                                     |
+| SIMD                                                   | m1/02          | one instruction, all lanes at once                                                                                       |
+| FMA                                                    | m1/02          | fused multiply-add: `a×b + c` in one step = 2 operations                                                                 |
+| FLOP vs FLOPS                                          | m1/02          | FLOP = one floating-point operation (a count). FLOPS = per second (a rate)                                               |
+| issue                                                  | m1/02          | to start an instruction                                                                                                  |
+| P-core / E-core                                        | m1/02          | performance cores are the big fast ones; efficiency cores are small and don't count to peak                              |
+| latency                                                | m1/01          | time for one round trip — measured in nanoseconds                                                                        |
+| bandwidth                                              | m1/03          | bytes moved per second while streaming — measured in GB/s                                                                |
+| throughput                                             | m1/03          | work finished per unit time (contrast: latency = time for one item)                                                      |
+| arithmetic intensity                                   | m1/03          | FLOPs done per byte moved — which budget the code lives on                                                               |
+| memory-/compute-bound                                  | m1/03          | which of the two is the actual ceiling                                                                                   |
+| roofline, ridge point                                  | m1/04          | the plot; ridge = where the memory limit and compute limit cross                                                         |
+| dtype                                                  | m1/04          | which number format a tensor's elements are stored in (fp32, fp16, int8)                                                 |
+| thread                                                 | m1/05          | one independent sequence of instructions the hardware can run                                                            |
+| SIMT, warp                                             | m1/05          | 32 threads locked in step running the same instruction on different data                                                 |
+| accelerator                                            | m1/05          | the general word for a GPU or any chip bought to do the maths faster than a CPU                                          |
+| HBM, TB/s                                              | m1/05          | GPU memory; terabytes per second — a thousand GB/s                                                                       |
+| bytecode                                               | m2/01          | the intermediate instructions Python compiles your source to before running it                                           |
+| warmup                                                 | m2/01          | discarded early runs; you are choosing to measure the steady state                                                       |
+| percentile, p50/p95/p99                                | m2/04          | p99 = the value 99% of runs come in under                                                                                |
+| host, device                                           | m4/01          | host = the CPU and its RAM; device = the accelerator and its own memory                                                  |
+| epoch                                                  | m4/01          | one full pass over the whole dataset                                                                                     |
+| process                                                | m6/01          | a running program plus its own memory, files and threads; cannot see another process's memory                            |
+| thread                                                 | m6/01          | one sequence of execution inside a process; threads of a process share its memory                                        |
+| context switch                                         | m6/01          | stopping one thread and starting another: ~1 microsecond direct, plus cache refill                                       |
+| virtual address                                        | m6/02          | the address your program uses; hardware translates it to a physical one on every access                                  |
+| page table                                             | m6/02          | translation happens in 4 KB blocks; the per-process table holding the mapping                                            |
+| TLB                                                    | m6/02          | small in-core cache of recent address translations; covers only ~6-12 MB                                                 |
+| page fault                                             | m6/02          | a touched page has no valid mapping; ~100 microseconds if served from SSD                                                |
+| file descriptor                                        | m6/03          | small integer handle indexing the kernel's table; files, sockets and pipes all use one                                   |
+| system call                                            | m6/03          | a switch into kernel code, ~1-2 microseconds, which is why libraries buffer                                              |
+| blocking vs non-blocking                               | m6/03          | wait for data and park a thread, or return immediately and track state yourself                                          |
+| CPU affinity (thread pinning; NOT m4/02 pinned memory) | m6/04          | restricting which cores the scheduler may run a thread on                                                                |
+| hyper-threading                                        | m6/04          | one physical core presented as two logical ones sharing execution units and L1/L2                                        |
+| performance counters, IPC                              | m6/05          | hardware event counts; IPC near 0.3 on a superscalar core means mostly stalled                                           |
+| shard                                                  | m4/03          | one large archive file packing many samples, read as a stream                                                            |
 
 ## ML terms
 

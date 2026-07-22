@@ -109,21 +109,24 @@ profiling and distributed. 4 lessons, 20 questions.
 
 # To author, in dependency order
 
-## M6 — Linux and the OS underneath
+## M6 — The operating system underneath
 
 **Prereqs:** M1. **Roadmap:** Linux + OS.
 **Why here:** M2 already blames "the scheduler took your core", M4 already
 leans on the GIL and the page cache, and M12 will need sockets and concurrency.
-Those are currently explained inline as asides. This module gives them a home
-and makes them usable.
+Those are currently explained inline as asides. This module gives them a home.
+**Honesty note:** this laptop runs Windows 11, and the roadmap says "Linux".
+The concepts below are the same on both; Linux is used as the reference because
+that is what servers run, and each lesson names the Windows equivalent tool
+rather than pretending `perf` is available here.
 
 1. Processes, threads, and what the scheduler actually does
 2. Virtual memory — pages, page tables, and why an address is not a location
 3. Files, descriptors and sockets — how data gets into a process
 4. CPU affinity — pinning, and why it changes a benchmark
-5. Reading the system's own counters — perf tooling
+5. Watching a running system — the counters the OS already keeps
 
-## M7 — Research communication
+## M7 — Reading and writing technical results
 
 **Prereqs:** M2. **Roadmap:** research communication.
 **Why here:** it needs M2's measurement discipline as its substance and
@@ -131,8 +134,8 @@ nothing else, so it can come early — and everything authored or written after
 it improves.
 
 1. The shape of a technical result — question, method, baseline, finding
-2. Threats to validity — what makes a comparison believable
-3. Negative results and limitations — why they strengthen a report
+2. Threats to validity — what makes a comparison believable, in your work or a paper's
+3. Negative results and limitations — why stating them strengthens a claim
 
 ## M8 — The PyTorch execution model
 
@@ -167,7 +170,6 @@ understood first.
 2. Export — tracing, the graph you actually get, and where it breaks
 3. Graph optimisation — constant folding, fusion, and what a runtime can see
 4. Execution providers and threading — mapping a graph onto this machine
-5. Runtime profiling — reading a runtime's own numbers
 
 ## M11 — Profiling ML workloads
 
@@ -192,13 +194,15 @@ operator-level attribution means anything.
 3. Backpressure and timeouts — what to do when you cannot keep up
 4. Batching strategies — static, dynamic, continuous, and the latency price
 5. LLM inference — prefill versus decode, and the KV cache
-6. Serving metrics in anger — p99, goodput, and SLOs
 
-## M13 — C++ foundations for ML systems
+## M13 — Native code and the Python boundary
 
 **Prereqs:** M8. **Roadmap:** C++/CUDA foundations.
 **Note:** the roadmap is explicit that CUDA comes only after CPU work is
 correct, so this module is C++-first and treats CUDA as the last lesson.
+**Scope, stated honestly:** five lessons will not make you a C++ programmer.
+The goal is to read native code, reason about ownership and builds, and
+understand what happens when Python calls into C++ — not proficiency.
 
 1. Why C++ is still underneath everything
 2. Memory and ownership — stack, heap, and RAII
@@ -241,11 +245,11 @@ landscape. Partly covered by M10's graph-optimisation lesson.
 | Group              | Lessons | Questions |
 | ------------------ | ------- | --------- |
 | Built (M1–M5)      | 21      | 107       |
-| To author (M6–M14) | 42      | ~210      |
-| **Total syllabus** | **63**  | **~317**  |
+| To author (M6–M14) | 40      | ~200      |
+| **Total syllabus** | **61**  | **~307**  |
 
 At 8 focused study hours per week, and roughly 1 to 1.5 hours per lesson
-including its quiz, 42 new lessons is on the order of 3 months of study. Build
+including its quiz, 40 new lessons is on the order of 3 months of study. Build
 time is a separate constraint and does not come out of the 8 hours.
 
 ## Open question: labs
