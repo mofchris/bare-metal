@@ -1,4 +1,5 @@
 # M3 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
 
 # ---- Lesson 01: IEEE 754 ----
 
@@ -13,8 +14,10 @@
     - "1 sign, 15 exponent, 16 mantissa"
   answer: 0
   explanation: >-
-    1/8/23. The exponent's 8 bits set the range (~10^±38); the 23 stored
-    mantissa bits (plus the implicit leading 1) give ~7 decimal digits.
+    One sign bit, 8 exponent bits and 23 mantissa bits. The exponent sets the
+    range, covering roughly 10⁻³⁸ to 10³⁸. The mantissa sets the precision: 23
+    stored bits plus one implicit leading bit that is never stored, giving 24
+    binary digits, which works out to about 7 decimal digits.
   tags: [numerics, ieee754]
 
 - id: m3/q-002
@@ -22,43 +25,73 @@
   type: mcq
   prompt: "Why is 0.1 + 0.2 == 0.3 false in floating point?"
   options:
-    - "A known hardware bug never fixed for compatibility"
-    - "1/10 is a repeating fraction in binary, so 0.1 is stored as a nearby value"
+    - "A known hardware bug that was never fixed, for compatibility"
+    - "1/10 repeats forever in binary, so 0.1 is stored as a nearby value rather than exactly"
     - "Addition randomly loses the last bit"
   answer: 1
   explanation: >-
-    Like 1/3 in decimal, 1/10 repeats forever in binary. Each constant is
-    rounded, the sum rounds again — compare with a tolerance, never with ==.
+    In base two, 1/10 is a repeating fraction in the same way 1/3 repeats in
+    base ten. A mantissa has finitely many bits, so it cannot store an endlessly
+    repeating pattern, and what gets stored is the nearest representable value.
+    Both constants are therefore slightly off, their sum is slightly off, and it
+    lands somewhere other than the stored version of 0.3. Compare against a
+    tolerance instead of using ==.
   tags: [numerics, representation]
 
 - id: m3/q-003
   lesson: m3/01-ieee-754
   type: short
   prompt: >-
-    The gap between 1.0 and the next representable float32 (~1.2×10⁻⁷) has a
-    standard name. What is it? (two words)
+    The gap between 1.0 and the next representable float32, about 1.2×10⁻⁷, has
+    a standard name. What is it? (two words)
   accept:
     - "machine epsilon"
     - "epsilon"
   explanation: >-
-    Machine epsilon. Add anything much smaller than it to 1.0 and the answer
-    is still 1.0 — absorption, the seed of lesson 04's failures.
+    Machine epsilon. Adding anything much smaller than it to 1.0 leaves a true
+    result that falls between 1.0 and the next representable float, so rounding
+    sends it back to 1.0 and the addition has no effect at all. That silent
+    disappearance is called absorption, and it is the seed of lesson 04's
+    failures.
   tags: [numerics, precision]
 
 - id: m3/q-004
   lesson: m3/01-ieee-754
   type: mcq
-  prompt: "How many float32 values lie between 1024 and 2048, compared to between 1 and 2?"
+  prompt: "How many float32 values lie between 1024 and 2048, compared with between 1 and 2?"
   options:
-    - "Far fewer — big numbers are sparse"
+    - "Far fewer, because large numbers are stored more sparsely"
     - "Exactly the same count"
-    - "Far more — big numbers need more coverage"
+    - "Far more, because a larger interval needs more values to cover it"
   answer: 1
   explanation: >-
-    The mantissa gives a fixed number of steps per power of two, so every
-    [2^k, 2^(k+1)) interval holds the same count — absolute spacing grows
-    with magnitude.
+    The mantissa provides a fixed number of steps, and the exponent decides how
+    much territory those steps cover. Between 1 and 2 they span a distance of 1;
+    between 1024 and 2048 the same number of steps spans 1024. So the count is
+    identical and each individual step is 1024 times larger. That step size is
+    the unit in the last place, or ULP.
   tags: [numerics, representation]
+
+- id: m3/q-017
+  lesson: m3/01-ieee-754
+  type: mcq
+  prompt: >-
+    float32's exponent field is 8 bits and holds no sign, yet floats can
+    represent values far below 1. How does the format express a negative
+    exponent?
+  options:
+    - "The sign bit is reused to indicate a negative exponent"
+    - "A fixed bias of 127 is subtracted from whatever the 8 bits hold"
+    - "Negative exponents are stored in the mantissa instead"
+    - "It cannot; values below 1 are stored as subnormals only"
+  answer: 1
+  explanation: >-
+    Whatever value the 8 bits hold, subtract 127 to get the real exponent. A
+    stored 128 therefore means 2¹ and a stored 126 means 2⁻¹, so one unsigned
+    field covers both directions. The sign bit is not involved: it says whether
+    the whole number is positive or negative, which is a separate question from
+    which way the exponent points.
+  tags: [numerics, ieee754]
 
 # ---- Lesson 02: fp16 / bf16 ----
 
@@ -67,61 +100,96 @@
   type: mcq
   prompt: "What distinguishes bf16 from fp16?"
   options:
-    - "bf16 keeps fp32's 8-bit exponent (same range) with a 7-bit mantissa; fp16 trades range for a 10-bit mantissa"
+    - "bf16 keeps fp32's 8-bit exponent and its range, with a 7-bit mantissa; fp16 trades range for a 10-bit mantissa"
     - "bf16 is 18 bits wide"
-    - "fp16 has the larger range, bf16 the higher precision"
+    - "fp16 has the larger range and bf16 the higher precision"
     - "They are two names for the same format"
   answer: 0
   explanation: >-
-    Same 16 bits, opposite splits: fp16 = 5-bit exponent (max 65504) with
-    more precision; bf16 = fp32's range with coarse precision.
+    Both spend 16 bits and split them in opposite directions. fp16 takes a 5-bit
+    exponent, which caps it at 65504 and floors it around 6×10⁻⁵, in exchange
+    for a 10-bit mantissa. bf16 keeps fp32's full 8-bit exponent and therefore
+    fp32's range, paying with a 7-bit mantissa so coarse that 256 + 1 rounds
+    back to 256.
   tags: [numerics, formats]
 
 - id: m3/q-006
   lesson: m3/02-fp16-bf16
   type: mcq
-  prompt: "Why did bf16 become the training default over fp16?"
+  prompt: "Why did bf16 become the default for training rather than fp16?"
   options:
-    - "It's more precise than fp16"
-    - "Its fp32-sized range means gradients don't overflow/underflow, so no loss-scaling machinery is needed"
-    - "It's faster to convert to int8"
+    - "It is more precise than fp16"
+    - "Its fp32-sized range means gradients neither overflow nor underflow, so no loss-scaling machinery is needed"
+    - "It converts to int8 faster"
     - "fp16 is patent-encumbered"
   answer: 1
   explanation: >-
-    Gradients span wild magnitudes; range is what saves them. Gradient noise
-    already exceeds bf16's rounding error, so the lost precision is cheap.
+    Gradient magnitudes span an enormous range: they shrink toward zero as a
+    model converges and occasionally spike. In fp16 the small ones underflow to
+    zero, so those weights silently stop learning, and spikes overflow to
+    infinity, which poisons everything downstream. bf16 has float32's range, so
+    anything that fit in float32 fits, and its coarse mantissa costs little
+    because gradient noise already exceeds the rounding error.
   tags: [numerics, training]
 
 - id: m3/q-007
   lesson: m3/02-fp16-bf16
   type: mcq
   prompt: >-
-    A memory-bound elementwise op switches tensors from fp32 to bf16. On the
-    roofline (M1), what happens?
+    A memory-bound elementwise operation switches its tensors from fp32 to
+    bf16. What happens on the roofline from M1?
   options:
-    - "Nothing — the FLOPs are unchanged"
-    - "Bytes halve, so arithmetic intensity doubles and the bandwidth-bound speed limit doubles"
-    - "It becomes slower due to conversion costs"
+    - "Nothing, because the FLOP count is unchanged"
+    - "Bytes halve, so arithmetic intensity doubles and the bandwidth-bound ceiling doubles"
+    - "It gets slower, because of conversion costs"
   answer: 1
   explanation: >-
-    Half the bytes per element at the same FLOPs slides the op right on the
-    roofline: the AI × bandwidth ceiling doubles. This is why precision is a
-    systems dial, not just an accuracy dial.
+    Arithmetic intensity is FLOPs divided by bytes moved. Halving the bytes at
+    an unchanged FLOP count doubles the ratio, which slides the operation
+    rightward on the plot. Since a memory-bound operation's ceiling is intensity
+    multiplied by bandwidth, doubling the intensity doubles the ceiling. This is
+    why a number format is a systems decision and not only an accuracy decision.
   tags: [numerics, roofline]
 
 - id: m3/q-008
   lesson: m3/02-fp16-bf16
   type: short
   prompt: >-
-    The standard mixed-precision pattern: store and move tensors narrow, but
-    do sums in a wider type. Complete the slogan: "store narrow, ______ wide."
+    The standard mixed-precision pattern is to store and move tensors narrow
+    but perform the sums in a wider type. Complete it: "store narrow,
+    ______ wide."
   accept:
     - "accumulate"
     - "accumulate wide"
   explanation: >-
-    Accumulate wide — matmul units sum bf16/fp16 products into fp32;
-    int8 products sum into int32. Protect the accumulations.
+    Accumulate wide. Matrix multiply units read bf16 or fp16 inputs and sum
+    their products into a float32 accumulator, and int8 products are summed into
+    int32. The accumulator is where rounding errors would otherwise pile up
+    across hundreds of additions, so it is the one place precision is not
+    traded away.
   tags: [numerics, patterns]
+
+- id: m3/q-018
+  lesson: m3/02-fp16-bf16
+  type: mcq
+  prompt: >-
+    Training in fp16, an engineer sees the loss plateau early with nothing
+    appearing to crash, and later in the same run the loss becomes NaN. Which
+    single cause explains both?
+  options:
+    - "The learning rate is too high"
+    - "fp16's 5-bit exponent: small gradients underflow to zero, and spikes overflow to infinity"
+    - "The dataset contains corrupted labels"
+    - "fp16's 10-bit mantissa is too imprecise for the weight updates"
+  answer: 1
+  explanation: >-
+    Both symptoms come from the range rather than the precision. Gradients below
+    about 6×10⁻⁵ underflow to zero, so those weights receive no update and stop
+    learning with no error raised, which is the silent plateau. Gradients above
+    65504 overflow to infinity, which contaminates later arithmetic until the
+    loss becomes NaN. Switching to bf16, whose 8-bit exponent gives float32's
+    range, removes both without loss scaling.
+  tags: [numerics, training, formats]
 
 # ---- Lesson 03: int8 quantization ----
 
@@ -136,8 +204,11 @@
     - "A random seed for rounding"
   answer: 1
   explanation: >-
-    Scale is the tick width of the 256-tick ruler: the tensor's measured
-    range divided by 255. Zero-point pins which tick means real 0.0.
+    Scale is the width of one step on a 256-step ruler, computed as the tensor's
+    measured range divided by 255 and stored as an ordinary float alongside the
+    tensor. zero_point is separate: it says which integer represents real 0.0,
+    and it exists because the values being represented are usually not centred
+    on zero.
   tags: [numerics, quantization]
 
 - id: m3/q-010
@@ -146,47 +217,77 @@
   prompt: "What does calibration do in post-training quantization?"
   options:
     - "Retrains the model at 8-bit precision"
-    - "Runs sample data to measure each tensor's real value range, from which scales are chosen"
-    - "Rounds all weights to the nearest integer"
+    - "Runs sample data to measure each tensor's actual value range, from which the scales are chosen"
+    - "Rounds all the weights to the nearest integer"
     - "Verifies accuracy after quantization"
   answer: 1
   explanation: >-
-    The scale must stretch the ruler over the range values actually occupy —
-    weights are known statically, activations need representative data. Too
-    wide → coarse ticks; too tight → clipping.
+    The ruler is only as good as the range it is stretched over, and that range
+    has to be measured. Weights can be inspected directly because they sit
+    still, but activations depend on what data flows through, so they must be
+    observed on real inputs. Too wide a range makes every step coarse; too tight
+    a range makes outlying values clip at the end of the ruler.
   tags: [numerics, quantization]
 
 - id: m3/q-011
   lesson: m3/03-int8-quantization
   type: mcq
   prompt: >-
-    For bandwidth-bound LLM decode, int8 weights (vs fp32) buy roughly what
-    speedup, before any other optimization?
+    Generating text from a language model is bandwidth-bound, since each token
+    requires reading the whole model. Roughly what speedup do int8 weights buy
+    over fp32, before any other change?
   options:
-    - "None — decode is compute-bound"
-    - "~1.3×"
-    - "~4×, because 4× fewer bytes stream through the memory system"
-    - "~100×"
+    - "None, because decoding is compute-bound"
+    - "About 1.3×"
+    - "About 4×, because a quarter as many bytes stream through the memory system"
+    - "About 100×"
   answer: 2
   explanation: >-
-    Decode streams the weights past the compute for every token; at 1/4 the
-    bytes, the memory-bound ceiling rises ~4×. M1's roofline doing money work.
+    int8 is 1 byte per value against fp32's 4, so the weights are a quarter the
+    size. For a memory-bound operation the ceiling is arithmetic intensity
+    multiplied by bandwidth, and quartering the bytes quadruples that ceiling.
+    This is the roofline from M1 turned directly into money.
   tags: [numerics, quantization, roofline]
 
 - id: m3/q-012
   lesson: m3/03-int8-quantization
   type: mcq
-  prompt: "Why are int8 × int8 products accumulated in int32?"
+  prompt: "Why are products of int8 values accumulated in int32?"
   options:
-    - "Hardware has no int8 adders"
-    - "Hundreds of summed ±127×±127 products would overflow 8 bits almost immediately"
-    - "int32 is faster than int8"
+    - "Because hardware has no int8 adders"
+    - "Because one product alone can reach 16,129, and a matmul sums hundreds of them"
+    - "Because int32 arithmetic is faster than int8"
     - "For compatibility with Python integers"
   answer: 1
   explanation: >-
-    A single product can reach ~16K; a dot product sums hundreds of them.
-    Accumulate wide (int32), then re-quantize — the module's standing pattern.
+    Multiply two int8 values near their limits and you get 127 × 127 = 16,129,
+    which already does not fit in an int8's maximum of 127. A matrix
+    multiplication then sums hundreds of such products. The running total is
+    kept in int32, which has room, and only converted back to int8 for the next
+    layer. This is the same accumulate-wide rule seen in lesson 02.
   tags: [numerics, quantization]
+
+- id: m3/q-019
+  lesson: m3/03-int8-quantization
+  type: mcq
+  prompt: >-
+    A layer's weights lie between −2.0 and 2.0, except for four outliers at
+    ±15.0. You calibrate using the true minimum and maximum. What goes wrong,
+    and what fixes it?
+  options:
+    - "Nothing goes wrong; using the true range is always correct"
+    - "The step becomes about 0.118 instead of about 0.0157, so ordinary weights lose most of their precision; percentile calibration fixes it"
+    - "The four outliers clip to ±127; a wider range fixes it"
+    - "The zero-point becomes wrong; re-centring the tensor fixes it"
+  answer: 1
+  explanation: >-
+    The true range spans 30.0, so the step is 30.0 ÷ 255 ≈ 0.118. Had the range
+    been ±2.0 it would span 4.0, giving a step of 4.0 ÷ 255 ≈ 0.0157, roughly
+    7.5 times finer. Nearly all the resolution is being spent on empty territory
+    between 2 and 15 where almost no weights live. Percentile calibration sets
+    the range to cover most values and deliberately clips the four outliers,
+    trading them for a far finer step everywhere else.
+  tags: [numerics, quantization, calibration]
 
 # ---- Lesson 04: failure modes ----
 
@@ -194,30 +295,38 @@
   lesson: m3/04-failure-modes
   type: short
   prompt: >-
-    Subtracting two nearly equal numbers cancels their accurate leading
-    digits and promotes rounding noise. What is this failure called? (two words)
+    Subtracting two nearly equal numbers cancels their accurate leading digits
+    and promotes rounding noise to the front of the result. What is this failure
+    called? (two words)
   accept:
     - "catastrophic cancellation"
     - "cancellation"
   explanation: >-
-    Catastrophic cancellation — the classic case is variance via
-    E[x²] − E[x]². Restructure the algorithm; don't just add precision.
+    Catastrophic cancellation. Each operand carries about 7 accurate digits plus
+    rounding noise below them; subtraction removes the accurate leading digits,
+    so what survives is dominated by noise that was previously harmless. The
+    classic case is computing variance as E[x²] − E[x]². The fix is to
+    restructure the algorithm rather than to add precision.
   tags: [numerics, failures]
 
 - id: m3/q-014
   lesson: m3/04-failure-modes
   type: mcq
   prompt: >-
-    The same model trains to slightly different losses on 4 GPUs vs 8. A
-    legitimate (non-bug) explanation:
+    The same model trains to slightly different losses on 4 GPUs versus 8. What
+    is the legitimate, non-bug explanation?
   options:
-    - "Floating-point addition isn't associative — different reduction orders round differently"
-    - "More GPUs are inherently less accurate"
+    - "Floating-point addition is not associative, so different reduction orders round differently"
+    - "More GPUs are inherently less numerically accurate"
     - "The learning rate scales with GPU count automatically"
   answer: 0
   explanation: >-
-    Parallel sums group terms differently, and (a+b)+c ≠ a+(b+c) in floats.
-    Fixed reduction orders or wider accumulators buy reproducibility.
+    Summing an array in parallel means splitting it across devices, summing each
+    piece, then combining. That grouping differs from a sequential loop's, and
+    (a + b) + c does not equal a + (b + c) in floating point because each
+    grouping rounds at different moments. So the same computation on a different
+    device count legitimately produces different bits. Fixed reduction orders or
+    wider accumulators buy back reproducibility.
   tags: [numerics, failures, distributed]
 
 - id: m3/q-015
@@ -225,29 +334,57 @@
   type: mcq
   prompt: "What does loss scaling do in fp16 mixed-precision training?"
   options:
-    - "Normalizes the loss to [0, 1] for stability"
-    - "Multiplies the loss by S so all gradients ride through backprop at magnitudes above fp16's underflow floor, then unscales before the update"
+    - "Normalizes the loss into the range [0, 1] for stability"
+    - "Multiplies the loss by S so every gradient travels through backprop above fp16's underflow floor, then divides by S before the update"
     - "Clips exploding gradients to a maximum norm"
-    - "Reduces the learning rate when the loss spikes"
+    - "Reduces the learning rate whenever the loss spikes"
   answer: 1
   explanation: >-
-    By linearity, scaling the loss scales every gradient — lifting small ones
-    out of the silent-death zone. Divide by S (in fp32) before updating.
-    bf16 made the whole dance unnecessary.
+    Differentiation is linear, so scaling the quantity you differentiate scales
+    every derivative by the same factor. Multiplying the loss by 1024 therefore
+    lifts a gradient of 10⁻⁷, well below fp16's floor of about 6×10⁻⁵, up to
+    about 10⁻⁴ where the format can hold it. Dividing by 1024 in float32 before
+    the weight update restores the true values, so the mathematics is unchanged
+    end to end.
   tags: [numerics, training]
 
 - id: m3/q-016
   lesson: m3/04-failure-modes
   type: mcq
-  prompt: "A training loss suddenly reads NaN. The most likely story is:"
+  prompt: "A training loss suddenly reads NaN. What is the most likely story?"
   options:
     - "The dataset contains a corrupted label"
-    - "An overflow (inf) or invalid operation upstream propagated through the graph to the loss"
+    - "An overflow to infinity, or an invalid operation, happened in an earlier layer and propagated to the loss"
     - "The random seed was reused"
-    - "NaN means training converged"
+    - "NaN indicates that training has converged"
   answer: 1
   explanation: >-
-    NaN is a symptom that flows: an activation spike overflowed (fp16's 65504
-    is nearby) or an inf−inf/0÷0 occurred, layers earlier. Debug at layer
-    boundaries, suspect the narrowest format first.
+    NaN is a symptom that travels. An activation spike overflowed, which is easy
+    in fp16 where the ceiling is 65504, or an operation such as inf − inf or 0/0
+    produced NaN, and it then flowed through every subsequent layer to reach the
+    loss. The cause is therefore upstream of where you noticed it. Check for
+    infinities and NaNs at each layer boundary to find where they first appear,
+    and suspect the narrowest format in the pipeline.
   tags: [numerics, failures, training]
+
+- id: m3/q-020
+  lesson: m3/04-failure-modes
+  type: mcq
+  prompt: >-
+    You compute the variance of a million sensor readings, all close to 10,000,
+    using E[x²] − E[x]² in float32. The answer comes back negative, which is
+    impossible for a variance. Why?
+  options:
+    - "A sign bit was corrupted during accumulation"
+    - "Both quantities are near 10⁸ and nearly equal, so their difference is smaller than the rounding error in each"
+    - "float32 cannot represent numbers as large as 10⁸"
+    - "The readings must contain a negative value"
+  answer: 1
+  explanation: >-
+    With readings near 10,000, both E[x²] and E[x]² land near 10⁸. float32
+    carries about 7 accurate decimal digits, so at 10⁸ the absolute error in
+    each is on the order of 10. The true variance is far smaller than that
+    error, so subtracting two nearly equal noisy numbers leaves a result made
+    mostly of noise, which can easily come out negative. Subtracting the mean
+    from each value before squaring removes the cancellation entirely.
+  tags: [numerics, failures]

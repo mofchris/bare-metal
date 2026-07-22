@@ -1,21 +1,24 @@
 # M2 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
 
 # ---- Lesson 01: why timing is hard ----
 
 - id: m2/q-001
   lesson: m2/01-why-timing-is-hard
   type: mcq
-  prompt: "Why do benchmarks discard the first few runs as 'warmup'?"
+  prompt: "Why do benchmarks discard the first few runs as warmup?"
   options:
-    - "To give the OS time to notice the process"
-    - "Because cold caches, fresh compilation, and untrained predictors make early runs measure a different program"
+    - "To give the operating system time to notice the process"
+    - "Because cold caches, first-time compilation and untrained predictors make early runs a different program"
     - "Because timers are inaccurate for the first few milliseconds"
-    - "Superstition — warm and cold runs are statistically identical"
+    - "Out of habit; warm and cold runs are statistically the same"
   answer: 1
   explanation: >-
-    First runs pay one-time costs (cold caches, bytecode compilation, naive
-    branch predictors). Discarding them is choosing to measure the steady
-    state — and saying so.
+    A first run pays costs later runs never pay. Caches start empty, so it pays
+    about 100 ns per miss where a later run pays about 1 ns. Branch predictors
+    have no history, so they guess badly. Python compiles bytecode and imports
+    modules lazily. Discarding those runs is choosing to measure the steady
+    state, which is legitimate only if you say that is what you did.
   tags: [measurement, warmup]
 
 - id: m2/q-002
@@ -23,111 +26,169 @@
   type: mcq
   prompt: "Which Python timer should benchmarks use, and why?"
   options:
-    - "time.time() — it reports real-world time"
-    - "time.perf_counter() — monotonic and high-resolution, built for intervals"
-    - "datetime.now() — timezone-aware timing"
+    - "time.time(), because it reports real-world time"
+    - "time.perf_counter(), because it is monotonic and built for measuring intervals"
+    - "datetime.now(), because it is timezone-aware"
   answer: 1
   explanation: >-
-    time.time() is wall-clock: NTP can adjust it mid-measurement and its
-    resolution is coarser. perf_counter() is monotonic and made for exactly
-    this job.
+    time.time() reports the current time of day, which a network time service
+    may adjust while your benchmark runs, including backwards. A measurement
+    spanning such an adjustment is wrong by the size of the adjustment.
+    perf_counter() only ever moves forward and exists specifically for
+    intervals, so it cannot be corrected out from under you.
   tags: [measurement, timers]
 
 - id: m2/q-003
   lesson: m2/01-why-timing-is-hard
   type: short
   prompt: >-
-    A thin laptop runs fast for the first seconds of a benchmark, heats up,
-    and slows down. What is this called? (two words)
+    A thin laptop runs fast for the first seconds of a benchmark, warms up, and
+    then slows down. What is that called? (two words)
   accept:
     - "thermal throttling"
     - "thermal throttle"
     - "throttling"
   explanation: >-
-    Thermal throttling: the CPU trades clock speed against temperature. It's
-    why long benchmarks drift and why variants should be interleaved.
+    Thermal throttling. A chip produces heat in proportion to how hard it works,
+    and a thin laptop can only remove heat so fast, so the chip reduces its own
+    clock rate to stay within a survivable temperature. This is why a 10-second
+    benchmark's first and last seconds run at different clock rates.
   tags: [measurement, thermals]
 
 - id: m2/q-004
   lesson: m2/01-why-timing-is-hard
   type: mcq
   prompt: >-
-    The ASPLOS 2009 "Producing Wrong Data" paper showed benchmark results
-    changing measurably due to:
+    The ASPLOS 2009 paper "Producing Wrong Data Without Doing Anything
+    Obviously Wrong" found benchmark results changing measurably because of:
   options:
     - "Cosmic ray bit flips"
-    - "Link order and even the size of environment variables"
+    - "The order the linker placed functions in, and the size of the environment variables"
     - "The brand of RAM installed"
     - "Whether the benchmark was written in C or C++"
   answer: 1
   explanation: >-
-    Setup details nobody thinks about (link order, environment size shifting
-    alignment) changed results — "measurement bias." One configuration is one
-    sample from a distribution of setups.
+    Environment variables are copied onto the program's stack before it starts,
+    so their total size shifts where the stack begins. Shifting the stack shifts
+    every address in it, which changes which addresses share a cache line and
+    which collide. The code is identical and its cache behaviour is not. The
+    authors called this measurement bias.
   tags: [measurement, bias]
+
+- id: m2/q-017
+  lesson: m2/01-why-timing-is-hard
+  type: mcq
+  prompt: >-
+    You are comparing implementations A and B over 20 runs each, on a laptop
+    that warms up during the benchmark. Why run them as A, B, A, B rather than
+    all 20 of A followed by all 20 of B?
+  options:
+    - "It makes the benchmark finish sooner"
+    - "Because the machine drifts over time, and interleaving makes that drift hit both equally"
+    - "Because switching between programs clears the cache between runs"
+    - "It does not matter, as long as both get the same number of runs"
+  answer: 1
+  explanation: >-
+    The chip is cool at the start and throttled by the end, so its clock rate
+    falls during the benchmark. Running all of A first gives A the cool machine
+    and B the hot one, penalising B by an amount that has nothing to do with the
+    code. Interleaving spreads that drift across both, so the comparison
+    measures the implementations rather than the running order.
+  tags: [measurement, comparison]
 
 # ---- Lesson 02: statistics ----
 
 - id: m2/q-005
   lesson: m2/02-benchmark-statistics
   type: mcq
-  prompt: "Why are timing distributions right-skewed?"
+  prompt: "Why are benchmark timing distributions right-skewed?"
   options:
     - "Floating-point rounding accumulates upward"
-    - "Noise (scheduler, throttling, cache misses) can only make runs slower, never faster"
+    - "Interference can only make a run slower, so there is a hard floor but no ceiling"
     - "Timers round up to the nearest millisecond"
   answer: 1
   explanation: >-
-    Interference adds delay in one direction only: there's a hard floor (the
-    code's intrinsic cost) and a straggling tail of unlucky runs above it.
+    The scheduler taking your core, thermal throttling and a cold cache all add
+    time. Nothing on that list can make a run finish before the work is done. So
+    results cluster just above a floor, the time the work genuinely takes, while
+    unlucky runs trail off upward with no limit. That produces a tight left
+    cluster and a thin right tail.
   tags: [statistics, distributions]
 
 - id: m2/q-006
   lesson: m2/02-benchmark-statistics
   type: mcq
-  prompt: "For a pure CPU-bound microbenchmark, why is reporting the MINIMUM defensible?"
+  prompt: "For a pure CPU-bound microbenchmark, why is reporting the minimum defensible?"
   options:
-    - "It makes the code look fastest"
-    - "Noise only slows runs down, so the minimum best estimates intrinsic cost"
-    - "It's the easiest statistic to compute"
-    - "It isn't — the minimum is never a valid statistic"
+    - "Because it makes the code look fastest"
+    - "Because interference only adds time, so the fastest run is closest to the intrinsic cost"
+    - "Because it is the easiest statistic to compute"
+    - "It is not; the minimum is never a valid statistic"
   answer: 1
   explanation: >-
-    With one-directional noise, the least-interfered run is closest to the
-    code's true cost (timeit's own recommendation). For I/O or concurrency,
-    though, the minimum is a fantasy case.
+    Since noise is one-directional, the least-disturbed run is the best
+    available estimate of what the code costs without interference, and Python's
+    timeit documentation recommends it for this reason. It stops being
+    defensible as soon as the work waits on a disk, a network, or memory
+    allocation, because those waits are part of the real cost rather than
+    interference, and the luckiest run then describes a case that never repeats.
   tags: [statistics]
 
 - id: m2/q-007
   lesson: m2/02-benchmark-statistics
   type: short
   prompt: >-
-    The robust spread measure the labs report — the span of the middle 50% of
-    runs. What is it called? (abbreviation accepted)
+    The robust spread measure covering the middle 50% of runs, from the 25%
+    boundary to the 75% boundary. What is it called? (abbreviation accepted)
   accept:
     - "IQR"
     - "interquartile range"
     - "the interquartile range"
   explanation: >-
-    The interquartile range. A "speedup" smaller than the machine's IQR noise
-    floor is weather, not a finding.
+    The interquartile range. It ignores both extremes by construction, which is
+    what you want when the extremes are the machine misbehaving rather than the
+    code varying. A claimed speedup smaller than your machine's IQR noise floor
+    is not a finding.
   tags: [statistics]
 
 - id: m2/q-008
   lesson: m2/02-benchmark-statistics
   type: mcq
-  prompt: "You're comparing implementations A and B. Which procedure is honest?"
+  prompt: "You are comparing implementations A and B. Which procedure is honest?"
   options:
-    - "One careful run each, report the difference"
-    - "All A runs, then all B runs, compare means"
-    - "Interleave A and B runs, compare medians, check the distributions actually separate"
-    - "Run each until one produces a favorable number"
+    - "One careful run of each, and report the difference"
+    - "All A runs, then all B runs, and compare the means"
+    - "Interleave the runs, compare medians, and check that the distributions actually separate"
+    - "Run each until one of them produces a favourable number"
   answer: 2
   explanation: >-
-    Interleaving spreads machine drift over both variants; medians resist the
-    tail; and overlapping IQRs mean "no measurable difference" — which is a
-    valid result.
+    Each version produces a distribution rather than a value. If A's slower runs
+    overlap B's faster runs, a single-run comparison depends on which sample you
+    happened to catch and flips sign from day to day. Interleaving spreads
+    machine drift across both, the median resists the tail, and substantially
+    overlapping IQRs mean the honest answer is no measurable difference.
   tags: [statistics, comparison]
+
+- id: m2/q-018
+  lesson: m2/02-benchmark-statistics
+  type: mcq
+  prompt: >-
+    A nightly batch job runs 4000 times a year on rented hardware and you need
+    to predict the annual bill. Its timings are right-skewed with occasional
+    very slow runs. Which statistic should you report?
+  options:
+    - "The median, because it resists the slow outliers"
+    - "The minimum, because it shows what the code really costs"
+    - "The mean, because total cost is the sum of every run, outliers included"
+    - "The IQR, because spread is what matters for cost"
+  answer: 2
+  explanation: >-
+    This is the case where the mean is correct rather than a trap. You pay for
+    every run including the slow ones, and the total is exactly the mean
+    multiplied by the count. The median deliberately discards the tail, and here
+    the tail is real money. Use the median to describe a typical run, and the
+    mean when you genuinely need the total.
+  tags: [statistics]
 
 # ---- Lesson 03: profiling ----
 
@@ -137,36 +198,41 @@
   prompt: "What is the core tradeoff between sampling and instrumenting profilers?"
   options:
     - "Sampling is exact but slow; instrumentation is statistical but fast"
-    - "Instrumentation is exact but distorts timings; sampling is statistical with near-zero overhead"
+    - "Instrumentation is exact but distorts the timings; sampling is statistical with almost no overhead"
     - "They differ only in output format"
   answer: 1
   explanation: >-
-    Instrumentation hooks every call — complete data, but the hooks inflate
-    cheap, hot functions. Sampling interrupts periodically — honest
-    proportions, but rare events can slip between samples.
+    Instrumentation attaches a hook to every call, so a function costing 50 ns
+    that is called ten million times pays the hook cost ten million times, while
+    a function costing 2 seconds pays it once. Cheap frequently-called functions
+    therefore look far more expensive than they are. Sampling interrupts a few
+    hundred times a second and records the call stack, so proportions come out
+    honest, but rare fast events can fall between samples.
   tags: [profiling]
 
 - id: m2/q-010
   lesson: m2/03-profiling
   type: mcq
-  prompt: >-
-    A function shows high CUMULATIVE time but near-zero SELF time. What is it?
+  prompt: "A function shows high cumulative time but almost no self time. What is it?"
   options:
-    - "The optimization target — attack it directly"
-    - "An orchestrator — the real target is somewhere in what it calls"
-    - "Profiler measurement error"
+    - "The optimization target, so attack it directly"
+    - "An orchestrator, so the real target is inside something it calls"
+    - "A profiler measurement error"
   answer: 1
   explanation: >-
-    It spends its time waiting on callees. Follow the tree down to where self
-    time concentrates — in a flame graph, the wide plateau.
+    Self time is time spent in a function's own code, and cumulative time is
+    self time plus everything it called. High cumulative with near-zero self
+    means the function delegates rather than works, so optimizing its own body
+    changes almost nothing. Follow the tree downward to where self time
+    concentrates, which in a flame graph is the wide plateau.
   tags: [profiling]
 
 - id: m2/q-011
   lesson: m2/03-profiling
   type: mcq
   prompt: >-
-    A component takes 5% of runtime. Per Amdahl's law, making it INFINITELY
-    fast speeds the program up by at most:
+    A component takes 5% of runtime. By Amdahl's law, making it infinitely fast
+    speeds up the whole program by at most:
   options:
     - "About 1.05×"
     - "About 1.5×"
@@ -174,24 +240,49 @@
     - "About 20×"
   answer: 0
   explanation: >-
-    1 / (1 − 0.05) ≈ 1.05×. The other 95% still runs. This is why you learn
-    p from a profile before spending a week optimizing.
+    Overall speedup is 1 / ((1 − p) + p/s). With p = 0.05 and s infinite, p/s
+    goes to 0, so the result is 1 / 0.95 ≈ 1.05. The other 95% of the program
+    still has to run. This is why you measure p from a profile before spending a
+    week on an optimization.
   tags: [profiling, amdahl]
 
 - id: m2/q-012
   lesson: m2/03-profiling
   type: short
   prompt: >-
-    Gregg's visualization of profiled call stacks where width is proportional
-    to time spent — what is it called? (two words)
+    Gregg's visualization of profiled call stacks, where each box is a function
+    and box width is proportional to time spent. What is it called? (two words)
   accept:
     - "flame graph"
     - "a flame graph"
     - "flamegraph"
   explanation: >-
-    A flame graph. Read it by hunting wide plateaus — they're where the time
-    is, and therefore where the wins are.
+    A flame graph. Boxes sit on top of whatever called them, so height is call
+    depth and width is time. You read it by searching for width rather than
+    height: a tall narrow tower is a deep call chain that costs little, while a
+    wide box at the top of a tower is expensive code doing its own work.
   tags: [profiling]
+
+- id: m2/q-019
+  lesson: m2/03-profiling
+  type: mcq
+  prompt: >-
+    A profile shows one function taking 70% of runtime, and you believe you can
+    make that function twice as fast. What whole-program speedup should you
+    expect?
+  options:
+    - "About 1.35×"
+    - "About 1.54×"
+    - "About 2×"
+    - "About 1.7×"
+  answer: 1
+  explanation: >-
+    Apply 1 / ((1 − p) + p/s) with p = 0.70 and s = 2. The unchanged portion is
+    0.30 and the improved portion becomes 0.70 ÷ 2 = 0.35, so the total is
+    1 / 0.65 ≈ 1.54. Compare that with the 5% case, where an infinite speedup
+    bought only 1.05: a modest improvement to a large fraction beats a heroic
+    improvement to a small one.
+  tags: [profiling, amdahl]
 
 # ---- Lesson 04: benchmarking ML ----
 
@@ -206,23 +297,28 @@
     - "Only changes memory usage"
   answer: 1
   explanation: >-
-    Shared fixed costs raise work/second, but requests wait for the batch to
-    fill and travel with it. Throughput and latency are a dial, not a pair of
-    reciprocals.
+    Throughput rises because a batch of 32 turns 32 small matrix multiplications
+    into one large one with higher arithmetic intensity, and spreads each step's
+    fixed costs across 32 samples. Latency rises because a request arriving at
+    an empty batch waits for 31 others before anything happens to it. The two
+    are a dial rather than reciprocals.
   tags: [ml-benchmarking, batching]
 
 - id: m2/q-014
   lesson: m2/04-benchmarking-ml
   type: mcq
-  prompt: "Why do serving SLOs target p99 latency rather than the average?"
+  prompt: "Why do serving performance promises target p99 latency rather than the average?"
   options:
-    - "p99 is easier to measure"
-    - "Averages are always wrong"
-    - "A session making ~100 requests experiences the p99 about once — the tail is what users actually feel"
+    - "Because p99 is easier to measure"
+    - "Because averages are always misleading"
+    - "Because a session making about 100 requests hits the p99 roughly once, so the tail is what users experience"
   answer: 2
   explanation: >-
-    Many-request sessions sample the tail reliably. A great average with a
-    terrible p99 is a product that feels broken once per session.
+    p99 is the value 99% of requests come in under, so 1 request in 100 exceeds
+    it. A user whose session makes 100 requests therefore expects to hit one of
+    those slow requests every session. The rare case is not rare from where the
+    user is sitting, so a good average with a bad p99 is a product that feels
+    broken once per session.
   tags: [ml-benchmarking, percentiles]
 
 - id: m2/q-015
@@ -230,28 +326,54 @@
   type: mcq
   prompt: >-
     A benchmark stops its CPU-side timer right after the framework call
-    returns, without synchronizing with the GPU. The measured time is:
+    returns, without synchronizing with the GPU. What did it measure?
   options:
-    - "Correct — the call returned, so the work is done"
-    - "How long it took to ENQUEUE the work, not to execute it"
+    - "The correct execution time, since the call returned"
+    - "How long it took to queue the work, not to perform it"
     - "Double the true execution time"
   answer: 1
   explanation: >-
-    Accelerator execution is asynchronous: calls queue work and return. Sync
-    with the device before reading the clock — the most common real-world ML
-    benchmarking bug.
+    GPU execution is asynchronous: the framework places work on a queue and
+    returns immediately, before the device has done any of it. The clock
+    therefore stopped when the work was queued. On a large matrix multiply this
+    reports a speed the hardware could not physically achieve, which is the
+    signal to suspect it. Call torch.cuda.synchronize() before reading the clock
+    at both ends of the measurement.
   tags: [ml-benchmarking, async]
 
 - id: m2/q-016
   lesson: m2/04-benchmarking-ml
   type: short
   prompt: >-
-    Load-testing trap named by Gil Tene: a wait-for-reply test client lets
-    slow replies suppress the measurements that would expose them. What's it
-    called? (two words)
+    The load-testing trap named by Gil Tene, where a client that waits for each
+    reply before sending the next stops sampling exactly while the system is
+    stalled. What is it called? (two words)
   accept:
     - "coordinated omission"
   explanation: >-
-    Coordinated omission. Fixed-rate load generation (send on schedule
-    regardless of replies) is the antidote.
+    Coordinated omission. If the system stalls for one second at 100 requests
+    per second, then 100 requests should have been slow, but a wait-for-reply
+    client records one. The stall is almost entirely missing from the results,
+    so the p99 looks healthy. Sending on a fixed schedule regardless of replies
+    is the fix.
   tags: [ml-benchmarking, load-testing]
+
+- id: m2/q-020
+  lesson: m2/04-benchmarking-ml
+  type: mcq
+  prompt: >-
+    A colleague reports "our model serves 8000 requests per second". What is
+    the single most important thing missing from that claim?
+  options:
+    - "The name of the model architecture"
+    - "The latency it was achieved at, since batching trades one against the other"
+    - "The programming language the server was written in"
+    - "Nothing; requests per second is a complete performance figure"
+  answer: 1
+  explanation: >-
+    Throughput and latency move in opposite directions as batch size changes, so
+    any throughput figure can be raised by batching harder and accepting worse
+    latency. Without the latency it was measured at, 8000 requests per second
+    could describe an excellent system or an unusable one. The mirror-image
+    mistake is quoting a latency without saying at what load.
+  tags: [ml-benchmarking, batching]

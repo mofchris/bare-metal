@@ -1,5 +1,12 @@
 # M1 question bank. Grows as lessons are authored; ids are stable forever
 # (progress history references them — see docs/DATA_MODEL.md).
+#
+# Question standard (D-026): a prompt states a concrete situation rather than
+# asking which statement is true; every wrong option encodes one specific
+# misunderstanding a reader could actually hold; the explanation derives the
+# answer with arithmetic where arithmetic exists, and says why the tempting
+# wrong answer is wrong. Explanations are the teaching moment, not a verdict.
+
 - id: m1/q-001
   lesson: m1/01-memory-hierarchy
   type: mcq
@@ -11,30 +18,33 @@
     - "About 10,000×"
   answer: 2
   explanation: >-
-    L1 hits land in ~1 ns while DRAM takes ~60–100 ns — roughly two orders of
-    magnitude. (10,000× is the right ballpark for SSD reads, not DRAM.)
+    An L1 hit takes about 1 ns and a DRAM access about 60 to 100 ns, so the
+    ratio is roughly 100. The 10,000× option is the right order of magnitude
+    for reading from an SSD, which is a different level again.
   tags: [memory, latency]
 
 - id: m1/q-002
   lesson: m1/01-memory-hierarchy
   type: short
   prompt: >-
-    What property of real programs makes caches effective despite being
-    thousands of times smaller than DRAM? (one word or phrase)
+    A cache is thousands of times smaller than DRAM, yet most accesses hit in
+    it. What property of real programs makes that possible? (one word or phrase)
   accept:
     - "locality"
     - "locality of reference"
     - "temporal and spatial locality"
     - "spatial and temporal locality"
   explanation: >-
-    Locality of reference: programs re-touch recent data (temporal) and
-    neighboring data (spatial), so a small cache captures most accesses.
+    Locality of reference. Programs re-touch data they used recently, which is
+    temporal locality, and touch data next to what they just used, which is
+    spatial locality. A cache holding a random slice of DRAM would almost never
+    hold the part you wanted.
   tags: [memory, locality]
 
 - id: m1/q-003
   lesson: m1/01-memory-hierarchy
   type: mcq
-  prompt: "Memory moves between DRAM and cache in fixed-size units called cache lines. How big is a typical cache line?"
+  prompt: "Memory moves between DRAM and cache in fixed-size blocks called cache lines. How big is a typical cache line?"
   options:
     - "4 bytes"
     - "64 bytes"
@@ -42,102 +52,136 @@
     - "1 MB"
   answer: 1
   explanation: >-
-    64 bytes on essentially all current x86 and Arm cores — 16 float32 values
-    per line. (4 KB is a memory *page*, a different unit for a different
-    mechanism.)
+    64 bytes on essentially all current x86 and Arm cores. Since a float32
+    occupies 4 bytes, 64 ÷ 4 = 16 float32 values arrive together. The 4 KB
+    option is a memory page, which is a different unit used by a different
+    mechanism.
   tags: [memory, cache-lines]
 
 - id: m1/q-004
   lesson: m1/01-memory-hierarchy
   type: mcq
   prompt: >-
-    Two loops sum the same large matrix stored row-major: loop A walks it row
-    by row, loop B column by column. Same arithmetic. Which statement is true?
+    Two loops sum the same large matrix, which is stored row by row in memory.
+    Loop A walks it row by row. Loop B walks it column by column. Both perform
+    the same additions on the same numbers.
   options:
-    - "They run at the same speed — the work is identical"
-    - "A is faster: it uses each fetched 64-byte line fully; B wastes most of every line"
-    - "B is faster: columns are shorter than rows in memory"
+    - "They run at the same speed, because the work is identical"
+    - "A is faster: it uses all 16 floats of each fetched line, while B uses one"
+    - "B is faster, because a column is shorter than a row in memory"
   answer: 1
   explanation: >-
-    Row-major means row neighbors are adjacent in memory. Loop A consumes all
-    16 floats of each fetched line (spatial locality); loop B touches one
-    float per line and pays a fresh miss almost every access.
+    Row-by-row storage means neighbours within a row are adjacent in memory.
+    Loop A therefore consumes all 16 float32 values of each 64-byte line before
+    needing another. Loop B takes one value from a line and jumps to a different
+    row, so it discards 15 of every 16 bytes DRAM delivered and pays a fresh
+    miss almost every access.
   tags: [memory, locality, layout]
 
 - id: m1/q-005
   lesson: m1/01-memory-hierarchy
   type: short
   prompt: >-
-    Reusing a weight matrix across every sample in a batch keeps it hot in
-    cache. Which form of locality is that exploiting? (one word)
+    A model's weights are loaded once and then reused for all 32 samples in a
+    batch, so they stay in cache. Which form of locality is that? (one word)
   accept:
     - "temporal"
     - "temporal locality"
   explanation: >-
-    Temporal locality — the same data re-touched soon. Spatial locality would
-    be about touching *neighboring* data.
+    Temporal locality, meaning the same data is touched again soon. Spatial
+    locality would be the separate observation that the weights sitting next to
+    these ones will also be needed.
   tags: [memory, locality, ml]
+
+- id: m1/q-023
+  lesson: m1/01-memory-hierarchy
+  type: mcq
+  prompt: >-
+    A loop reads every 16th float32 of a large array, so it touches one value
+    per 64-byte cache line. What fraction of the bytes DRAM delivers does this
+    loop actually use?
+  options:
+    - "All of them: DRAM only sends what was asked for"
+    - "One quarter"
+    - "One sixteenth"
+    - "One half"
+  answer: 2
+  explanation: >-
+    A 64-byte line holds 64 ÷ 4 = 16 float32 values, and the loop uses one of
+    them, so it uses 1/16 of every line and discards the other 15. The first
+    option is the misunderstanding worth killing: hardware never transfers
+    single bytes, so asking for 4 bytes always costs a full 64-byte line.
+  tags: [memory, cache-lines, layout]
 
 # ---- Lesson 02: CPU architecture ----
 
 - id: m1/q-006
   lesson: m1/02-cpu-architecture
   type: mcq
-  prompt: "How many float32 values fit in one 256-bit AVX2 register?"
+  prompt: "How many float32 values fit side by side in one 256-bit AVX2 register?"
   options:
     - "4"
     - "8"
     - "16"
     - "32"
   answer: 1
-  explanation: "256 bits ÷ 32 bits per float32 = 8 lanes per instruction."
+  explanation: >-
+    A float32 occupies 32 bits, so 256 ÷ 32 = 8. Each of those eight slots is
+    called a lane, and one SIMD instruction operates on all eight at once.
   tags: [cpu, simd]
 
 - id: m1/q-007
   lesson: m1/02-cpu-architecture
   type: short
   prompt: >-
-    What is the name for a core executing several independent instructions in
-    the same cycle by having multiple execution units? (one word)
+    A core has several execution units and finishes more than one instruction
+    in the same cycle. What is that design called? (one word)
   accept:
     - "superscalar"
     - "superscalar execution"
   explanation: >-
-    Superscalar execution — several instructions issued per cycle. Pipelining
-    alone only overlaps the *stages* of consecutive instructions.
+    Superscalar. Pipelining alone overlaps the five stages of consecutive
+    instructions and caps the core at one finished instruction per cycle.
+    Superscalar breaks that cap by running several pipelines side by side.
   tags: [cpu, ilp]
 
 - id: m1/q-008
   lesson: m1/02-cpu-architecture
   type: mcq
-  prompt: "Roughly what does one branch misprediction cost a modern core?"
+  prompt: "Roughly what does one branch misprediction cost a modern core, and why that amount?"
   options:
-    - "Nothing measurable — mispredictions are free"
-    - "1–2 cycles"
-    - "15–20 cycles of thrown-away work"
-    - "Thousands of cycles"
+    - "Nothing measurable, because the predictor corrects itself instantly"
+    - "1 to 2 cycles, the time to notice the mistake"
+    - "15 to 20 cycles, because refilling an empty pipeline takes one cycle per stage"
+    - "Thousands of cycles, comparable to a DRAM access"
   answer: 2
   explanation: >-
-    The speculatively executed work is flushed and the pipeline refills —
-    roughly 15–20 cycles. Free it is not; catastrophic it is not either.
+    Everything fetched after the branch came from the wrong address and is
+    discarded, so fetch restarts with every pipeline stage empty. Refilling
+    costs one cycle per stage, and a real core is 15 to 20 stages deep. At 3 GHz
+    that is about 5 to 7 nanoseconds, which is expensive but far below a DRAM
+    access at roughly 300 cycles.
   tags: [cpu, branches]
 
 - id: m1/q-009
   lesson: m1/02-cpu-architecture
   type: mcq
   prompt: >-
-    A Python for-loop summing a million floats is ~100–1000× slower than
-    numpy.sum on the same data. What's the main reason?
+    A Python for-loop summing a million floats is 100 to 1000 times slower than
+    numpy.sum on the same data. What is the main reason?
   options:
-    - "Python floats are 64-bit, NumPy's are 32-bit"
-    - "Per-element interpreter dispatch, with no SIMD and unpredictable control flow"
+    - "Python floats are 64-bit while NumPy's are 32-bit"
+    - "Interpreter work per element, with no SIMD lanes used and unpredictable branches"
     - "The Python loop causes cache misses that NumPy avoids entirely"
-    - "NumPy runs on a hidden GPU"
+    - "NumPy quietly runs the work on a GPU"
   answer: 1
   explanation: >-
-    Each loop iteration pays hundreds of nanoseconds of interpreter overhead
-    per element and never touches the SIMD units; the compiled NumPy loop
-    streams 8 lanes per instruction. The data and dtypes are secondary.
+    Each iteration fetches an object, checks its type and dispatches the
+    operation, costing on the order of 100 ns per element, which is about 300
+    cycles to perform one addition. Seven of the eight SIMD lanes sit empty, no
+    FMA is issued, and the interpreter's dispatch branches are unpredictable.
+    Both versions walk the same array in the same order, so cache behaviour is
+    not the difference.
   tags: [cpu, simd, ml]
 
 - id: m1/q-010
@@ -151,67 +195,124 @@
     - "cores × pipeline depth × branch accuracy"
   answer: 0
   explanation: >-
-    Every core, every SIMD lane, 2 FLOPs per FMA, per FMA unit, per cycle.
-    Cache and bandwidth decide whether you can *feed* that peak, not its size.
+    Each core has some number of lanes, each FMA instruction performs 2
+    operations, each FMA unit can start one such instruction per cycle, and the
+    clock says how many cycles happen per second. Cache size and bandwidth
+    decide whether the machine can be fed fast enough to approach that ceiling,
+    which is a separate question from how high the ceiling is.
   tags: [cpu, flops]
+
+- id: m1/q-024
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  prompt: >-
+    A core runs at 3 GHz. Lesson 01 said a DRAM access takes about 100
+    nanoseconds. Roughly how many cycles does the core spend waiting for one
+    such access?
+  options:
+    - "About 3 cycles"
+    - "About 30 cycles"
+    - "About 300 cycles"
+    - "About 3000 cycles"
+  answer: 2
+  explanation: >-
+    At 3 GHz the core pulses 3 billion times per second, so one cycle lasts
+    1 ÷ 3,000,000,000 seconds, which is about 0.33 nanoseconds. Dividing 100 ns
+    by 0.33 ns gives roughly 300 cycles. This conversion is what gives the
+    memory hierarchy its weight: 300 cycles is enough time to finish hundreds of
+    instructions, and all of them are waiting instead.
+  tags: [cpu, clock, memory]
 
 # ---- Lesson 03: the three budgets ----
 
 - id: m1/q-011
   lesson: m1/03-three-budgets
   type: short
-  prompt: "FLOPs performed per byte of memory traffic — what is this ratio called?"
+  prompt: >-
+    Floating-point operations performed per byte of memory traffic. What is
+    this ratio called? (two words)
   accept:
     - "arithmetic intensity"
     - "operational intensity"
   explanation: >-
-    Arithmetic (or operational) intensity, in FLOPs per byte — the exchange
-    rate that decides whether compute or memory is your limit.
+    Arithmetic intensity, also called operational intensity, measured in FLOPs
+    per byte. It answers how much arithmetic you get out of each byte you go
+    and fetch, and comparing it against the machine's break-even point tells you
+    whether memory or arithmetic is your limit.
   tags: [budgets, intensity]
 
 - id: m1/q-012
   lesson: m1/03-three-budgets
   type: mcq
   prompt: >-
-    Elementwise vector add (1 FLOP per 12 bytes moved) runs on a machine with
-    400 GFLOPS and 100 GB/s. What limits its speed?
+    An elementwise vector add performs 1 FLOP per 12 bytes moved, on a machine
+    with 400 GFLOPS of compute and 100 GB/s of bandwidth. What limits its speed?
   options:
-    - "Compute — more cores would speed it up"
-    - "Memory bandwidth — extra compute changes nothing"
-    - "DRAM latency — prefetching is impossible for arrays"
+    - "Compute, so adding cores would speed it up"
+    - "Memory bandwidth, so extra compute changes nothing"
+    - "DRAM latency, because arrays cannot be prefetched"
   answer: 1
   explanation: >-
-    AI ≈ 0.08 FLOP/byte, far below the 4 FLOP/byte break-even. Streaming
-    bandwidth caps it at ~8 GFLOPS; the arithmetic units idle either way.
+    Its intensity is 1 ÷ 12 ≈ 0.083 FLOPs per byte, far below the break-even of
+    400 ÷ 100 = 4. Bandwidth caps it at 100 GB/s ÷ 12 bytes ≈ 8.3 GFLOPS, which
+    is about 2% of the machine's 400. Latency is not the limit here because the
+    access pattern is sequential and predictable, so the hardware prefetches it
+    successfully.
   tags: [budgets, intensity]
 
 - id: m1/q-013
   lesson: m1/03-three-budgets
   type: mcq
-  prompt: "Why does matrix multiplication's arithmetic intensity GROW with matrix size?"
+  prompt: "Why does matrix multiplication's arithmetic intensity grow with matrix size?"
   options:
-    - "Bigger matrices have more FLOPs, and FLOPs are all that matters"
-    - "Each loaded value can be reused ~N times — 2N³ FLOPs against ~3N² values"
-    - "Larger matrices compress better in memory"
+    - "Bigger matrices perform more FLOPs, and FLOPs are what intensity counts"
+    - "It performs 2N³ FLOPs while moving only about 12N² bytes, so the ratio grows with N"
+    - "Larger matrices compress better in memory, so fewer bytes move"
   answer: 1
   explanation: >-
-    O(N³) arithmetic over O(N²) data: reuse per byte scales with N. This is
-    the fact that makes fast matmul kernels — and deep learning — possible.
+    The arithmetic grows as N³ while the data grows as N², so the ratio 2N³ ÷
+    12N² = N ÷ 6 rises with N. Concretely, each loaded value gets reused about N
+    times instead of once. The first option is the trap: intensity is a ratio,
+    so more FLOPs alone changes nothing unless the bytes grow more slowly.
   tags: [budgets, matmul]
 
 - id: m1/q-014
   lesson: m1/03-three-budgets
   type: mcq
   prompt: >-
-    A machine peaks at 400 GFLOPS and 100 GB/s. Above what arithmetic
-    intensity can a kernel be compute-bound?
+    A machine peaks at 400 GFLOPS and 100 GB/s. Above what arithmetic intensity
+    can a kernel be compute-bound?
   options:
     - "0.25 FLOPs/byte"
     - "4 FLOPs/byte"
     - "40 FLOPs/byte"
     - "100 FLOPs/byte"
   answer: 1
-  explanation: "The break-even is peak compute ÷ peak bandwidth = 400/100 = 4 FLOPs/byte."
+  explanation: >-
+    The break-even is peak compute divided by peak bandwidth: 400 ÷ 100 = 4
+    FLOPs per byte. Below that the memory system cannot deliver bytes fast
+    enough to keep the arithmetic units busy, so memory sets the speed.
+  tags: [budgets, intensity]
+
+- id: m1/q-025
+  lesson: m1/03-three-budgets
+  type: mcq
+  prompt: >-
+    Compute the arithmetic intensity of `y[i] = 3.0 * x[i]` over a large float32
+    array, then classify it on a machine whose break-even point is 4 FLOPs per
+    byte.
+  options:
+    - "0.125 FLOPs/byte, memory-bound"
+    - "0.25 FLOPs/byte, memory-bound"
+    - "1.0 FLOPs/byte, memory-bound"
+    - "4.0 FLOPs/byte, exactly at break-even"
+  answer: 0
+  explanation: >-
+    Each element costs 1 FLOP, the single multiplication. Each element moves 8
+    bytes: 4 read from x and 4 written to y. So the intensity is 1 ÷ 8 = 0.125
+    FLOPs per byte, which is 32 times below the break-even of 4, making it
+    firmly memory-bound. The common slip is forgetting that the write costs
+    bytes too, which would give 0.25.
   tags: [budgets, intensity]
 
 # ---- Lesson 04: the roofline model ----
@@ -219,7 +320,7 @@
 - id: m1/q-015
   lesson: m1/04-roofline-model
   type: mcq
-  prompt: "In the roofline model, attainable performance at intensity AI equals:"
+  prompt: "In the roofline model, the attainable performance at arithmetic intensity AI equals:"
   options:
     - "peak compute × AI"
     - "min(peak compute, AI × peak bandwidth)"
@@ -227,57 +328,87 @@
     - "peak bandwidth ÷ AI"
   answer: 1
   explanation: >-
-    Whichever roof is lower wins: the flat compute roof or the slanted
-    bandwidth line AI × BW.
+    Two limits apply at once and the lower one binds. The flat roof is peak
+    compute, which no code exceeds. The slanted roof is AI × bandwidth, because
+    at AI FLOPs per byte a machine delivering B bytes per second supports at
+    most AI × B operations per second. Taking the maximum would claim a speed
+    that violates one of the two limits.
   tags: [roofline]
 
 - id: m1/q-016
   lesson: m1/04-roofline-model
   type: short
   prompt: >-
-    The corner of the roofline where the bandwidth line meets the compute
-    roof divides memory-bound from compute-bound kernels. What is this corner
-    called? (two words)
+    On a roofline plot, the corner where the slanted bandwidth line meets the
+    flat compute roof separates memory-bound from compute-bound code. What is
+    that corner called? (two words)
   accept:
     - "ridge point"
     - "the ridge point"
   explanation: >-
-    The ridge point, at intensity = peak compute ÷ peak bandwidth. Left of it
-    memory rules; right of it arithmetic rules.
+    The ridge point, which sits at intensity = peak compute ÷ peak bandwidth.
+    Left of it the sloping line is lower, so bandwidth binds. Right of it the
+    flat line is lower, so arithmetic binds.
   tags: [roofline]
 
 - id: m1/q-017
   lesson: m1/04-roofline-model
   type: mcq
   prompt: >-
-    A kernel with AI = 0.5 FLOP/byte sits under the slanted roof of a machine
-    whose ridge point is 4. Which optimization can actually raise its speed?
+    A kernel with intensity 0.5 FLOPs per byte sits on the slanted roof of a
+    machine whose ridge point is 4. Which change can actually make it faster?
   options:
     - "Using more cores"
     - "Raising the clock frequency"
-    - "Moving fewer bytes — fusion, reuse, or a smaller dtype like fp16"
-    - "Enabling wider SIMD instructions"
+    - "Moving fewer bytes, through fusion, better reuse, or a smaller dtype"
+    - "Using wider SIMD registers"
   answer: 2
   explanation: >-
-    Memory-bound means the arithmetic units are already idle. Only reducing
-    bytes (or increasing reuse) moves the limit; fp16 halves the bytes and
-    doubles effective intensity.
+    Sitting on the slanted roof means the code is already running as fast as
+    bandwidth permits, so the arithmetic units are idle waiting for data. Cores,
+    clock speed and SIMD width all add arithmetic capability, which is the
+    resource that is already spare. Only reducing bytes moved raises the ceiling,
+    and switching from fp32 to fp16 halves the bytes and doubles the intensity.
   tags: [roofline, optimization]
 
 - id: m1/q-018
   lesson: m1/04-roofline-model
   type: mcq
   prompt: >-
-    A kernel measures far BELOW both roofs — nowhere near the bandwidth line
-    or the compute ceiling. What does the roofline model tell you?
+    A kernel measures far below both roofs, nowhere near the bandwidth line or
+    the compute ceiling. What does that tell you?
   options:
-    - "The hardware is the bottleneck; buy a faster machine"
-    - "Neither hardware limit is being hit — the code itself is the problem"
-    - "The measurement must be wrong"
+    - "The hardware is the bottleneck, so a faster machine is needed"
+    - "No hardware limit is being reached, so the problem is in the code"
+    - "The measurement must be wrong, because everything hits some roof"
   answer: 1
   explanation: >-
-    Below both roofs, no hardware budget is exhausted: overhead, poor access
-    patterns, or imbalance are wasting the machine. Fix software first.
+    Both roofs describe hardware limits, and this kernel reaches neither, so no
+    hardware budget is exhausted. The usual causes are interpreter overhead, an
+    access pattern that defeats the prefetcher, or work split unevenly so some
+    cores finish early and idle. This is the model's most useful result, because
+    it separates "my code is slow" from "this machine is slow".
+  tags: [roofline, optimization]
+
+- id: m1/q-026
+  lesson: m1/04-roofline-model
+  type: mcq
+  prompt: >-
+    A machine peaks at 400 GFLOPS and 50 GB/s. You measure a kernel of
+    intensity 2 FLOPs per byte running at 40 GFLOPS. What is the fastest it
+    could run, and what should you fix?
+  options:
+    - "100 GFLOPS; the code, because 40 is well below its own ceiling"
+    - "100 GFLOPS; the memory system, because the kernel is memory-bound"
+    - "400 GFLOPS; the code, because it is nowhere near peak compute"
+    - "40 GFLOPS; nothing, because it is already at its roofline limit"
+  answer: 0
+  explanation: >-
+    The ridge point is 400 ÷ 50 = 8, and 2 is left of it, so the kernel is
+    memory-bound and its ceiling is 2 × 50 = 100 GFLOPS. It measures 40, which
+    is well under that ceiling, so it is not actually hitting the memory limit
+    either. That places it below both roofs, which points at the code rather
+    than the hardware.
   tags: [roofline, optimization]
 
 # ---- Lesson 05: GPUs overview ----
@@ -287,14 +418,17 @@
   type: mcq
   prompt: "How does a GPU primarily deal with memory latency?"
   options:
-    - "Very large caches, like a CPU"
-    - "Keeping far more threads resident than lanes and switching on every stall"
-    - "Faster DRAM with lower latency than CPU memory"
-    - "Speculative out-of-order execution per thread"
+    - "With very large caches, in the way a CPU does"
+    - "By keeping far more threads resident than lanes and switching whenever one group stalls"
+    - "With DRAM that has genuinely lower latency than a CPU's memory"
+    - "With speculative out-of-order execution inside each thread"
   answer: 1
   explanation: >-
-    Massive oversubscription: when one warp stalls on memory another runs.
-    The latency is still there — it's just always hidden behind other work.
+    A GPU drops the expensive per-thread machinery so that tens of thousands of
+    small lanes fit, then keeps more threads loaded than it can run at once.
+    When one group stalls, the scheduler swaps in another within a cycle,
+    because that group's values are already on the chip. The 100 ns wait has not
+    been shortened at all; it is simply always some other group's turn to wait.
   tags: [gpu, latency]
 
 - id: m1/q-020
@@ -302,42 +436,73 @@
   type: short
   prompt: >-
     NVIDIA's name for the fixed group of 32 threads that execute one
-    instruction in lockstep? (one word)
+    instruction in lockstep. (one word)
   accept:
     - "warp"
     - "a warp"
-  explanation: "A warp — 32 threads, one instruction, SIMT execution."
+  explanation: >-
+    A warp: 32 threads, all performing the same instruction in the same cycle on
+    their own data. That arrangement is called SIMT, single instruction multiple
+    threads.
   tags: [gpu, simt]
 
 - id: m1/q-021
   lesson: m1/05-gpus-overview
   type: mcq
-  prompt: "Which workload is the WORST fit for a GPU?"
+  prompt: "Which of these workloads is the worst fit for a GPU?"
   options:
-    - "Elementwise ops over a 10-million-element tensor"
-    - "Large dense matrix multiplication"
-    - "Branch-heavy sequential parsing with data-dependent control flow"
+    - "An elementwise operation over a 10-million-element tensor"
+    - "A large dense matrix multiplication"
+    - "Branch-heavy sequential parsing where each step depends on the last"
     - "Applying the same filter to every pixel of an image"
   answer: 2
   explanation: >-
-    Branchy sequential work defeats both pillars of the throughput machine:
-    warps diverge on the branches, and there's too little parallelism to hide
-    latency. The other three are exactly what SIMT wants.
+    Branchy sequential work defeats both halves of the design. Threads in a warp
+    take different paths, so the hardware runs both paths in sequence and
+    discards the results of whichever threads did not take each one. And a
+    dependent chain of steps offers almost no independent work to fill the other
+    lanes. The other three apply the same operation to many independent
+    elements, which is exactly what SIMT wants.
   tags: [gpu, workloads]
 
 - id: m1/q-022
   lesson: m1/05-gpus-overview
   type: mcq
   prompt: >-
-    Datacenter-GPU memory (HBM) bandwidth compared to laptop DRAM (~100 GB/s)
-    is roughly:
+    Datacenter GPU memory (HBM) delivers roughly what bandwidth, compared with
+    a laptop's DRAM at about 100 GB/s?
   options:
     - "About the same"
-    - "2–3×"
-    - "10–30× (1–3 TB/s)"
-    - "1000×"
+    - "2 to 3 times more"
+    - "10 to 30 times more, at 1 to 3 TB/s"
+    - "1000 times more"
   answer: 2
   explanation: >-
-    HBM delivers on the order of 1–3 TB/s. Huge — and yet elementwise ops are
-    STILL memory-bound there, because compute scaled up too.
+    HBM delivers on the order of 1 to 3 TB/s, and one terabyte is a thousand
+    gigabytes, so that is 10 to 30 times a laptop's 100 GB/s. Note what it does
+    not fix: compute grew even faster, so the ridge point moved right and
+    elementwise operations remain memory-bound on that hardware too.
   tags: [gpu, memory]
+
+- id: m1/q-027
+  lesson: m1/05-gpus-overview
+  type: mcq
+  prompt: >-
+    A GPU has 50 TFLOPS of fp32 compute and 2 TB/s of bandwidth. Your laptop's
+    ridge point is 4 FLOPs per byte. What is the GPU's ridge point, and what
+    does the comparison mean for a low-intensity operation?
+  options:
+    - "25 FLOPs/byte; low-intensity work is relatively worse off on the GPU"
+    - "25 FLOPs/byte; low-intensity work becomes compute-bound on the GPU"
+    - "0.04 FLOPs/byte; almost everything is compute-bound on the GPU"
+    - "4 FLOPs/byte; the ridge point is a property of the code, not the machine"
+  answer: 0
+  explanation: >-
+    The ridge point is peak compute divided by peak bandwidth: 50 ÷ 2 = 25
+    FLOPs per byte. That is higher than the laptop's 4 because compute grew
+    faster than bandwidth did. A higher ridge means an operation needs more
+    arithmetic per byte before it becomes compute-bound, so an elementwise
+    operation at 0.083 sits 300 times below the laptop's ridge and 300 times
+    below this card's. Faster hardware makes low arithmetic intensity relatively
+    worse, not better.
+  tags: [gpu, roofline]

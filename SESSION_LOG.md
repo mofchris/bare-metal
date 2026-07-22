@@ -517,3 +517,24 @@ The ledger proved itself mid-session: while writing m4/02 I introduced "epoch" i
 **Next session should start with:** Christopher's read-through of the full curriculum. The 86 quiz questions were NOT rewritten — only checked that they remain answerable from the changed prose. A question-bank pass against the new lessons is the obvious next content job.
 **Open questions for Christopher:** none outstanding.
 **New DECISIONS.md entries this session:** D-026 (ratified — his direction)
+
+## Session 2026-07-22 (twenty-sixth block — question bank rewritten to D-026, +21 questions)
+
+**Stage:** B | **Gate status:** Gate B unsigned
+**Trigger:** Christopher, straight after approving the lesson rewrite: "now do the quiz questions and add a question to each unit."
+
+**Done this session:**
+
+- **All 86 existing questions rewritten** to the D-026 standard, with **every id preserved** (verified by diffing ids against the previous commit: MISSING=[] for all five modules). Ids are referenced by progress history, so changing them would orphan Christopher's record.
+- **21 new questions added, one per lesson** — 86 to **107**. New ids continue each module's sequence (m1/q-023 to q-027, and q-017 to q-020 in M2 through M5).
+- Question standard, written into the header of m1's questions.yaml so future authoring inherits it: a prompt states a concrete situation rather than asking which statement is true; every wrong option encodes one specific misunderstanding a reader could actually hold; the explanation derives the answer with arithmetic where arithmetic exists, and says why the tempting wrong answer is wrong.
+- The new question in each lesson is deliberately the applied tier, the one that cannot be answered by recognising a phrase: compute the arithmetic intensity of `y[i] = 3.0 * x[i]` and classify it; convert 100 ns of DRAM latency into ~300 cycles at 3 GHz; find a GPU's ridge point and say why a higher ridge makes low-intensity work relatively worse; work Amdahl at p=0.70, s=2 to get 1.54x; choose the mean over the median for an annual cloud bill; explain why a fixed learning rate invalidates a batch-size sweep; compute the idle fraction from a 100 ms real step against a 70 ms synthetic one.
+- Old register removed throughout. The Yoda-ish "Free it is not; catastrophic it is not either" and similar are gone, along with the last surviving lab reference (m4/q-007 cited lab L4.1, and m5/q-009 and q-014 cited L5.1 and L5.2). **Zero lab references remain anywhere in the repo.**
+- Verified: 107 questions compile; 0 structural problems (every mcq answer index in range, every short-answer accept list non-empty, no thin explanations); mean explanation length 337 characters; 90 mcq and 17 short. 72 tests green, typecheck clean.
+
+**Effect on existing progress:** none is lost. Stored `bestScorePct` values are not recomputed, so a past 4/4 stays passed. Lesson quizzes now run 5 questions instead of 4 (6 for m1/01 and m1/02), and module exams grow correspondingly, so a retake is scored against the larger set. The new question ids simply have no SRS state yet and enter the review deck as unseen.
+
+**In progress / half-finished:** nothing.
+**Next session should start with:** Christopher's read of the questions in the app, particularly whether the new applied ones are the right difficulty. The obvious remaining content gap is that the curriculum still has no labs, and ten of them are named in BUILD_PLAN and docs/CURRICULUM.md while none exist as files.
+**Open questions for Christopher:** none outstanding.
+**New DECISIONS.md entries this session:** none — this applies D-026 to the question bank rather than deciding anything new.

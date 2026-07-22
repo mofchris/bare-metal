@@ -1,21 +1,24 @@
 # M4 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
 
 # ---- Lesson 01: the input pipeline ----
 
 - id: m4/q-001
   lesson: m4/01-input-pipeline
   type: mcq
-  prompt: "In an image training pipeline, why is the DECODE stage usually expensive?"
+  prompt: "In an image training pipeline, why is the decode stage usually expensive?"
   options:
-    - "It reads from disk, and disks are slow"
-    - "JPEG decoding is real computation (entropy decoding, IDCT) costing milliseconds of CPU per image"
-    - "It runs on the GPU and blocks kernels"
-    - "It isn't — decode is a simple memory copy"
+    - "Because it reads from disk, and disks are slow"
+    - "Because turning compressed JPEG bytes into pixels is real arithmetic, costing milliseconds of CPU per image"
+    - "Because it runs on the GPU and blocks other work"
+    - "It is not; decoding is a simple memory copy"
   answer: 1
   explanation: >-
-    Decode turns compressed bytes into pixels by computing, not copying.
-    That CPU cost per sample is a chief reason pipelines fall behind
-    accelerators.
+    A JPEG stores compressed frequency information rather than pixels, so
+    decoding runs arithmetic over every block of the image to reconstruct it.
+    That is thousands of times more expensive than copying the same bytes, and
+    it happens once per sample on the CPU. Reading is a separate stage, and on
+    modern storage it is usually not the slow one.
   tags: [pipelines, decode]
 
 - id: m4/q-002
@@ -24,29 +27,34 @@
   prompt: "A pipeline of chained stages processes at the rate of:"
   options:
     - "The average of its stages"
-    - "Its slowest stage — the bottleneck"
-    - "Its fastest stage, if buffered"
-    - "The sum of all stage rates"
+    - "Its slowest stage, which is called the bottleneck"
+    - "Its fastest stage, if buffering is used"
+    - "The sum of all the stage rates"
   answer: 1
   explanation: >-
-    The pipeline law: the slowest stage sets throughput, and speeding up any
-    other stage changes nothing — Amdahl's logic applied to a chain.
+    Stages run concurrently but cannot outpace their supply. If decode produces
+    200 images per second and every other stage could handle 2000, nothing
+    downstream ever receives more than 200. This is Amdahl's law from M2/03
+    applied to a chain, and it has the same consequence: optimizing any stage
+    other than the bottleneck changes the total by nothing.
   tags: [pipelines, bottleneck]
 
 - id: m4/q-003
   lesson: m4/01-input-pipeline
   type: mcq
-  prompt: "Why does PyTorch's DataLoader use worker PROCESSES instead of threads?"
+  prompt: "Why does PyTorch's DataLoader use worker processes rather than threads?"
   options:
-    - "Processes are always faster than threads"
-    - "Python's GIL prevents true thread parallelism for Python-level work"
-    - "Threads can't open files"
+    - "Because processes are always faster than threads"
+    - "Because Python's GIL lets only one thread execute Python instructions at a time"
+    - "Because threads cannot open files"
     - "A historical accident kept for compatibility"
   answer: 1
   explanation: >-
-    The global interpreter lock serializes Python bytecode across threads;
-    separate processes (num_workers) sidestep it so decodes genuinely run in
-    parallel.
+    CPython's global interpreter lock allows one thread at a time to run Python
+    instructions, so adding threads adds no parallel Python work no matter how
+    many cores you own. Separate processes each get their own interpreter and
+    their own lock, so their decoding genuinely happens side by side. That is
+    what the num_workers setting creates.
   tags: [pipelines, python]
 
 - id: m4/q-004
@@ -54,14 +62,36 @@
   type: short
   prompt: >-
     The situation where an accelerator sits idle because the input pipeline
-    can't keep up is called a data ______. (one word)
+    cannot keep up is called a data ______. (one word)
   accept:
     - "stall"
     - "data stall"
   explanation: >-
-    A data stall (Mohan et al. measured them rampant in real training jobs).
-    Diagnosing them is lesson 04's whole topic.
+    A data stall. Mohan and colleagues measured real training jobs and found a
+    large fraction of them limited by the input pipeline rather than by the
+    model, which is why diagnosing this is worth a lesson of its own.
   tags: [pipelines, stalls]
+
+- id: m4/q-017
+  lesson: m4/01-input-pipeline
+  type: mcq
+  prompt: >-
+    Your pipeline reads at 3000 images/sec, decodes at 450, augments at 1200
+    and collates at 5000. You optimize reading to 6000 images/sec. What happens
+    to end-to-end throughput?
+  options:
+    - "It roughly doubles, since reading is the first stage"
+    - "It rises to about 900 images/sec"
+    - "It does not change, because decode still caps the chain at 450"
+    - "It falls, because the faster stage overwhelms the slower ones"
+  answer: 2
+  explanation: >-
+    Decode at 450 images per second is the slowest stage and therefore the
+    bottleneck. Reading twice as fast simply means the read stage spends more
+    time idle waiting for decode to accept work. To change the total you must
+    widen decode itself, through more worker processes, cheaper decoding, or
+    caching decoded samples after the first epoch.
+  tags: [pipelines, bottleneck]
 
 # ---- Lesson 02: overlap ----
 
@@ -70,45 +100,53 @@
   type: mcq
   prompt: "Prefetching makes the input pipeline's cost disappear when:"
   options:
-    - "The dataset fits in RAM"
-    - "Preparing a batch consistently takes less time than computing one — prep hides entirely behind compute"
+    - "The dataset fits entirely in RAM"
+    - "Preparing a batch consistently takes less time than computing one, so preparation hides entirely behind computation"
     - "At least 8 workers are configured"
     - "The data is stored uncompressed"
   answer: 1
   explanation: >-
-    Overlap hides cost; it doesn't shrink it. If prep < compute, the model
-    never waits; if prep > compute, no buffer size saves you — the fixes
-    become structural.
+    While the model computes on batch N, the CPU prepares batch N+1, and the
+    two use different hardware so they genuinely proceed at once. If preparation
+    takes 30 ms and computation 50 ms, the step costs 50 ms rather than 80, and
+    the 30 ms costs nothing in wall-clock time. Note what this does not do: the
+    preparation is hidden, not eliminated.
   tags: [pipelines, prefetch]
 
 - id: m4/q-006
   lesson: m4/02-overlap
   type: mcq
-  prompt: "Why does a prefetch buffer of 2–4 batches usually beat a buffer of 100?"
+  prompt: "Why does a prefetch buffer of 2 to 4 batches usually beat a buffer of 100?"
   options:
-    - "Big buffers make the model overfit"
-    - "A small buffer already absorbs prep-time spikes; a queue that's always full doesn't get fuller, and each buffered batch costs host RAM"
-    - "Frameworks can't allocate more than 4"
+    - "Because large buffers cause the model to overfit"
+    - "Because a small buffer already absorbs preparation spikes, and a queue that is always full cannot get fuller, while each buffered batch costs host RAM"
+    - "Because frameworks cannot allocate more than 4"
   answer: 1
   explanation: >-
-    Buffering exists to absorb variance in prep time. Once spikes are
-    covered, extra depth adds memory cost and zero throughput.
+    The buffer exists to cover occasional slow batches: an unusually large
+    image, a file boundary, the scheduler taking a core. Two to four batches
+    covers those spikes. Beyond that the buffer is simply full all the time,
+    which adds no throughput and does consume host memory that each held batch
+    occupies.
   tags: [pipelines, prefetch]
 
 - id: m4/q-007
   lesson: m4/02-overlap
   type: mcq
-  prompt: "Adding DataLoader workers speeds things up until:"
+  prompt: "Adding DataLoader worker processes speeds preparation up until:"
   options:
-    - "Exactly 4 workers, always"
-    - "A shared resource saturates — all physical cores busy, disk at its limit, or memory bandwidth spent"
-    - "The batch size is reached"
+    - "Exactly 4 workers, on every machine"
+    - "Some shared resource saturates: all physical cores busy, the disk at its IOPS limit, or memory bandwidth spent"
+    - "The worker count reaches the batch size"
     - "It never stops helping"
   answer: 1
   explanation: >-
-    Scaling is roughly linear while independent work remains; the plateau
-    arrives when workers start competing for the same core, spindle, or
-    bandwidth. Found by experiment, not formula (lab L4.1).
+    Scaling is roughly linear while each new process can claim its own core. It
+    stops when the cores run out, when the drive hits its limit on separate read
+    requests per second, or when memory bandwidth is exhausted. Past that point
+    extra workers compete for busy cores and each holds batches in RAM, so they
+    actively hurt. The right count depends on this machine and this dataset, so
+    it is found by measurement.
   tags: [pipelines, workers]
 
 - id: m4/q-008
@@ -117,48 +155,76 @@
   prompt: "What does pinned (page-locked) host memory enable?"
   options:
     - "Larger batch sizes"
-    - "Faster DMA copies and asynchronous host→device transfer that overlaps with compute"
+    - "Direct DMA copies, and therefore asynchronous host-to-device transfer that overlaps with compute"
     - "Protection against out-of-memory errors"
     - "Deterministic training"
   answer: 1
   explanation: >-
-    The DMA engine can read locked pages directly, and async transfer on a
-    separate stream lets batch N+1's copy ride under batch N's compute — the
-    third lane of full overlap.
+    Normally the operating system may relocate your data in RAM or move it to
+    disk, so a copy must go through the CPU. Pinning locks those pages in place,
+    which lets a DMA engine, a small piece of hardware that copies memory
+    without involving the CPU, read them directly. Because that engine works
+    independently, batch N+1's copy can travel while the device computes on
+    batch N.
   tags: [pipelines, transfer]
+
+- id: m4/q-018
+  lesson: m4/02-overlap
+  type: mcq
+  prompt: >-
+    Preparation takes 30 ms per batch and computation takes 50 ms. Prefetching
+    is already enabled. You raise num_workers from 2 to 8. What happens to step
+    time?
+  options:
+    - "It falls to about 20 ms, because preparation is now four times faster"
+    - "It stays at about 50 ms, because preparation was already hidden behind computation"
+    - "It falls to about 30 ms, the new preparation time"
+    - "It rises, because the workers compete with the model for cores"
+  answer: 1
+  explanation: >-
+    Overlap and parallelism solve different problems. Preparation at 30 ms is
+    already shorter than computation at 50 ms, so prefetching hides it entirely
+    and the step is limited by computation. Making preparation faster still
+    hides it, just with more slack. Extra workers only help when preparation is
+    the longer of the two, which is when no amount of buffering can cover it.
+  tags: [pipelines, workers, prefetch]
 
 # ---- Lesson 03: storage formats ----
 
 - id: m4/q-009
   lesson: m4/03-storage-formats
   type: mcq
-  prompt: "Training reads whole samples in random order. Which layout serves that directly?"
+  prompt: "Training reads whole samples in randomized order. Which layout serves that directly?"
   options:
-    - "Columnar — each field stored contiguously"
-    - "Row-oriented — each sample stored contiguously (TFRecord, WebDataset)"
+    - "Columnar, where each field is stored contiguously"
+    - "Row-oriented, where each sample is stored contiguously, as in TFRecord and WebDataset"
     - "One file per sample"
     - "A relational database"
   answer: 1
   explanation: >-
-    Reading a whole sample from a row layout is one contiguous touch.
-    Columnar (Parquet/Arrow) shines when you read few fields across many
-    rows — analytics and feature engineering.
+    Reading a complete sample from a row layout touches one contiguous region,
+    which is the sequential case that runs at full device speed. Columnar
+    layouts such as Parquet and Arrow store each field together instead, which
+    wins when you read a few fields across many records, as analytics and
+    feature engineering do.
   tags: [storage, layout]
 
 - id: m4/q-010
   lesson: m4/03-storage-formats
   type: mcq
-  prompt: "Why is 'a million small JPEG files' a pipeline disaster?"
+  prompt: "Why is a million small JPEG files a pipeline disaster?"
   options:
-    - "JPEGs can't be read in parallel"
-    - "Per-file metadata overhead plus random placement turns reading into seeking; object stores throttle per request"
-    - "Small files decompress slower"
-    - "Filesystems cap directories at 65536 entries"
+    - "Because JPEGs cannot be read in parallel"
+    - "Because each file costs a metadata lookup, scattered placement turns reading into seeking, and object stores charge per request"
+    - "Because small files decompress more slowly"
+    - "Because filesystems cap directories at 65536 entries"
   answer: 1
   explanation: >-
-    Every file pays open/stat/close before its first byte, and random layout
-    forfeits sequential bandwidth. Sharding — packing samples into a few
-    hundred large archives — restores streaming reads.
+    Three costs compound. Every file needs locating, permission-checking and a
+    handle before its first byte arrives, and that is work per file rather than
+    per byte. Files written separately land wherever there was room, so shuffled
+    reading becomes a seek per sample. And cloud object storage bills and
+    rate-limits per request, so a million objects is slower and dearer than one.
   tags: [storage, sharding]
 
 - id: m4/q-011
@@ -167,31 +233,57 @@
   prompt: "How do sharded pipelines approximate random shuffling without random I/O?"
   options:
     - "They read every shard twice"
-    - "Shuffle the order of shards per epoch + shuffle within a streaming memory buffer"
+    - "They shuffle which shards are read each epoch, and shuffle within a buffer of samples held in memory as they stream"
     - "True shuffling is impossible with shards"
-    - "They sort samples by label instead"
+    - "They sort the samples by label instead"
   answer: 1
   explanation: >-
-    Shard-order shuffle plus a shuffle buffer gives approximate randomness
-    at sequential-read prices — the standard compromise (WebDataset,
-    tf.data).
+    Streaming a shard gives fixed order, and training wants randomized order.
+    Rather than buying randomness with seeks, two cheap tricks approximate it:
+    randomize the shard order each epoch, and draw randomly from an in-memory
+    buffer that samples stream through. Neither produces true uniform shuffling,
+    and the combination is close enough while every read stays sequential.
   tags: [storage, shuffling]
 
 - id: m4/q-012
   lesson: m4/03-storage-formats
   type: mcq
-  prompt: "On a fast local NVMe drive, heavy compression can make an epoch SLOWER because:"
+  prompt: "On a fast local NVMe drive, heavy compression can make an epoch slower because:"
   options:
-    - "NVMe drives can't read compressed bytes"
-    - "The drive delivers bytes faster than the CPU can decompress them — decompression becomes the bottleneck stage"
+    - "NVMe drives cannot read compressed bytes"
+    - "The drive delivers bytes faster than the CPU can expand them, so decompression becomes the bottleneck stage"
     - "Compression corrupts tensors"
-    - "It can't — compression always helps"
+    - "It cannot; compression always helps"
   answer: 1
   explanation: >-
-    Compression trades CPU for bandwidth. When bandwidth is abundant and the
-    pipeline's CPU is already busy, the trade inverts — hence fast codecs
-    (or none) as the default, and 'measure it' as the rule.
+    Compression spends CPU to save bytes, and whether that wins depends on which
+    resource is scarce. On slow or remote storage, bytes are scarce and it wins
+    easily. On fast local storage, bytes are abundant and the CPU is already the
+    pipeline's constraint, so decompression becomes the slowest stage. This is
+    why training formats default to fast codecs, or none for already-compressed
+    JPEGs.
   tags: [storage, compression]
+
+- id: m4/q-019
+  lesson: m4/03-storage-formats
+  type: mcq
+  prompt: >-
+    A tabular dataset has 40 columns. Your feature-engineering job computes
+    statistics over 2 of them across all 10 million rows. Which layout suits
+    that job, and why?
+  options:
+    - "Row-oriented, because each record is read as one contiguous piece"
+    - "Columnar, because the 2 needed fields are contiguous and the other 38 are never read"
+    - "One file per row, so each can be opened independently"
+    - "Either; layout only affects write speed"
+  answer: 1
+  explanation: >-
+    A columnar layout stores each field contiguously, so reading 2 of 40 columns
+    touches two contiguous regions and skips 95% of the bytes on disk. A row
+    layout interleaves all 40 fields per record, so reading 2 of them still
+    drags the other 38 through the memory system. Note that this is the opposite
+    of what training wants, which is why tabular work often stores both.
+  tags: [storage, layout]
 
 # ---- Lesson 04: pipeline health ----
 
@@ -199,64 +291,94 @@
   lesson: m4/04-pipeline-health
   type: mcq
   prompt: >-
-    Training runs at the same speed with real data and with a cached
-    synthetic batch. The conclusion:
+    Training runs at the same speed with real data and with a single cached
+    batch of synthetic data. What follows?
   options:
     - "The pipeline is the bottleneck"
-    - "The pipeline was never the limit — you are compute-bound; pipeline work is wasted effort"
+    - "The pipeline was never the limit; the job is compute-bound and pipeline work is wasted effort"
     - "The experiment is inconclusive"
-    - "The synthetic data is broken"
+    - "The synthetic data must be broken"
   answer: 1
   explanation: >-
-    Removing the pipeline changed nothing, so it wasn't the constraint. The
-    decisive experiment, outcome one — go optimize the model instead.
+    The synthetic run removes all reading, decoding, augmenting and collating.
+    If removing that work changes nothing, then the model was already the
+    slowest stage and the accelerator never waited on data. This is a properly
+    controlled comparison in M2's sense, since exactly one thing changed. Effort
+    belongs in the training step itself, found by profiling.
   tags: [pipelines, diagnosis]
 
 - id: m4/q-014
   lesson: m4/04-pipeline-health
   type: mcq
-  prompt: "Accelerator utilization that sawtooths (busy → idle gap → busy) during training signals:"
+  prompt: >-
+    Accelerator utilization that sawtooths during training, climbing to busy
+    then dropping to idle in a repeating pattern, signals:
   options:
     - "Healthy overlap"
-    - "Data stalls at batch boundaries — the prefetch queue is emptying faster than it refills"
+    - "Stalls at batch boundaries, where the queue empties faster than it refills"
     - "Thermal throttling"
     - "A learning-rate schedule"
   answer: 1
   explanation: >-
-    The idle gaps are the model waiting for the next batch. Follow up on the
-    producer side: pegged worker cores → widen prep; idle cores + busy disk
-    → fix I/O.
+    The idle gaps are the model waiting for its next batch. Having seen the
+    pattern, look at the producer side to find the cause: worker cores pegged at
+    100% means preparation is the bottleneck, idle cores with a busy disk means
+    reading is, and nothing saturated means serialization or too few workers.
   tags: [pipelines, diagnosis]
 
 - id: m4/q-015
   lesson: m4/04-pipeline-health
   type: mcq
-  prompt: "Why is epoch 2 often dramatically faster than epoch 1, with no code change?"
+  prompt: "Why is epoch 2 often much faster than epoch 1, with no code change?"
   options:
-    - "The model has learned the data"
-    - "The OS page cache now serves file reads from RAM instead of disk"
-    - "Python JIT-compiles the loop after one epoch"
-    - "The scheduler prioritizes long-running jobs"
+    - "The model has already learned the data"
+    - "The operating system's page cache now serves the file reads from RAM rather than from disk"
+    - "Python compiles the loop after one epoch"
+    - "The scheduler gives priority to long-running jobs"
   answer: 1
   explanation: >-
-    Recently read files live in the page cache. Epoch 1 measures cold I/O;
-    epoch 2 measures RAM. Decide which question you're asking before
-    benchmarking either (M2's warmup discipline).
+    After one pass, recently read files are held in spare RAM in the page cache,
+    so epoch 2 reads at DRAM speed and may not touch the disk at all. That makes
+    the two epochs measurements of different things: epoch 1 says how the job
+    behaves on cold storage, epoch 2 says how it behaves in steady state.
+    Neither is wrong; benchmarking one while claiming the other is.
   tags: [pipelines, measurement]
 
 - id: m4/q-016
   lesson: m4/04-pipeline-health
   type: short
   prompt: >-
-    Occasional pipeline starvation hides in the mean but shows in per-step
-    time percentiles. Which M2 statistic family exposes it? (say the
-    percentile everyone quotes)
+    Occasional pipeline starvation hides in the mean step time but shows up in
+    the slow end of the per-step distribution. Which statistic exposes it?
+    (name the percentile usually quoted)
   accept:
     - "p95"
     - "p99"
     - "tail percentiles"
     - "percentiles"
   explanation: >-
-    Tail percentiles (p95/p99) of step time. Stalls are tail events — M2's
-    right-skew lesson wearing pipeline clothes.
+    Tail percentiles such as p95 or p99 of step time. A pipeline that keeps up
+    almost always and starves occasionally has a healthy median, and averaging
+    the steps together conceals exactly the events you were hunting. This is
+    M2/02's right-skew appearing again in pipeline form.
   tags: [pipelines, measurement]
+
+- id: m4/q-020
+  lesson: m4/04-pipeline-health
+  type: mcq
+  prompt: >-
+    A real training step takes 100 ms. The same step with cached synthetic data
+    takes 70 ms. How much of the accelerator's time is spent waiting on input?
+  options:
+    - "70%, since synthetic data takes 70 ms"
+    - "30 ms of every 100 ms, which is 30% of its time"
+    - "43%, since 30 divided by 70 is 0.43"
+    - "None; the difference is measurement noise"
+  answer: 1
+  explanation: >-
+    The model needs only the 70 ms that the synthetic run took, so the extra
+    30 ms in the real run is the accelerator sitting idle waiting for data.
+    Expressed against the real step time it is 30 ÷ 100 = 30%. The third option
+    is the common slip: dividing by the synthetic time rather than by the actual
+    elapsed step answers a different question.
+  tags: [pipelines, diagnosis]
