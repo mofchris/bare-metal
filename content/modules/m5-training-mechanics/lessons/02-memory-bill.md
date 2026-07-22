@@ -11,88 +11,131 @@ sources:
   - "PyTorch docs: CUDA memory management"
 ---
 
-## Four line items
+## What this lesson answers
 
-Training memory is an itemized bill, and the items behave differently:
+Lesson 01 explained why training holds every activation in memory at once. That
+is one item on a larger bill.
 
-| Item                | Size                                             | Scales with batch? |
-| ------------------- | ------------------------------------------------ | ------------------ |
-| **Weights**         | bytes-per-param × params                         | no                 |
-| **Gradients**       | same shape as weights                            | no                 |
-| **Optimizer state** | Adam: two extra buffers (momentum m, variance v) | no                 |
-| **Activations**     | every layer's forward outputs (the tape, L01)    | **yes**            |
+This lesson itemizes the whole thing, because knowing it turns "will this model
+train on my machine?" from a question you answer by trying into one you answer
+by multiplying. That one multiplication explains more failed training runs than
+any other fact in the field.
 
-Gradients take exactly as much room as the weights because there is precisely
-one gradient number per weight — the two arrays are the same shape.
+## What are the four things occupying memory?
 
-The third item needs a word. The **optimizer** is the rule that turns
-gradients into the actual weight update. The simplest, **SGD** (stochastic
-gradient descent), just subtracts a fraction of the gradient and stores
-nothing extra. **Adam**, the modern default, does better by remembering two
-running averages per weight: **momentum** (m — the recent average direction,
-so updates keep rolling rather than jittering) and **variance** (v — how much
-that weight's gradient has been bouncing around, used to take smaller steps
-where the signal is noisy). Two extra numbers per weight, permanently
-resident.
+**Weights.** The parameters themselves, at whatever bytes per parameter the
+format costs.
 
-The first three items are fixed by the model and optimizer; the last is the
-variable you actually control day to day.
+**Gradients.** One gradient number per weight, from lesson 01, so this array has
+exactly the same shape and size as the weights.
 
-## The 16-bytes-per-parameter rule
+**Optimizer state.** The **optimizer** is the rule that turns gradients into the
+actual weight update. Which optimizer you choose decides how much memory this
+line costs, and the two common choices differ sharply.
 
-Plain fp32 + Adam: 4 bytes (weight) + 4 (gradient) + 4 (m) + 4 (v) = **16
-bytes per parameter** before a single activation exists.
+**SGD**, or stochastic gradient descent, simply subtracts a fraction of the
+gradient from each weight. It stores nothing beyond what it was given.
 
-The standard mixed-precision recipe lands at exactly the same total: 2 bytes
-(fp16 weight) plus 2 (fp16 gradient) plus 4 (fp32 master weight) plus 4
-(fp32 m) plus 4 (fp32 v) = 16 — the famous figure from the ZeRO paper, whose
-whole subject is how to survive this bill on huge models (M9 takes it up). The
-savings from mixed precision show up in activations and in speed, not here.
+**Adam**, the modern default, keeps two extra numbers per weight. The first is
+**momentum**, a running average of that weight's recent gradient direction, so
+updates keep rolling in a consistent direction instead of jittering. The second
+is **variance**, a running average of how much that weight's gradient has been
+bouncing around, used to take smaller steps where the signal is noisy. Two extra
+numbers per weight, held for the whole run.
 
-Apply it: a 1-billion-parameter model needs **16 GB of optimizer-adjacent
-state** — your 16 GB laptop is full before the first batch arrives. A
-100-million-parameter model: 1.6 GB, leaving room to actually train.
+**Activations.** Every layer's output, held from the forward pass until backward
+consumes it, for the reason lesson 01 established.
 
-This one multiplication explains more **OOM** errors — out of memory, where an
-allocation fails and the job dies on the spot — than any other fact in ML.
-It's why "just fine-tune a 7B model locally" fails without tricks. **LoRA** and
-its relatives exist precisely for this: freeze the original weights and train
-a small add-on set instead, shrinking the trainable-parameter count that the
-16-byte rule multiplies against.
+The first three are fixed by the model and the optimizer. The fourth is the one
+you control day to day, because it is the only one that grows with batch size.
 
-## Activations: the batch-scaled item
+## Where does the 16-bytes-per-parameter rule come from?
 
-Activation memory ≈ sum over layers of (outputs kept for backward) ×
-bytes-per-element — proportional to **batch size × per-sample activation
-footprint**.
+Take float32 weights with Adam and add up the bytes per parameter:
 
-For **transformers** (the model architecture behind essentially every modern
-language model), that footprint is set by **sequence length** — how many
-tokens the model looks at in one go — times **hidden size** — how many numbers
-represent each token internally — times the number of layers, with the
-attention mechanism adding its own terms on top. Korthikanti et al. give the
-exact formulas.
+4 (weight) + 4 (gradient) + 4 (momentum) + 4 (variance) = **16 bytes per
+parameter**
 
-Double the batch, double this line item; the other three don't move. That's
-why the OOM boundary is a _batch size_ in practice, and why lab L5.1 has you
-measure activation growth against batch size, predict the OOM point from the
-slope, then hit it on purpose.
+That total exists before a single activation is stored.
 
-## The fine print
+The interesting part is that mixed precision does not reduce it. The standard
+recipe stores a 2-byte fp16 weight, a 2-byte fp16 gradient, a 4-byte float32
+master weight, and float32 momentum and variance at 4 bytes each. Add them:
+2 + 2 + 4 + 4 + 4 = 16, exactly the same. This is the figure the ZeRO paper
+made famous, and the paper's whole subject is how to survive it on large models.
 
-Real allocators add overhead the clean model misses:
+Now apply it. A model with 1 billion parameters needs 1,000,000,000 × 16 bytes
+= **16 GB** of weights, gradients and optimizer state. Your laptop has 16 GB of
+RAM in total, so that model is out of memory before a single activation exists
+or the operating system takes its share.
 
-- **CUDA context and framework runtime** — the working state NVIDIA's driver
-  sets up for your process before your model gets a single byte. Hundreds of
-  MB, gone before you start.
-- **Temporary workspaces** that convolution and matmul algorithms request as
-  scratch space while they run.
-- **Fragmentation** — free memory chopped into pieces that are individually
-  too small to satisfy one large request, so an allocation fails with plenty
-  of "free" memory on the books. Same disease as a fragmented disk.
+Run it the other way for a model that fits. 100 million parameters × 16 bytes =
+1.6 GB, which leaves real room to train.
 
-PyTorch's caching allocator also holds freed blocks for reuse rather than
-handing them back to the operating system, so tools watching from outside
-over-report your usage; `torch.cuda.memory_allocated()` (or its CPU-profiler
-equivalents) is the honest ledger. Budget ~10–20% above the itemized bill and
-measure (M2) rather than trusting arithmetic alone.
+The failure this predicts has a name. **OOM** stands for out of memory, meaning
+an allocation failed and the job died on the spot.
+
+The rule also explains a technique you will meet constantly. **LoRA** freezes
+the original weights and trains a small set of added parameters instead. Since
+gradients and optimizer state are only kept for parameters being trained, the
+16-byte multiplier applies to a far smaller count.
+
+## Which item grows when you raise the batch size?
+
+Only activations, and they grow in direct proportion.
+
+Activation memory is roughly the sum over layers of the outputs kept for
+backward, multiplied by bytes per element. Since each sample in a batch produces
+its own activations, doubling the batch doubles this line while the other three
+do not move at all.
+
+For **transformers**, the architecture behind essentially every modern language
+model, the per-sample footprint is set by three numbers multiplied together:
+**sequence length**, meaning how many tokens the model processes at once;
+**hidden size**, meaning how many numbers represent each token internally; and
+the number of layers. The attention mechanism adds further terms, and Korthikanti
+and colleagues give the exact formulas.
+
+This is why the practical limit on batch size is memory rather than anything
+about the mathematics, and why an OOM error arrives at a specific batch size
+that you can predict in advance from how activation memory grows.
+
+## What does the clean arithmetic miss?
+
+Real allocations cost more than the itemized bill, in three ways.
+
+The **CUDA context** is the working state NVIDIA's driver establishes for your
+process. It costs hundreds of megabytes and is spent before your model receives
+a single byte.
+
+**Temporary workspaces** are scratch space that convolution and matrix-multiply
+algorithms request while they run, and then release.
+
+**Fragmentation** is the subtle one. Memory is allocated and freed in blocks of
+varying size, and over time the free space ends up split into many pieces that
+are individually too small to satisfy one large request. Adding up the free
+space says there is plenty; no single contiguous piece is big enough, so the
+allocation fails anyway. It is the same problem as a fragmented disk.
+
+One more thing distorts what you observe. PyTorch's caching allocator keeps
+freed blocks for reuse rather than returning them to the operating system, so
+tools watching from outside over-report your usage. Read
+`torch.cuda.memory_allocated()` instead, which reports what your tensors
+actually hold.
+
+Budget 10 to 20% above the itemized bill, and measure rather than trusting the
+arithmetic alone.
+
+## Check your understanding
+
+You want to fine-tune a 7-billion-parameter model with Adam on a GPU with 24 GB
+of memory.
+
+Compute whether the optimizer-adjacent state fits, and say what LoRA changes
+about the calculation. A correct answer computes 7,000,000,000 × 16 bytes =
+112 GB against 24 GB available, so it does not fit by a factor of nearly five,
+and that is before any activations, the CUDA context, or fragmentation. It then
+notes that LoRA freezes the 7 billion original weights, so gradients and
+optimizer state are kept only for the small number of added parameters; the
+frozen weights still occupy memory at 2 or 4 bytes each, but the 16-byte
+multiplier no longer applies to all 7 billion.

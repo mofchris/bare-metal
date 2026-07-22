@@ -11,70 +11,104 @@ sources:
   - "PyTorch docs: torch.utils.data (DataLoader, Dataset)"
 ---
 
-## The half of training nobody benchmarks
+## What this lesson answers
 
-A training step is really two programs running in tandem: the model's maths,
-and the machinery that gets each batch _to_ the maths. That machinery — the
-**input pipeline** — is pure classical systems: reading files, decoding
-formats, copying memory, moving things through queues. When it falls behind, a
-five-figure accelerator sits idle waiting on it, and Mohan et al. measured
-exactly that happening in a large fraction of real training jobs. This module
-is about noticing it, measuring it (M2), and fixing it.
+Modules 1 to 3 were about the arithmetic: how fast a machine can compute, how
+to measure it honestly, and what its numbers can represent.
 
-## Anatomy of one sample's journey
+None of that matters if the arithmetic unit has nothing to work on. A training
+step needs a batch of data in memory before it can start, and assembling that
+batch is a separate program running alongside the model. Mohan and colleagues
+measured real training jobs and found a large fraction of them limited by this
+second program rather than by the model.
 
-A **sample** is one training example — one image, one sentence, one row. For
-an image dataset it passes through five stages:
+This lesson covers what that program does, and which part of it is usually slow.
 
-1. **Read** — pull the bytes off disk or network (an M1 story: reading in
-   order is fast, jumping around is not — lesson 03 exploits this).
-2. **Decode** — turn compressed JPEG bytes into an actual grid of pixel
-   values. Deceptively expensive: milliseconds of real CPU work per image,
-   because JPEG decoding is genuine computation, not a copy. (It undoes two
-   compression steps — a variable-length code for the bits, and a
-   frequency-domain transform for the pixels. What matters here is only that
-   it is arithmetic, and there's a lot of it.)
-3. **Transform/augment** — resize, crop, flip, normalize. **Augmentation**
-   means deliberately varying each sample slightly every **epoch** — one
-   epoch being one full pass over the whole dataset — so the model sees more
-   variety than the dataset literally contains. More per-sample CPU
-   arithmetic, on the CPU's time.
-4. **Collate** — stack N samples into one batch tensor. A big memory copy, so
-   it spends M1's bandwidth budget on the **host** — the CPU and its RAM, as
-   opposed to the **device**, the accelerator and its own separate memory.
-5. **Transfer** — host memory → device memory, over a bus (the physical
-   connection between them) that has its own bandwidth ceiling.
+## What happens to one sample before the model sees it?
 
-Text pipelines swap decode for tokenization; tabular data swaps it for
-parsing. The shape is identical: a chain of stages, each consuming CPU time,
-memory bandwidth, or disk.
+A **sample** is one training example: one image, one sentence, one row of a
+table. For an image dataset, a sample passes through five stages.
 
-## The pipeline law
+**Read.** The bytes are pulled off disk or across a network. This is an M1
+story with larger constants: reading in the order data was written is fast,
+jumping between distant positions is slow.
 
-A chain processes at the rate of its **slowest stage** — the bottleneck.
-Speeding up any other stage changes nothing (Amdahl, M2/03, in pipeline
-clothes). So pipeline engineering is really two skills: _find_ the bottleneck
-stage (lesson 04's whole topic), and _widen_ it — more parallel workers,
-cheaper work per sample, or work moved elsewhere (decode on the GPU, augment
-ahead of time, cache whatever repeats).
+**Decode.** Compressed JPEG bytes are turned into an actual grid of pixel
+values. This is the surprising one, because it looks like reading a file and is
+not. A JPEG is stored as compressed frequency information, so decoding it means
+running real arithmetic over every block of the image to reconstruct the
+pixels. It costs milliseconds of CPU per image, which is thousands of times
+more than a copy of the same bytes would cost.
 
-## Why the CPU is chronically the underdog
+**Transform and augment.** The image is resized, cropped, flipped and
+normalized. **Augmentation** means deliberately varying each sample slightly
+every **epoch**, where one epoch is one full pass over the whole dataset, so the
+model sees more variety than the dataset literally contains. Every one of those
+variations is more CPU arithmetic per sample.
 
-Accelerators improved faster than CPUs for a decade, and one accelerator is
-typically fed by a handful of CPU cores that also have to run your Python.
-That's worse than it sounds, because of the **GIL** (global interpreter lock):
-a lock inside CPython that lets only one thread execute Python bytecode at a
-time. Threads therefore don't buy you parallel Python work, no matter how many
-cores you own.
+**Collate.** N samples are stacked into a single batch tensor. This is a large
+memory copy, so it spends the bandwidth budget of M1/03 on the **host**, which
+is the CPU and its RAM, as distinct from the **device**, which is the
+accelerator and its own separate memory.
 
-Which is why PyTorch's DataLoader uses worker _processes_ rather than threads
-(the `num_workers` setting) — separate processes each get their own
-interpreter and their own GIL, so they genuinely decode samples side by side.
-The practical consequence you'll measure in lab L4.1: a "slow model" is very
-often a fast model behind a slow kitchen.
+**Transfer.** The batch is copied from host memory to device memory over a bus,
+which is the physical connection between them and has its own bandwidth
+ceiling.
 
-## The mental model to carry forward
+Text pipelines replace decode with tokenization and tabular data replaces it
+with parsing, but the shape is identical: a chain of stages, each consuming CPU
+time, memory bandwidth, or disk.
 
-Producer (the CPU pipeline) and consumer (the accelerator), connected by a
-queue. Everything in the next lesson — prefetching, overlap, workers — is
-about keeping that queue from ever being the reason anyone waits.
+## Why does the slowest stage decide everything?
+
+A chain of stages processes at the rate of its slowest stage. That stage is
+called the **bottleneck**.
+
+The reason is that stages run concurrently but cannot outpace their supply. If
+decode produces 200 images per second and every other stage could handle 2000,
+then nothing downstream ever receives more than 200 per second, no matter how
+fast it is capable of running.
+
+This is Amdahl's law from M2/03 wearing different clothing, and it has the same
+practical consequence: optimizing any stage other than the bottleneck changes
+the total by nothing at all.
+
+So pipeline work is two skills. Find which stage is the bottleneck, which is
+lesson 04's entire subject. Then widen it, by adding parallel workers, by making
+the per-sample work cheaper, or by moving the work somewhere else.
+
+## Why is the CPU usually the one that falls behind?
+
+Two forces push in the same direction.
+
+First, accelerators improved faster than CPUs for over a decade. A single modern
+accelerator can consume batches faster than the handful of CPU cores feeding it
+can produce them.
+
+Second, those same CPU cores have to run Python, and Python cannot use them
+properly. CPython contains the **GIL**, or global interpreter lock, which allows
+only one thread to execute Python instructions at a time. Adding threads
+therefore adds no parallel Python work regardless of how many cores you own.
+
+PyTorch's answer is visible in its interface. The DataLoader's `num_workers`
+setting spawns worker _processes_ rather than threads, because separate
+processes each get their own interpreter and their own GIL, so they genuinely
+decode samples side by side.
+
+The practical consequence is worth internalising before you ever debug it: a
+model that appears slow is very often a fast model waiting on a slow kitchen.
+
+## Check your understanding
+
+A training job processes 400 images per second. Profiling the input pipeline
+shows: read at 3000 images/sec, decode at 450 images/sec, augment at 1200
+images/sec, collate at 5000 images/sec.
+
+Identify the bottleneck, predict what happens to end-to-end throughput if you
+make reading twice as fast, and name two ways to widen the real bottleneck. A
+correct answer identifies decode at 450 images/sec as the slowest stage; states
+that doubling read speed from 3000 to 6000 changes end-to-end throughput by
+nothing, because decode still caps the chain at 450; and names two of: more
+DataLoader worker processes to decode in parallel, cheaper decode by storing
+smaller images, decoding on the accelerator, or caching decoded samples after
+the first epoch.

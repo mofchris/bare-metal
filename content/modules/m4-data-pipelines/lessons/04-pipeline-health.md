@@ -10,75 +10,96 @@ sources:
   - "PyTorch profiler docs (pytorch.org/docs/stable/profiler); tf.data performance guide"
 ---
 
-## The one question that orders all the others
+## What this lesson answers
 
-Every pipeline investigation starts the same way: **is the model waiting on
-data, or is data waiting on the model?** Only one of those is a problem worth
-fixing, and everything in lessons 01–03 only matters in the first case. M2
-taught the discipline; this lesson is its application.
+Lessons 01 to 03 gave you three ways to make a pipeline faster. Applying any of
+them to a pipeline that was never the problem wastes the effort entirely.
 
-## The decisive experiment: synthetic data
+So one question comes before all the others: is the model waiting on data, or is
+data waiting on the model? This lesson answers it two ways, one experimental and
+one observational, and then covers the ways pipeline benchmarks lie.
 
-Replace the real pipeline with a fake one — a single batch of random numbers,
-generated once and served over and over, so there is zero reading, zero
-decoding, zero collating — and time training both ways:
+## What is the one experiment that settles it?
 
-- **Same speed with fake data** → the pipeline was never the limit. You are
-  compute-bound; close this module and go optimize the model.
-- **Fake data much faster** → the gap _is_ your data stall, measured directly.
-  A 30% gap means 30% of your accelerator's time was idle waiting for input.
+Replace the real pipeline with a fake one. Generate a single batch of random
+numbers once, hold it in memory, and feed that same batch to the model over and
+over. There is no reading, no decoding, no augmenting and no collating.
 
-This experiment is cheap, unambiguous, and the single highest-value diagnostic
-in this module — lab L4.2's centerpiece. It's also a controlled comparison in
-M2's sense: exactly one variable (the pipeline) changed, everything else held
+Then time training both ways. There are exactly two outcomes and each one tells
+you what to do next.
+
+**If both versions run at the same speed**, the pipeline was never the limit.
+The model was already the bottleneck, so you are compute-bound. Stop working on
+the pipeline entirely and go optimize the model.
+
+**If the fake version is faster**, the difference is your data stall, measured
+directly rather than inferred. Suppose a real step takes 100 ms and a synthetic
+step takes 70 ms. The model needs only 70 ms of that, so 30 ms of every 100 ms
+was the accelerator sitting idle, which is 30% of its time.
+
+This experiment is cheap, it is unambiguous, and it is a properly controlled
+comparison in the sense of M2: exactly one thing changed, everything else held
 identical.
 
-## Reading the utilization signals
+## What can you tell without changing any code?
 
-**Utilization** means the fraction of time a piece of hardware was actually
-doing work rather than sitting idle — it's what the percentages in a task
-manager or `nvidia-smi` report.
+**Utilization** is the fraction of time a piece of hardware spent doing work
+rather than waiting. It is what the percentages in a task manager or in
+`nvidia-smi` report.
 
-Without touching code, watch per-stage utilization during training.
-Accelerator utilization that **sawtooths** — busy, idle gap, busy, idle gap,
-tracing a repeating up-down pattern — is the signature of stalls at batch
-boundaries: the queue empties, everyone waits, it refills.
+Watch the accelerator's utilization during training and look at its shape rather
+than its average. Utilization that **sawtooths**, meaning it climbs to busy,
+drops to idle, and climbs again in a repeating pattern, is the signature of
+stalling at batch boundaries. The queue empties, the model waits, the queue
+refills.
 
-Then look at the producer side to find which stage is responsible:
+Once you see that pattern, look at the producer side to find which stage is
+responsible.
 
-- All DataLoader worker cores pegged at 100% → prep is the bottleneck (widen
-  it, lesson 02).
-- Cores idle but the disk at 100% → you're I/O bound (pack shards, lesson 03).
-- Everything idle in turns, nothing saturated → likely serialization: some
-  stage running under a lock so only one thing proceeds at a time, or simply
-  too few workers to keep the chain full.
+If every DataLoader worker core is pegged at 100%, preparation is the
+bottleneck, so widen it with more workers or cheaper per-sample work.
 
-Timeline profilers (PyTorch's, which annotates DataLoader activity) show the
-same story with more precision: per-step gaps between "data ready" and "step
-start."
+If the worker cores are mostly idle while the disk is at 100%, you are limited
+by reading, so the fix is in lesson 03: pack shards, or compress less.
 
-## Pipeline-specific measurement traps
+If nothing is saturated and everything idles in turns, the likely cause is
+serialization. Some stage is running under a lock so only one thing proceeds at
+a time, or there are simply too few workers to keep the chain occupied.
 
-Three ways to lie to yourself, all M2 patterns wearing pipeline clothes:
+A timeline profiler gives the same diagnosis with more precision. PyTorch's
+annotates DataLoader activity, so the gap between "data ready" and "step start"
+is directly visible per step.
 
-1. **The first epoch is a different program.** After epoch one, the OS **page
-   cache** holds recently read files in spare RAM — so epoch two reads from
-   memory at DRAM speed, never touching the disk at all. Benchmarking epoch 2
-   tells you nothing about cold I/O; benchmarking epoch 1 tells you nothing
-   about steady state. Decide which question you're asking, and state it
-   (warmup discipline, M2/01).
-2. **Warmup includes the pipeline.** Worker processes have to spawn, buffers
-   have to fill, shard file handles have to open — the first dozen steps are
-   startup cost, not throughput.
-3. **The tail is where stalls live.** A pipeline that's fast on median and
-   occasionally starves shows up in p95 step time, not in the mean (M2/02's
-   skew, again). A series of per-step times beats an aggregate average here,
-   because the aggregate averages the stalls away.
+## What lies do pipeline benchmarks tell?
 
-## The module, closed
+Three, and all three are M2 patterns in pipeline clothing.
 
-Feeding the model is a chain of classical systems stages (L01); overlap
-hides their cost when they're cheap enough (L02); layout and packing decide
-the I/O floor (L03); and one synthetic-data experiment plus utilization
-eyes tell you who's actually waiting (L04). With M5, the story moves inside
-the training step itself — what backprop costs and where the memory goes.
+**The first epoch is a different program.** After one pass over the data, the
+operating system holds recently read files in spare RAM, in what is called the
+**page cache**. Epoch two therefore reads from memory at DRAM speed and may not
+touch the disk at all. Benchmarking epoch 2 tells you nothing about how the job
+behaves on cold storage; benchmarking epoch 1 tells you nothing about its steady
+state. Decide which question you are asking, and say which one you measured.
+
+**Warmup includes the pipeline, not just the model.** Worker processes have to
+be spawned, prefetch buffers have to fill, and shard file handles have to open.
+The first dozen steps are measuring startup rather than throughput.
+
+**Stalls hide in the tail.** A pipeline that keeps up almost always and starves
+occasionally has a healthy median and an ugly p95, and averaging the steps
+together conceals exactly the events you were looking for. Record a series of
+per-step times and look at its distribution, as M2/02 required.
+
+## Check your understanding
+
+A training job runs at 100 ms per step. You rerun it with synthetic data and it
+takes 100 ms per step. A colleague suggests adding more DataLoader workers and
+switching the dataset to sharded storage.
+
+Say what the synthetic-data result proves, evaluate the colleague's suggestion,
+and say where the effort should go instead. A correct answer says that identical
+timings prove the pipeline was already keeping up and the job is compute-bound,
+so the accelerator never waits on data; that adding workers and resharding
+addresses a bottleneck that does not exist and will change end-to-end step time
+by nothing; and that the effort belongs in the model itself, found by profiling
+the training step as in M2/03.

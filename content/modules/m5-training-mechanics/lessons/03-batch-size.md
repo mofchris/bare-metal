@@ -10,82 +10,129 @@ sources:
   - "Goyal et al., Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour, arXiv 2017"
 ---
 
-## One knob, three dials
+## What this lesson answers
 
-Batch size is the most-turned knob in training, and it moves three things at
-once — hardware efficiency, memory, and optimization behavior. Confusing their
-effects is the standard way to draw wrong conclusions from a batch size sweep,
-so this lesson separates them.
+Batch size is the most frequently adjusted number in training, and it moves
+three unrelated things at the same time: how efficiently the hardware runs, how
+much memory is used, and how well the model learns per step.
 
-## Dial 1: hardware throughput (up, then flat)
+Because one knob moves three things, experiments that change it produce results
+that are easy to misread. This lesson separates the three effects so you can say
+which one produced any change you observe.
 
-Bigger batches make bigger matmuls. From M1: bigger matmuls have higher
-arithmetic intensity, and they spread the fixed per-step costs — launching
-each kernel onto the device, Python overhead, the optimizer's own update pass
-— across more samples. So **samples/second rises with batch size**.
+## Effect 1: why does throughput rise and then stop rising?
 
-But once the hardware's execution units are saturated — genuinely busy every
-cycle — the curve goes flat: a batch of 512 on a machine already saturated at
-128 computes no faster per sample. Free lunch until saturation, zero lunch
-after, and where saturation lands is machine-specific (lab L5.1's sweep finds
-this laptop's).
+Larger batches make larger matrix multiplications, and that helps twice.
 
-## Dial 2: memory (up, linearly, forever)
+First, from M1/03: arithmetic intensity for a matrix multiply grows with size,
+so a bigger multiply does more arithmetic per byte fetched and sits further to
+the right on the roofline.
 
-Last lesson: activations scale linearly with batch size, everything else
-doesn't. So the practical ceiling on batch size is almost always memory, and
-it arrives as an OOM at some exact batch size you can predict in advance from
-the activation slope (lab L5.1 again).
+Second, every step carries fixed costs that do not depend on batch size:
+launching each operation onto the device, Python overhead, and the optimizer's
+update pass over the weights. Running 32 samples through one step rather than
+one sample through 32 steps pays those costs once instead of 32 times.
 
-## Dial 3: optimization (better gradients, diminishing returns)
+So samples per second rises with batch size. It stops rising when the hardware's
+execution units are saturated, meaning they are already busy every cycle. Past
+that point a larger batch is simply more work for a machine already working
+flat out, and per-sample speed stops improving.
 
-A batch's gradient is an average over its samples — and that average is a
-_noisy estimate_ of the gradient you'd get from the entire dataset. More
-samples in the average, less noise, so each step points more accurately
-downhill.
+Where saturation lands depends on the machine and the model, so it is found by
+measurement rather than predicted.
 
-That works near-perfectly at first: doubling a small batch roughly halves the
-number of steps needed, so time-to-result scales beautifully. But Shallue et
-al.'s large empirical study mapped what follows: a **diminishing-returns
-regime**, and then a **maximal useful batch size** past which more samples per
-step buy _nothing_ — the gradient estimate is already accurate enough, and the
-extra averaging is wasted work. Where those regimes sit varies by model and
-dataset; no universal number exists.
+## Effect 2: why does memory rise forever?
 
-Two couplings to respect when scaling batch up:
+Lesson 02 answered this. Activations scale linearly with batch size and the
+other three items on the bill do not.
 
-- **Learning rate must move with it.** The learning rate is how big a step the
-  optimizer takes along the gradient. A bigger batch gives a more trustworthy
-  direction, so you can afford to travel further along it — the classic recipe
-  (Goyal et al.) scales learning rate linearly with batch size, with a warmup
-  period at the start to survive those early large steps. Sweeping batch size
-  at fixed learning rate measures the wrong thing entirely.
-- **Generalization** — how well the model does on data it never trained on.
-  Very large batches sometimes end at slightly worse test accuracy, because
-  the noise in small-batch gradients acts as a mild randomizing force that
-  keeps the model from settling too precisely into the training data. Real,
-  but second-order next to getting the learning rate right.
+That makes memory the practical ceiling on batch size in nearly every real
+situation, and it makes the ceiling predictable. Measure activation memory at
+two batch sizes, take the slope, and you can compute the batch size at which the
+job will hit OOM before you run it.
 
-## What batch size does NOT change
+## Effect 3: why do bigger batches stop helping the learning?
 
-The FLOPs per epoch. Every sample's forward and backward pass costs the same
-arithmetic regardless of how the samples are grouped — grouping changes the
-shape of the matmuls, not the total multiply-adds.
+A batch's gradient is an average of the gradients from its samples, and that
+average is an estimate of the gradient you would get from the entire dataset.
 
-So batch size changes how _efficiently_ the hardware executes those FLOPs
-(dial 1) and how many epochs you need (dial 3) — never the per-epoch
-arithmetic itself. When a bigger batch "trains faster," always ask which dial
-actually moved: hardware utilization, or fewer steps? The honest experiment
-separates them — steps-to-target-accuracy and samples/second, reported side by
-side (M2's discipline: name the metric).
+Averaging more samples produces a less noisy estimate, so each step points more
+accurately downhill. At small batch sizes this works nearly perfectly: doubling
+the batch roughly halves the number of steps needed, so the time to reach a
+given accuracy scales beautifully.
 
-## The gradient-accumulation preview
+It does not continue. Shallue and colleagues mapped the curve empirically across
+many models and datasets, and found three regions. There is a region of near
+perfect scaling, then a region of **diminishing returns** where doubling the
+batch reduces the step count by less than half, then a **maximal useful batch
+size** beyond which extra samples per step buy nothing at all.
 
-If optimization wants a big batch but memory forbids it, run k small
-micro-batches, adding up their gradients without applying an update, then step
-once using the sum. Mathematically that's the same gradient a single large
-batch would have produced, but only one micro-batch's activations are alive at
-any moment.
+The reason for that ceiling is that the gradient estimate has already stopped
+being the limiting factor. Once the direction is accurate enough, making it more
+accurate does not let you take a more productive step, so the additional samples
+are wasted work. Where the ceiling falls varies by model and dataset, and no
+universal number exists.
 
-That's **gradient accumulation**, the first of the compute-for-memory trades
-that fill the next lesson.
+## What has to change when you change the batch size?
+
+**The learning rate.** The learning rate is how large a step the optimizer takes
+along the gradient direction. A larger batch produces a more trustworthy
+direction, so you can afford to travel further along it before re-measuring. The
+standard recipe, from Goyal and colleagues, scales the learning rate linearly
+with the batch size, with a warmup period at the start of training to survive
+the early large steps.
+
+The consequence for experiments is direct: sweeping batch size at a fixed
+learning rate does not measure what batch size does. It measures batch size
+combined with an increasingly wrong learning rate, and it will make large
+batches look worse than they are.
+
+**Generalization**, meaning how well the model performs on data it never trained
+on, can also shift. Very large batches sometimes end at slightly lower test
+accuracy. The usual explanation is that the noise in small-batch gradients acts
+as a mild randomizing force, keeping the model from settling too precisely into
+the training data. The effect is real and it is second-order next to getting the
+learning rate right.
+
+## What does batch size not change?
+
+The FLOPs per epoch. Every sample requires the same forward and backward
+arithmetic regardless of how the samples are grouped, and grouping changes the
+shape of the matrix multiplications rather than the total number of multiplies
+and adds.
+
+So batch size changes how efficiently the hardware executes those FLOPs, and how
+many steps are needed, but never the arithmetic itself.
+
+This gives you the right question whenever a larger batch appears to "train
+faster": which effect actually moved? Report steps-to-target-accuracy and
+samples-per-second side by side, and the answer is visible. Reporting only one
+of them makes the two indistinguishable.
+
+## What if optimization wants a batch that will not fit?
+
+Run the large batch in pieces. Split it into k smaller micro-batches, run
+forward and backward on each in turn while adding the gradients together, and
+apply one weight update at the end using the accumulated sum.
+
+The gradient this produces is mathematically the same as the one a single large
+batch would have produced, because summing the gradients of the parts is
+summing over the same samples. Yet only one micro-batch's activations exist at a
+time, so the memory cost is that of the small batch.
+
+This technique is **gradient accumulation**, and it is the first of the
+trades between compute and memory that fill the next lesson.
+
+## Check your understanding
+
+You sweep batch size from 32 to 512 at a fixed learning rate and observe:
+samples per second rises from 900 to 2100 and then flattens after 256, memory
+grows steadily throughout, and final test accuracy falls at 512.
+
+Say what each of the three observations tells you, and name the flaw in the
+experiment. A correct answer attributes the rise and plateau in samples per
+second to hardware saturation around batch 256; attributes the steady memory
+growth to activations, the only line item that scales with batch size; and
+identifies the fixed learning rate as the flaw, since the standard recipe scales
+learning rate with batch size, so the accuracy drop at 512 may be an untuned
+learning rate rather than a property of large batches.

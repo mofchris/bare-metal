@@ -489,3 +489,31 @@ The ledger proved itself mid-session: while writing m4/02 I introduced "epoch" i
 
 **Deferred, deliberately:** a compiler check failing the build when a term appears before its declared first-grounding lesson. Cheap to add (each GLOSSARY row already declares the lesson), and it would have caught the gradient bug automatically — but it earns its keep when M6–M10 are authored, not now. Recorded in D-025.
 **New DECISIONS.md entries this session:** D-025 (ratified — his direction)
+
+## Session 2026-07-22 (twenty-fifth block — full prose rewrite of all 21 lessons + two gating bugs)
+
+**Stage:** B | **Gate status:** Gate B unsigned
+**Trigger:** Christopher, after reading the D-025 pass: "i am noticing a pattern of choppy texts and text without context because i dont see how any sentence in that paragraph connects to any other one... it reads more like a robot that expects me to know whats missing than text actually designed to help people reading understand what its all about". He asked for an independent agent to review the writing across all units.
+
+**The diagnosis (independent review; the 22 rules are recorded in D-026):** the prose was **compressed, not vague**. Facts correct and well ordered; the connective tissue between sentences — mechanism, derivation, antecedent, finite verb — had been deleted for rhythm. 14 distinct failure modes with verbatim evidence. **D-025 had made one axis actively worse**: "no naked terms" was satisfied the cheapest way that passes, by injecting glosses as em-dash asides inside existing sentences, giving m1/02 39 em-dashes in 1473 words and a peak-FLOPS payoff sentence with no main verb.
+
+**Done this session:**
+
+- **All 21 lessons rewritten** to the 22-rule contract. Frontmatter, objectives, sources, section sequence, tables and every number held constant; the argument between sentences restored. **1,493 to 3,016 lines.**
+- Branch prediction is the reference case: 180 to ~600 words, chain unbroken from "fetch needs an address every cycle" to "the deciding comparison is still in the pipeline" to "so either stall or guess" to "stalling gives back Trick 1's win" to the predictor table to "loops make it right 999/1000" to "a miss empties the pipeline" to "refill costs one cycle per stage" to "real depth is 15-20" — which is where the 15-20 cycles finally comes from. It was previously asserted.
+- Every number now derived on the page: 0.33 ns from 1/3e9; 300 wasted cycles from 100/0.33; 380 GFLOPS from 4x8x2x2x3e9; 16 floats per cache line from 64/4; AI 0.083 from 1/12 and N/6 from 2N^3/12N^2; int8 scale from 0.8/255; int32 accumulator justified by 127x127=16,129; Amdahl worked twice; loss scaling via linearity lifting 1e-7 to 1e-4.
+- **Content bugs the review caught and this pass fixed:** m4/04's synthetic-data arithmetic was ambiguous-to-wrong (now stated as explicit times: 100 ms real vs 70 ms synthetic = 30 ms idle per 100 ms); m1/02 taught a five-stage pipeline then priced misprediction at 15-20 cycles with no reconciliation (now explicitly reconciled).
+- **Ten labs (L1.1 to L5.2) were referenced as if they existed; none do.** Christopher's call: cut entirely. Also cut all M6-M10 references, since those modules do not exist as files either. Verified zero of both remain.
+- Comprehension checks added to **all 21** (previously 1). Headings are now questions the section answers. Em-dashes across the curriculum: 120+ to 7.
+- `content/GLOSSARY.md` kept in sync; `tools/audit-terms.mjs` now reports **CLEAN** — no ledger term used before the lesson that grounds it.
+
+**Two bugs Christopher reported, fixed and committed separately (9969d76):**
+
+- **D-023 gating BYPASS.** `Gated` re-checked only when `db` changed, so navigating lesson to lesson kept the PREVIOUS lesson's "open" verdict. The lesson footer's Next link therefore walked into a locked lesson without the quiz. Fixed with a `gateKey` identifying the screen a verdict belongs to; a verdict for another screen is discarded during render. The footer link is gated too — it names the next lesson but only links it when unlocked.
+- **Dead-end quiz pass.** Passing SAID "the next lesson is open" and offered no way to get there. The summary now offers the next lesson (or the module list after an exam) as the primary button, with Retry demoted to quiet on a pass and promoted on a fail.
+- New `src/components/gated.test.ts`: 5 tests around `stateFor()`, the pure function the bypass lived in. **72 tests green.**
+
+**In progress / half-finished:** nothing. 21/21 lessons compile and render, typecheck clean, 72 tests green, term audit clean.
+**Next session should start with:** Christopher's read-through of the full curriculum. The 86 quiz questions were NOT rewritten — only checked that they remain answerable from the changed prose. A question-bank pass against the new lessons is the obvious next content job.
+**Open questions for Christopher:** none outstanding.
+**New DECISIONS.md entries this session:** D-026 (ratified — his direction)

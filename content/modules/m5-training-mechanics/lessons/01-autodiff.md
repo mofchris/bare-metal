@@ -11,91 +11,139 @@ sources:
   - "PyTorch docs: Autograd mechanics (pytorch.org/docs/stable/notes/autograd)"
 ---
 
-## What we're actually computing
+## What this lesson answers
 
-M3 said gradients are the per-weight instructions for making the loss smaller.
-This lesson is how a machine produces millions of them without dying.
+M3 used gradients as given: the per-weight instructions for making the loss
+smaller. This lesson covers where they come from.
 
-The underlying quantity is a **derivative**: how much an output moves when you
-nudge one input slightly. A **gradient** is just the collection of those, one
-per parameter — for every weight in the model, how much the loss would change
-if you moved that weight a little. The tool for computing derivatives through
-a chain of operations is the **chain rule**: if a feeds b and b feeds c, then
-the sensitivity of c to a is the sensitivity of c to b multiplied by the
-sensitivity of b to a. Derivatives compose by multiplying along the path.
+The question has real weight, because a model has millions of weights and needs
+a gradient for every one of them on every step. Two of the three obvious methods
+are hopeless at that scale. Understanding why the third one works explains a
+memory cost that dominates the rest of this module.
 
-## Three ways to get a derivative, two of them wrong for us
+## What is a gradient, precisely?
 
-**Symbolic** differentiation (what you did in calculus) manipulates the
-expressions themselves, producing a formula for the derivative — but the
-formula for a million-parameter network's gradient explodes in size long
-before you can evaluate it.
+A **derivative** measures how much an output moves when you nudge one input
+slightly. If nudging a weight up by a tiny amount raises the loss, that
+derivative is positive, and the weight should move down instead.
 
-**Numerical** differentiation uses finite differences: nudge a parameter by a
-tiny amount, re-run the whole model, see how much the loss moved, divide. That
-needs one full forward pass _per parameter_ — a million passes for a million
-parameters — and the subtraction of two nearly equal loss values is
-catastrophic cancellation straight from M3/04. It's slow _and_ inaccurate. It
-survives only as a sanity check on other methods ("gradcheck").
+A **gradient** is the collection of those derivatives, one per parameter. It
+says, for every weight in the model at once, which direction that weight should
+move and how strongly.
 
-**Automatic differentiation** is the third way, and it's neither of those: run
-the ordinary program, and because every program is ultimately a composition of
-primitive operations (+, ×, exp, matmul…) whose individual derivatives are
-known formulas, apply the chain rule _to the execution itself_. Numerically
-exact (to float precision), at a small constant multiple of the program's own
-cost.
+Derivatives through a chain of operations combine by the **chain rule**: if a
+feeds b and b feeds c, then the sensitivity of c to a is the sensitivity of c to
+b multiplied by the sensitivity of b to a. Sensitivities multiply along the
+path. That single fact is the machinery behind everything below.
 
-## Forward mode vs reverse mode
+## Why not compute derivatives the ways you already know?
 
-The chain rule multiplies sensitivities along a path, and multiplication can
-be done starting from either end. That's the whole distinction:
+**Symbolic differentiation** manipulates the expressions themselves, which is
+what you did in calculus, and produces a formula for the derivative.
 
-- **Forward mode** pushes derivatives along beside the computation, from
-  inputs toward outputs. One pass yields the derivative with respect to _one
-  input_. Cost scales with the number of **inputs**.
-- **Reverse mode** runs the function once forward, then propagates
-  sensitivities backward from the output. One backward pass yields the
-  gradient with respect to **all inputs at once**. Cost scales with the number
-  of **outputs**.
+It fails on scale. A neural network is a composition of millions of operations,
+and applying the chain rule symbolically to that composition produces an
+expression that grows enormous long before it can be evaluated.
 
-Training has millions of inputs (the parameters) and exactly one output (the
-scalar loss — "scalar" meaning a single number, not an array). So reverse mode
-computes the entire gradient for roughly **2–3× the cost of one forward
-pass**, no matter how many parameters there are. That asymmetry is the single
-fact that makes deep learning computationally feasible; forward mode would
-need a pass per parameter, exactly like finite differences.
+**Numerical differentiation** uses finite differences: nudge one parameter by a
+tiny amount, run the whole model again, see how much the loss moved, and divide
+by the nudge.
 
-Backpropagation is reverse-mode autodiff specialized to neural networks.
+It fails twice. First on cost: getting one gradient requires one full forward
+pass, so a million parameters requires a million forward passes per training
+step. Second on accuracy: the method subtracts two nearly identical loss values,
+which is catastrophic cancellation straight out of M3/04, so the answer is made
+largely of rounding noise.
 
-## The tape
+It survives only as a slow check on other methods, where it is called
+gradcheck.
 
-To go backward, the framework must remember what happened forward. During the
-forward pass it records a graph — **the tape**: each operation performed, its
-inputs, and enough context to compute that operation's local derivative later.
-`loss.backward()` walks the tape in reverse, multiplying local derivatives per
-the chain rule and accumulating the results into each parameter's `.grad`.
+**Automatic differentiation** is the third option and is neither of the above.
+Rather than manipulating formulas or re-running the program, it runs the program
+once and applies the chain rule to the execution itself.
 
-PyTorch builds the tape fresh on every forward pass (**define-by-run**), which
-is why ordinary Python control flow works inside models: whatever actually
-executed _is_ the graph. An `if` that took the other branch this time simply
-records a different tape.
+The insight it rests on is that every program is ultimately built from primitive
+operations such as addition, multiplication, exponentiation and matrix multiply.
+The derivative of each primitive is a known, simple formula. So if you record
+which primitives ran and on what values, you can multiply their known local
+derivatives together along the chain, and the answer is exact to floating-point
+precision.
 
-## Why activations get stored — the module's pivotal fact
+## Why does the direction of the chain rule matter so much?
 
-Local derivatives usually need the forward pass's actual **values**. For
-y = W·x, the derivative with respect to the weights W needs **x** — the
-layer's input activation. For **ReLU** (the simplest common layer: keep
-positive numbers, set negatives to zero), the backward pass needs to know
-which inputs were positive, or it can't tell which ones to pass gradient
-through.
+The chain rule multiplies sensitivities along a path, and multiplication can be
+performed starting from either end. That choice produces two different
+algorithms with wildly different costs.
 
-So the tape pins the intermediate activations of _every layer_ in memory, from
-the moment they're computed until the backward pass consumes them. Only then
-is that memory freed, deepest layers first (since backward runs in reverse
-order).
+**Forward mode** carries derivatives alongside the computation, from inputs
+toward the output. One pass gives the derivative of everything with respect to
+_one input_. To get derivatives with respect to a million inputs, you need a
+million passes.
 
-The consequence: training memory grows with **depth × batch size**, entirely
-apart from the weights themselves. Inference can throw each activation away
-the instant the next layer has consumed it; training cannot. Where exactly the
-gigabytes land is the next lesson's accounting — that the tape demands them at
-all is the reason.
+**Reverse mode** runs the function forward once, then propagates sensitivities
+backward from the output. One backward pass gives the derivative of _one output_
+with respect to **every input at once**.
+
+Now count what training needs. It has millions of inputs, the parameters, and
+exactly one output, the loss, which is a **scalar**, meaning a single number
+rather than an array.
+
+Forward mode would need one pass per parameter, which is finite differences all
+over again. Reverse mode needs one backward pass total, and that pass costs
+roughly **2 to 3 times a forward pass** regardless of how many parameters exist.
+
+That asymmetry is the reason deep learning is computationally possible.
+Backpropagation is reverse-mode automatic differentiation applied to neural
+networks.
+
+## What does the framework have to remember?
+
+Going backward requires knowing what happened forward, so the framework records
+it during the forward pass. The record is called **the tape**: each operation
+performed, its inputs, and whatever else is needed to compute that operation's
+local derivative later.
+
+Calling `loss.backward()` walks the tape in reverse, multiplying local
+derivatives according to the chain rule and accumulating the result for each
+parameter into its `.grad`.
+
+PyTorch builds a fresh tape on every forward pass, which is called
+**define-by-run**. This is why ordinary Python control flow works inside a
+model: whatever actually executed is what got recorded, so an `if` that took the
+other branch this time simply produces a different tape.
+
+## Why does training use so much more memory than inference?
+
+Here is the pivotal consequence, and it drives the next three lessons.
+
+Computing a local derivative usually requires the forward pass's actual values.
+For y = W·x, the derivative with respect to the weights W depends on **x**,
+which is the layer's input activation. For **ReLU**, the simplest common layer,
+which keeps positive numbers and sets negative ones to zero, the backward pass
+needs to know which inputs were positive, because gradient flows through those
+positions and not the others.
+
+So the tape cannot discard activations. Every layer's output stays in memory
+from the moment it is computed until the backward pass reaches that layer and
+consumes it. Only then is the memory released, and because backward runs in
+reverse, the deepest layers are freed first and the earliest layers are held
+longest.
+
+Now compare the two modes of use. Inference discards each activation as soon as
+the next layer has consumed it, because there is no backward pass coming.
+Training keeps all of them alive simultaneously.
+
+Training memory therefore grows with **depth × batch size**, entirely separately
+from the size of the weights. Lesson 02 turns that into an itemized bill.
+
+## Check your understanding
+
+A model has 50 million parameters and produces a single scalar loss. A colleague
+proposes computing its gradients with forward-mode automatic differentiation,
+arguing that forward mode avoids storing activations and therefore saves memory.
+
+Evaluate the proposal on cost. A correct answer says forward mode gives
+derivatives with respect to one input per pass, so 50 million parameters would
+need 50 million forward passes per training step, against reverse mode's single
+backward pass costing 2 to 3 forward passes; and concludes that the memory saved
+is irrelevant because the compute cost is larger by a factor of tens of millions.

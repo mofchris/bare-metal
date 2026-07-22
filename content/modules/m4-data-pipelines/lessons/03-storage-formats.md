@@ -11,81 +11,121 @@ sources:
   - "WebDataset documentation (github.com/webdataset/webdataset)"
 ---
 
-## Layout is destiny (disk edition)
+## What this lesson answers
 
-M1 taught that walking memory along the order it's laid out in is fast, and
-walking across that order is slow. Storage has the same law with much bigger
-constants: **sequential reads** — asking for bytes in the order they physically
-sit — stream at the device's full bandwidth, while random **seeks** — jumping
-to an unrelated position — pay a fixed overhead per access before any data
-arrives.
+Lesson 01 listed reading as the first pipeline stage and moved on. This lesson
+covers what decides whether reading is cheap or ruinous, which comes down
+entirely to how the dataset was written to disk in the first place.
 
-So the question "how should a dataset be laid out?" is really "what will the
-access pattern be?" — and ML training's pattern is peculiar: read _whole
-samples_, all fields at once, in _randomized order_, epoch after epoch.
+The same law from M1/01 applies, with much larger constants.
 
-## Row vs column
+## Why does layout matter more on disk than in memory?
 
-**Row-oriented** layouts store each record contiguously — all of sample 1,
-then all of sample 2. Read one sample and everything about it arrives in one
-touch.
+A **sequential read** asks for bytes in the order they physically sit on the
+device, and it runs at the device's full streaming speed. A **seek** jumps to an
+unrelated position, and it pays a fixed setup cost before any data arrives.
 
-**Columnar** layouts (Parquet, Arrow) store each _field_ contiguously instead
-— every record's first field together, then every record's second field. That
-lets you read one column across a million rows without touching the rest,
-which is why analytics ("average price by month") loves them, per Abadi's
-classic comparison. Columnar also compresses better, because similar values
-end up sitting next to each other.
+That fixed cost is the whole story. In memory, a cache miss costs about 100
+nanoseconds. On a solid-state drive, a seek costs tens of microseconds, which is
+hundreds of times worse. On network storage it can be milliseconds.
 
-Training reads whole samples, which is row-shaped — hence TFRecord and
-WebDataset are row-oriented containers. But tabular ML blurs the line: feature
-engineering reads columns (columnar wins), then training reads sample rows.
-Parquet's answer is **row groups** — column layout _within_ chunks of rows —
-so a reader pulling a batch of rows still gets reasonable sequential behavior
-either way. The honest rule: name the dominant access pattern first; the
-format follows.
+So the question "how should a dataset be laid out?" is really "what order will
+it be read in?" Training's answer is unusual: read whole samples, all fields at
+once, in randomized order, over and over for many epochs.
 
-## The small-file trap
+## Should each record be stored together, or each field?
 
-The naive layout — one file per sample, a million JPEGs in folders — is a
-pipeline disaster out of all proportion to its innocence. Every file costs a
-**metadata lookup** first: the OS must find the file, check permissions, and
-set up a handle (`open`, `stat`, `close`) before a single byte of content
-arrives. Random placement across the disk turns reading into seeking. And
-object stores (cloud storage like S3) bill and rate-limit _per request_, not
-per byte.
+**Row-oriented** layouts store each record contiguously. All of sample 1, then
+all of sample 2. Reading one complete sample touches one contiguous region.
 
-The fix is **sharding**: pack the samples into a few hundred large archive
-files instead. WebDataset literally uses `tar` archives; TFRecord uses its own
-framing. Readers then stream each shard start to finish — full-bandwidth
-sequential reads — and "random order" gets approximated cheaply by two tricks
-instead of true random access: shuffle _which_ shards you read each epoch, and
-shuffle _within_ a buffer of samples held in memory as they stream past. That
-shuffle-buffer compromise buys approximate randomness at sequential-read
-prices.
+**Columnar** layouts store each field contiguously instead. Every record's first
+field together, then every record's second field. Reading one field across a
+million records touches one contiguous region, and the other fields are never
+read at all. Parquet and Arrow work this way.
 
-## Compression: spend CPU to buy bandwidth
+Match each to its access pattern. Analytics asks questions like "what was the
+average price by month", which needs two fields out of forty, so columnar reads
+a twentieth of the data. Abadi and colleagues quantified that advantage.
+Columnar also compresses better, because storing similar values next to each
+other gives a compressor more repetition to exploit.
 
-Compressed data moves fewer bytes (over disk or network — often the scarce
-resource) but must be decompressed by the CPU, which is the same CPU the
-pipeline is already starving (lesson 01).
+Training reads whole samples, which is row-shaped, and that is why TFRecord and
+WebDataset are row-oriented containers.
 
-On slow storage, compression wins outright. On a fast local **NVMe** drive —
-an SSD connected straight to the high-speed bus rather than through an older
-disk interface — heavy compression can _invert_ the tradeoff: the drive
-delivers bytes faster than the CPU can inflate them, and decompression becomes
-the new bottleneck stage.
+Tabular machine learning sits awkwardly between the two, because feature
+engineering reads columns and training then reads rows. Parquet's answer is
+**row groups**: apply columnar layout within chunks of rows rather than across
+the whole file. A reader pulling a batch of rows then gets acceptable sequential
+behaviour, and a reader pulling one column still skips most of the file.
 
-That's why pipeline-oriented formats default to cheap, fast codecs (snappy, or
-zstd at low settings — both tuned for decompression speed over maximum size
-reduction) rather than maximum-ratio ones, and use none at all for data that's
-already compressed, like JPEGs. It's a roofline argument with "storage
-bandwidth" on one axis and "decode CPU" on the other — and like every trade in
-this curriculum, it ends with _measure it_ (M2), because the answer flips with
-the hardware.
+The rule to take away is to name the dominant access pattern first. The format
+follows from it rather than the other way round.
 
-## What this laptop teaches
+## Why is one file per sample a disaster?
 
-Lab L4.1's dataset ships both ways — a folder of small files and packed shards
-— and the first exercise is simply timing an epoch of each. The gap (often
-several-fold, even on NVMe) is the whole lesson, felt.
+The obvious layout is one JPEG per image in a folder tree. It is also the worst
+one, for three reasons that compound.
+
+Every file costs a metadata lookup before its first byte arrives. The operating
+system has to locate the file, check permissions, and set up a handle. That is
+work per file rather than per byte, so a million tiny files pay it a million
+times.
+
+Files created separately are placed wherever the filesystem had room, so reading
+them in a shuffled order means a seek per sample rather than a stream.
+
+Cloud object storage bills and rate-limits per request rather than per byte, so
+a million small objects is both slower and more expensive than one large one
+holding the same data.
+
+**Sharding** fixes all three. Pack the samples into a few hundred large archive
+files, called shards. WebDataset uses ordinary `tar` archives; TFRecord uses its
+own framing.
+
+Readers then stream each shard from start to finish, which is the sequential
+case, and the per-file costs are paid a few hundred times rather than a million.
+
+That leaves one problem: training wants randomized order, and streaming a shard
+gives fixed order. The solution approximates randomness with two cheap tricks
+instead of buying it with seeks. Shuffle which shards are read, and in what
+order, each epoch. Then hold a buffer of samples in memory as they stream past
+and draw randomly from that buffer. Neither trick produces true uniform
+shuffling, and the combination is close enough while keeping every read
+sequential.
+
+## When does compressing the data make things slower?
+
+Compression trades one budget for another. Compressed data moves fewer bytes
+across disk or network, and it costs CPU time to expand.
+
+Whether that trade wins depends entirely on which of the two is scarce, and
+lesson 01 already told you the CPU usually is.
+
+On slow or remote storage, compression wins easily, because the bytes saved
+matter far more than the CPU spent.
+
+On a fast local **NVMe** drive, which is a solid-state drive connected directly
+to the high-speed bus, the trade can invert. The drive delivers bytes faster
+than the CPU can decompress them, so decompression becomes the bottleneck stage
+and the pipeline runs slower than it would with uncompressed data.
+
+This is why formats built for training pipelines default to fast codecs such as
+snappy, or zstd at low settings, which are tuned for decompression speed rather
+than for maximum size reduction. It is also why they leave already-compressed
+data such as JPEG alone, since compressing it again spends CPU to save almost
+nothing.
+
+## Check your understanding
+
+Two copies of the same 100,000-image dataset sit on an NVMe drive. Copy A is
+100,000 separate JPEG files in folders. Copy B is 200 tar shards holding the
+same images. You time one epoch of each and copy B finishes several times
+sooner.
+
+Give two distinct reasons, and say what B gives up to get that speed. A correct
+answer names two of: A pays a metadata lookup per file, 100,000 times against
+B's 200; A's files are scattered so shuffled reading becomes a seek per sample
+while B streams each shard sequentially; and per-request costs or rate limits
+apply per file. It then notes that B gives up true random ordering, since it
+approximates shuffling by randomizing shard order and drawing from an in-memory
+buffer rather than reading samples in a genuinely random sequence.
