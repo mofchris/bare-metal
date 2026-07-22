@@ -11,32 +11,37 @@ sources:
   - "Latency Numbers Every Programmer Should Know (Jeff Dean's numbers, via norvig.com/21-days.html)"
 ---
 
-## The one fact this lesson exists for
+## The problem this lesson exists for
 
-A processor can execute an **instruction** — one primitive step of machine
-work, like adding two numbers together — in well under a nanosecond. But
-fetching a value from main memory takes on the order of **100 nanoseconds**,
-and that wait is called **latency**: the time between asking for a value and
-having it in hand. Main memory is the gigabytes of RAM in your laptop — the
-hardware people call **DRAM** — and it sits physically far from the processor,
-on separate chips. If the CPU had to wait for DRAM on every access, it would
-spend roughly 99% of its time doing nothing.
+A processor can perform an **instruction**, meaning one primitive step of
+machine work such as adding two numbers, in well under a nanosecond.
 
-Almost everything strange-looking about hardware is a response to this single
-gap: caches, prefetchers (hardware that notices your access pattern and starts
-fetching the next data before you ask for it), and the shape of fast ML
-**kernels** — a kernel being one routine that does one specific piece of
-arithmetic over arrays, like a matrix multiply. Confusingly it is not the
-operating-system thing of the same name; in this curriculum "kernel" always
-means the maths routine.
+Fetching a value from main memory takes about 100 nanoseconds. Main memory is
+the several gigabytes of RAM in your laptop. Engineers call it **DRAM**, and it
+sits on separate chips a few centimetres from the processor. The time you wait
+between asking for a value and receiving it is called **latency**.
 
-## The hierarchy
+Put those two numbers together. If the processor needed a fresh value from DRAM
+for every instruction, it would spend under 1 nanosecond working and about 100
+nanoseconds waiting. That is roughly 99% of its time doing nothing.
 
-Between the CPU and DRAM sits a ladder of progressively bigger, slower
-memories. **Registers** are the top rung — the handful of bytes the core does
-its arithmetic in, the only place the maths actually happens. Below them sit
-three levels of **cache**, numbered by distance from the core: L1 is closest
-and smallest, L3 furthest and largest.
+No chip designer accepts that. Almost every strange-looking feature of modern
+hardware exists to avoid paying the 100 nanoseconds, and this lesson covers the
+main one.
+
+## What sits between the processor and DRAM?
+
+Hardware designers solved the problem by putting small, fast memories between
+the processor and DRAM, and arranging them in a ladder.
+
+A **register** is the top rung. Registers are tiny pieces of storage inside the
+core itself, holding a handful of bytes, and they are where arithmetic actually
+happens.
+
+Below the registers sit three levels of **cache**. A cache is a small memory
+holding copies of data recently taken from DRAM. The three levels are numbered
+by how close they are to the core: L1 is nearest and smallest, L3 is furthest
+and largest.
 
 | Level     | Typical size (per core)   | Typical latency  |
 | --------- | ------------------------- | ---------------- |
@@ -46,63 +51,85 @@ and smallest, L3 furthest and largest.
 | L3 cache  | 8–36 MB (shared by cores) | ~10–40 ns        |
 | DRAM      | gigabytes                 | ~60–100 ns       |
 
-Sizes and exact latencies vary by chip — what stays constant is the _shape_:
-each level is roughly an order of magnitude slower and much larger than the one
-above it. Your laptop's Core Ultra 7 follows this pattern; lab L1.1 will
-measure where its cliffs actually are.
+Exact sizes and latencies differ between chips. What stays the same is the
+shape of the ladder: each rung down is roughly ten times slower than the rung
+above it, and holds far more data.
 
-A cache holds copies of recently used DRAM data. When the CPU asks for an
-address, hardware checks L1, then L2, then L3; a **hit** means the data was
-found at that level and comes back quickly, a **miss** means it wasn't and the
-request falls through to the next level down. A miss all the way down pays the
-full DRAM price.
+The reason for the trade is physical. Fast memory must be small, because a
+larger memory takes longer to search and sits further from the core, and signals
+travel at a finite speed. You cannot have one memory that is both large and
+fast, so designers build several and stack them.
 
-## Why caching works at all: locality
+Here is how the stack is used. When the core asks for an address, the hardware
+checks L1, then L2, then L3. Finding the data at a level is called a **hit**,
+and the data comes back at that level's speed. Not finding it is a **miss**, and
+the request drops to the next level down. A request that misses every cache pays
+the full 100 nanoseconds to DRAM.
 
-A cache that held random data would be useless — it's tiny compared to DRAM.
-Caches work because real programs are not random:
+## Why does keeping copies help at all?
 
-- **Temporal locality:** something touched recently will likely be touched
-  again soon (a loop counter, a hot function's local variables, a model's
-  weights reused across a batch — more on those words in a moment).
-- **Spatial locality:** after touching an address, a program will likely touch
-  a _neighboring_ address soon (walking an array element by element).
+A cache is thousands of times smaller than DRAM, so it can only ever hold a
+sliver of your data. If programs touched addresses at random, that sliver would
+almost never be the part you wanted, and caches would be pointless.
 
-Hardware exploits spatial locality by never moving single bytes: memory is
-transferred in **cache lines**, typically **64 bytes**. Touch one `float32`
-and the 15 next to it arrive for free. Iterate an array in order and most
-accesses are hits on a line already fetched; jump randomly and every access
-can be a fresh miss — same data, same amount of work, order of magnitude
-difference in how long you actually wait.
+Programs are not random, and the two ways they are predictable have names.
 
-## What this means for ML systems
+**Temporal locality** means that data touched recently is likely to be touched
+again soon. A loop counter is read and written on every iteration. A model's
+weights are used again for every sample in a batch.
 
-Three words first, because the rest of this curriculum leans on them
-constantly. A **model** (or neural network) is a big pile of numbers plus the
-arithmetic that turns an input into an output. The numbers it learns are its
-**weights**, also called its **parameters** — same thing, two names. A
-**tensor** is just a big multi-dimensional array of numbers, which is how
-weights and data are both stored. And a **batch** is a group of samples pushed
-through the model together in one go, rather than one at a time.
+**Spatial locality** means that after touching one address, a program is likely
+to touch a neighbouring address soon. Walking through an array from start to
+finish does exactly this.
 
-With those in hand:
+Hardware exploits spatial locality by refusing to move single bytes. Memory
+travels between DRAM and cache in fixed blocks called **cache lines**, and a
+cache line is typically 64 bytes. A `float32` occupies 4 bytes, and 64 ÷ 4 = 16,
+so asking for one float32 brings 15 of its neighbours along at no extra cost.
 
-- A tensor being just a big array means all of the above applies to it
-  directly. Whether a kernel walks a tensor along the order it's laid out in
-  memory or across that order decides whether it runs at cache speed or DRAM
-  speed — this is why "memory layout" gets a whole discussion in every
-  fast-kernel tutorial, and why matrix-multiply implementations **tile** their
-  loops: chopping the matrices into blocks small enough to stay in cache while
-  they're being reused (much more on that in M8).
-- Reusing data while it's still in cache — batching, and **loop fusion**
-  (doing two operations in one pass over the data instead of two passes) — is
-  temporal locality engineering under another name.
-- When a model or batch stops fitting in cache, performance drops in visible
-  steps — you'll see those steps as measured cliffs in lab L1.1.
+That single fact decides the speed of most loops. Walk an array in order and
+only every sixteenth access is a miss, because the other fifteen were already
+delivered. Jump around randomly and each access can land on a different line, so
+nearly every one is a miss. The two loops perform identical arithmetic on
+identical data, and one of them waits ten times longer.
 
-## Check your intuition
+## What does this mean for machine learning?
 
-Before the quiz: two loops sum the same 4096×4096 float32 matrix. One iterates
-row by row (the order it's laid out in memory), the other column by column.
-Both do 16.7 million additions. Why is the second one several times slower? If
-your answer mentions cache lines going to waste, you have the idea.
+Four terms first, because the rest of the curriculum uses them constantly.
+
+A **model**, also called a neural network, is a large collection of numbers
+together with the arithmetic that turns an input into an output. The numbers a
+model learns are its **weights**, also called its **parameters**; the two words
+mean the same thing. A **tensor** is a large multi-dimensional array of numbers,
+and it is how both weights and input data are stored. A **batch** is a group of
+samples pushed through the model together instead of one at a time.
+
+Now apply the lesson. A tensor is an array, so everything above governs it
+directly.
+
+A tensor has a layout, meaning the order its elements are arranged in memory.
+Reading a tensor along its layout gives you spatial locality and mostly hits.
+Reading across the layout gives you a miss on nearly every element. This is why
+tutorials on fast numerical code spend so long on memory layout.
+
+Matrix multiplication shows the same principle at a larger scale. Implementations
+**tile** their loops, meaning they cut the matrices into blocks small enough to
+sit in cache, then finish all the work on one block before moving on. Each loaded
+block is reused many times while it is still fast to reach, which is temporal
+locality applied deliberately.
+
+Batching is the same idea again. Loading a weight once and using it for 32
+samples spreads the cost of that load across 32 pieces of useful work.
+
+## Check your understanding
+
+Two loops add up every element of the same 4096×4096 float32 matrix. The matrix
+is stored row by row in memory. Loop A walks it row by row. Loop B walks it
+column by column. Both perform 16.7 million additions on the same numbers, yet
+Loop B takes several times longer.
+
+Explain the difference in terms of cache lines. A correct answer says that each
+64-byte line holds 16 consecutive float32 values from one row, that Loop A uses
+all 16 before needing another line, and that Loop B uses 1 value from each line
+before jumping to a different row, so it discards 15 of every 16 bytes it made
+DRAM deliver.
