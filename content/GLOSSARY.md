@@ -89,6 +89,15 @@ the drift this ledger prevents:
 | CPU affinity (thread pinning; NOT m4/02 pinned memory) | m6/04          | restricting which cores the scheduler may run a thread on                                                                |
 | hyper-threading                                        | m6/04          | one physical core presented as two logical ones sharing execution units and L1/L2                                        |
 | performance counters, IPC                              | m6/05          | hardware event counts; IPC near 0.3 on a superscalar core means mostly stalled                                           |
+| eager execution                                        | m8/01          | each operation runs the moment Python reaches it and returns a real result                                               |
+| dispatcher                                             | m8/01          | routes one operation to the right compiled kernel by dtype, device and autograd state                                    |
+| shape, strides                                         | m8/02          | shape = size per dimension; a stride = elements to step to move one along a dimension                                    |
+| view, contiguous                                       | m8/02          | a tensor sharing storage via different shape/strides; contiguous = a real row-major copy                                 |
+| broadcasting                                           | m8/02          | combining tensors by repeating along size-1 dimensions                                                                   |
+| no_grad, inference_mode                                | m8/03          | stop recording the tape; inference_mode also drops per-tensor autograd tracking                                          |
+| tracing vs scripting                                   | m8/04          | record one execution (bakes in the branch taken) vs analyse source (keeps control flow)                                  |
+| graph break                                            | m8/04          | where torch.compile stops the graph and runs a piece eagerly; limits optimization scope                                  |
+| export                                                 | m8/04          | taking a graph out of PyTorch to a runtime with no Python fallback (M10)                                                 |
 | shard                                                  | m4/03          | one large archive file packing many samples, read as a stream                                                            |
 
 ## ML terms

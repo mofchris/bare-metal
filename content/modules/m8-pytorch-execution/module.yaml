@@ -1,0 +1,14 @@
+# M8 — The PyTorch execution model. Outline: docs/CURRICULUM.md.
+# Needs M5's tape before inference_mode means anything, and M1's cache lines
+# before strides do. Unblocks M10 (export), M11 (profiling) and M13 (the
+# Python/C++ boundary).
+id: m8-pytorch-execution
+title: "The PyTorch execution model"
+prereqs:
+  - m5-training-mechanics
+lessons:
+  - 01-eager-execution
+  - 02-tensors-shapes-strides
+  - 03-turning-the-tape-off
+  - 04-compilation-and-export
+  - 05-reproducibility

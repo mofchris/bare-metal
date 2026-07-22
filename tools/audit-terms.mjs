@@ -74,6 +74,8 @@ const SKIP = new Set([
   "generalization",
   "process",
   "page",
+  "shape",
+  "contiguous",
 ]);
 
 const findings = [];

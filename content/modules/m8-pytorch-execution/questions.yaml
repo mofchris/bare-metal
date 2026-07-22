@@ -1,0 +1,504 @@
+# M8 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
+
+# ---- Lesson 01: eager execution ----
+
+- id: m8/q-001
+  lesson: m8/01-eager-execution
+  type: mcq
+  prompt: "What does it mean that PyTorch runs in eager mode by default?"
+  options:
+    - "It compiles the whole model before running anything"
+    - "Each operation executes the moment your Python reaches it and returns a real result"
+    - "It runs operations on the GPU whenever possible"
+    - "It waits until you call backward before computing anything"
+  answer: 1
+  explanation: >-
+    Eager means nothing is deferred: `c = a + b` computes c right there, and
+    printing it shows numbers rather than a promise. The alternative, graph mode,
+    records operations without running them and executes the description later,
+    which is what M5's tape does for the forward pass. Eager is why a model is
+    ordinary debuggable Python.
+  tags: [pytorch, eager]
+
+- id: m8/q-002
+  lesson: m8/01-eager-execution
+  type: mcq
+  prompt: >-
+    Beyond the arithmetic, what does calling one PyTorch operation like a + b
+    actually cost?
+  options:
+    - "Nothing measurable; the addition is the only cost"
+    - "A few microseconds of overhead per operation, to work out the operation, choose an implementation, and record the tape"
+    - "A full millisecond, regardless of tensor size"
+    - "The cost depends only on the tensor's data type"
+  answer: 1
+  explanation: >-
+    Python must resolve that + means torch.add, PyTorch must select an
+    implementation based on dtype, device and whether gradients are tracked, and
+    if they are the tape records the operation. That surrounding work is a few
+    microseconds, which is thousands of cycles at 3 GHz. For a large tensor the
+    arithmetic dwarfs it; for a small one the overhead can exceed the work.
+  tags: [pytorch, overhead]
+
+- id: m8/q-003
+  lesson: m8/01-eager-execution
+  type: mcq
+  prompt: >-
+    Ten operations on million-element tensors versus ten thousand operations on
+    thousand-element tensors, doing similar total arithmetic. Why does the
+    second perform worse?
+  options:
+    - "It uses more memory"
+    - "It pays PyTorch's per-operation overhead a thousand times more often, on operations too small to use the hardware well"
+    - "Smaller tensors have worse cache behaviour per element"
+    - "The arithmetic is not actually similar"
+  answer: 1
+  explanation: >-
+    The cost driver is the number of dispatched operations, not their individual
+    speed. Many tiny operations pay the fixed per-operation overhead over and
+    over and give the hardware too little work each time to run efficiently. This
+    is why the fix for slow model code is usually to do the same work in fewer,
+    larger operations rather than to speed up each one.
+  tags: [pytorch, overhead]
+
+- id: m8/q-004
+  lesson: m8/01-eager-execution
+  type: short
+  prompt: >-
+    The part of PyTorch that routes one operation to the correct concrete
+    implementation, based on the tensors' dtype, device and autograd state.
+    What is it called? (one word)
+  accept:
+    - "dispatcher"
+    - "the dispatcher"
+    - "dispatch"
+  explanation: >-
+    The dispatcher. It sends torch.add to a CPU implementation for CPU tensors, a
+    CUDA one for GPU tensors, and different paths again when autograd is recording
+    or the tensors are quantized. This is why the same code runs on CPU and GPU
+    unchanged, and the routing is part of the per-operation overhead.
+  tags: [pytorch, dispatcher]
+
+- id: m8/q-005
+  lesson: m8/01-eager-execution
+  type: mcq
+  prompt: >-
+    Using M1's vocabulary, what does the dispatcher ultimately run for one
+    operation, and why does that matter later?
+  options:
+    - "A Python function; it matters for debugging"
+    - "A compiled routine called a kernel, which is what M11 measures at operator level"
+    - "A new process; it matters for the GIL"
+    - "A cache line; it matters for bandwidth"
+  answer: 1
+  explanation: >-
+    One dispatched operation runs one compiled implementation, and M1's word for
+    a compiled routine doing one piece of array work is a kernel. So "PyTorch
+    called a kernel" means the dispatcher selected and ran a concrete
+    implementation. When M11 profiles operator-level time, those kernels are
+    exactly what it attributes time to.
+  tags: [pytorch, dispatcher, kernels]
+
+# ---- Lesson 02: tensors, shapes, strides ----
+
+- id: m8/q-006
+  lesson: m8/02-tensors-shapes-strides
+  type: mcq
+  prompt: "A tensor is multi-dimensional but memory is a one-dimensional line of bytes. What bridges the gap?"
+  options:
+    - "The tensor is stored as nested arrays, one per dimension"
+    - "Flat contiguous storage plus shape and strides, where a stride is how many elements to step to move one along a dimension"
+    - "A hash table mapping indices to addresses"
+    - "The GPU handles multi-dimensional memory natively"
+  answer: 1
+  explanation: >-
+    The numbers sit in one flat run, and shape plus strides say how to read it as
+    rows and columns. For a 3-by-4 matrix stored row by row, moving one column is
+    1 element forward so the column stride is 1, and moving one row skips 4
+    elements so the row stride is 4. The flat position of [i, j] is just
+    i * 4 + j, which is all a library does to turn an index into an address.
+  tags: [pytorch, strides]
+
+- id: m8/q-007
+  lesson: m8/02-tensors-shapes-strides
+  type: mcq
+  prompt: "Why can transposing a matrix be effectively instant and use no extra memory?"
+  options:
+    - "The framework copies the data very quickly"
+    - "It swaps the shape and strides and leaves the flat storage untouched, producing a view onto the same numbers"
+    - "Transposes are computed lazily and never actually happen"
+    - "The GPU transposes in hardware"
+  answer: 1
+  explanation: >-
+    Transposing swaps shape from (3, 4) to (4, 3) and strides from (4, 1) to
+    (1, 4), so the same numbers in the same memory are now read in the other
+    order by the index formula. A tensor sharing another's storage with different
+    shape or strides is a view. The catch is that a view is a second window onto
+    the same numbers, so writing through one changes what the other sees.
+  tags: [pytorch, views]
+
+- id: m8/q-008
+  lesson: m8/02-tensors-shapes-strides
+  type: short
+  prompt: >-
+    An operation needs its input laid out in plain row-by-row order, so you call
+    .______() to physically copy the elements into that order. (one word)
+  accept:
+    - "contiguous"
+    - ".contiguous"
+    - "contiguous()"
+  explanation: >-
+    contiguous. A transposed tensor is a view whose storage is still in the
+    original order, so some operations demand a contiguous copy first. The cost
+    the free transpose deferred is paid here, as an actual rearrangement into
+    fresh storage. This is why a profile sometimes shows time inside a copy you
+    never wrote.
+  tags: [pytorch, contiguous]
+
+- id: m8/q-009
+  lesson: m8/02-tensors-shapes-strides
+  type: mcq
+  prompt: >-
+    You transpose a row-major matrix instantly, then read the result row by row
+    and find it several times slower than reading the original. Why?
+  options:
+    - "The transpose secretly copied the data"
+    - "The storage is still in the original order, so reading the transpose walks memory with a large stride and wastes most of each cache line"
+    - "Transposed tensors are stored in slower memory"
+    - "The framework adds overhead to transposed reads"
+  answer: 1
+  explanation: >-
+    The transpose changed only the bookkeeping, so the flat storage is untouched.
+    Reading the transposed tensor row by row now steps through memory with the
+    old row stride, and M1/01 priced exactly this: a large-stride walk uses one
+    element per cache line and discards the rest. The data is identical; only the
+    access order changed.
+  tags: [pytorch, strides, memory]
+
+- id: m8/q-010
+  lesson: m8/02-tensors-shapes-strides
+  type: mcq
+  prompt: >-
+    An operation combines a (3, 1) and a (1, 4) tensor and returns a (3, 4)
+    result instead of raising an error. What happened, and why is it worth
+    watching?
+  options:
+    - "A bug in the framework; it should have errored"
+    - "Broadcasting repeated each along its size-1 dimension, which is convenient but can turn a genuine shape bug into a silently wrong answer"
+    - "The tensors were automatically transposed to match"
+    - "The result should have been (1, 1)"
+  answer: 1
+  explanation: >-
+    Broadcasting lets tensors combine by repeating along size-1 dimensions, which
+    is often what you want. The hazard is that it can also make an operation
+    succeed on shapes that were wrong by accident, producing a plausible result
+    rather than an error. When a result has an unexpected shape, broadcasting is
+    the first thing to suspect, and printing shapes is the fastest check.
+  tags: [pytorch, broadcasting]
+
+# ---- Lesson 03: turning the tape off ----
+
+- id: m8/q-011
+  lesson: m8/03-turning-the-tape-off
+  type: mcq
+  prompt: >-
+    Why is leaving autograd on during inference pure waste?
+  options:
+    - "It changes the model's outputs"
+    - "The tape records every operation and pins every activation for a backward pass that will never be called"
+    - "It runs the model on the wrong device"
+    - "It disables the dispatcher"
+  answer: 1
+  explanation: >-
+    At inference there is no backward pass, but the tape cannot know that, so it
+    still records operations and still keeps activations alive as M5 described.
+    Both are wasted. The memory half bites hardest: M5/02 showed activations grow
+    with depth times batch size, so an evaluation loop with the tape on pays that
+    growth for nothing.
+  tags: [pytorch, autograd, inference]
+
+- id: m8/q-012
+  lesson: m8/03-turning-the-tape-off
+  type: mcq
+  prompt: "What does torch.no_grad() do?"
+  options:
+    - "It moves tensors to the GPU"
+    - "It stops recording operations onto the tape, so activations are freed as soon as the next operation is done with them"
+    - "It makes the model deterministic"
+    - "It converts the model to fp16"
+  answer: 1
+  explanation: >-
+    Inside a no_grad block the operations run and produce the same numbers, but
+    nothing is saved for a backward pass, so the activations training would pin
+    are released immediately. The saving is mostly memory, since the
+    depth-times-batch growth from M5/02 does not happen, with a smaller compute
+    saving from skipping the tape bookkeeping.
+  tags: [pytorch, no-grad]
+
+- id: m8/q-013
+  lesson: m8/03-turning-the-tape-off
+  type: mcq
+  prompt: "How does torch.inference_mode() go further than torch.no_grad()?"
+  options:
+    - "It also moves computation to the GPU"
+    - "It promises its tensors will never take part in autograd, letting PyTorch drop per-tensor version tracking, not just skip recording"
+    - "It automatically reduces precision to fp16"
+    - "It is simply a newer name for the same thing"
+  answer: 1
+  explanation: >-
+    no_grad stops recording but still maintains the per-tensor bookkeeping, like
+    version counters, because a tensor made under no_grad might later be used with
+    gradients on. inference_mode makes the stronger promise that its tensors stay
+    out of autograd for good, which lets PyTorch drop that tracking entirely. It
+    is faster, and stricter: its tensors cannot later enter a training
+    computation.
+  tags: [pytorch, inference-mode]
+
+- id: m8/q-014
+  lesson: m8/03-turning-the-tape-off
+  type: mcq
+  prompt: >-
+    An evaluation path only ever does inference and never feeds its outputs back
+    into training. Which tool is right?
+  options:
+    - "no_grad, because inference_mode is only for GPUs"
+    - "inference_mode, because the path never needs its tensors in an autograd graph"
+    - "Neither; evaluation should keep the tape on"
+    - "Whichever, since they are identical in effect"
+  answer: 1
+  explanation: >-
+    inference_mode is the correct tool for a pure inference or evaluation path,
+    because it can make the stronger promise and reap the extra saving. Use
+    no_grad, or nothing, only when the outputs must re-enter a graph that computes
+    gradients, since a tensor produced under inference_mode cannot later be used
+    in a training computation and will raise if you try.
+  tags: [pytorch, inference-mode]
+
+- id: m8/q-015
+  lesson: m8/03-turning-the-tape-off
+  type: mcq
+  prompt: >-
+    An evaluation loop works on batches of 8 in development but hits
+    out-of-memory on batches of 64 in production; the same forward pass at batch
+    64 works during training. What is wrong?
+  options:
+    - "The production machine has less memory"
+    - "The loop never disables autograd, so it pins every activation with nothing freeing them, and activation memory scales with batch size"
+    - "Batch 64 is simply too large for any model"
+    - "The model weights differ between environments"
+  answer: 1
+  explanation: >-
+    With the tape on, every evaluation batch's activations are pinned as if a
+    backward pass were coming, and M5/02 showed that memory grows with batch size,
+    so batch 64 holds eight times batch 8's. Training works at batch 64 because
+    there the activations are actually consumed by backward. Wrapping the loop in
+    inference_mode frees them, with no change to model or batch size.
+  tags: [pytorch, inference, memory]
+
+# ---- Lesson 04: compilation and export ----
+
+- id: m8/q-016
+  lesson: m8/04-compilation-and-export
+  type: mcq
+  prompt: "Why is capturing a reusable graph from eager code harder than it sounds?"
+  options:
+    - "Eager code runs too fast to observe"
+    - "An eager model can do things that depend on the actual input, like a data-dependent branch, which a single static graph cannot express"
+    - "Graphs cannot represent matrix multiplication"
+    - "Python is too slow to trace"
+  answer: 1
+  explanation: >-
+    The tape works because it records only one real execution. A graph you want
+    to reuse must represent computation for unseen inputs, but a model with
+    `if x.sum() > 0` has two paths, not one, and a loop running x.shape[0] times
+    does different work per input. Capture is an attempt to pin down something
+    deliberately left dynamic, which is why the tools differ in how they handle
+    the parts that will not pin down.
+  tags: [pytorch, graph-capture]
+
+- id: m8/q-017
+  lesson: m8/04-compilation-and-export
+  type: mcq
+  prompt: >-
+    You trace a model whose example input took the true branch of an if. What
+    does the trace contain?
+  options:
+    - "Both branches, chosen at runtime"
+    - "Only the true branch, which it will then use for every future input"
+    - "Neither branch; tracing skips control flow"
+    - "An error, because tracing rejects branches"
+  answer: 1
+  explanation: >-
+    Tracing records the operations that actually executed for the example, so it
+    bakes in the path the example took and silently uses it for all inputs,
+    including those that should take the other branch. The trace is not wrong
+    about what it saw; it is wrong to assume what it saw is the whole model. This
+    is why data-dependent branches should be scripted, not traced.
+  tags: [pytorch, tracing]
+
+- id: m8/q-018
+  lesson: m8/04-compilation-and-export
+  type: short
+  prompt: >-
+    When torch.compile meets Python it cannot put in the graph, it stops the
+    graph, runs that piece eagerly, and starts a new graph. What is that
+    stopping point called? (two words)
+  accept:
+    - "graph break"
+    - "a graph break"
+    - "graph breaks"
+  explanation: >-
+    A graph break. The model still runs correctly because the awkward piece runs
+    eagerly; what you lose is optimization scope, since the compiler can only
+    optimize within each unbroken graph. A model chopped into many small graphs by
+    many breaks gets far less benefit than one captured whole, so removing a break
+    can matter more than any other change.
+  tags: [pytorch, torch-compile]
+
+- id: m8/q-019
+  lesson: m8/04-compilation-and-export
+  type: mcq
+  prompt: >-
+    Why is the speedup from torch.compile not a fixed property of a model?
+  options:
+    - "It depends on the phase of the moon"
+    - "It depends on how much of the model can be captured into large graphs, which depends on how much data-dependent Python sits in the hot path"
+    - "It depends only on the batch size"
+    - "It is fixed; every model gets the same speedup"
+  answer: 1
+  explanation: >-
+    Graph breaks limit the compiler to optimizing within each unbroken graph, so
+    the benefit scales with how much of the hot path can be captured whole. A
+    model with data-dependent branches in its inner loop breaks into many small
+    graphs and gains little; the same model restructured to remove those breaks
+    can gain far more. The number is a property of the code's structure, not the
+    model.
+  tags: [pytorch, torch-compile]
+
+- id: m8/q-020
+  lesson: m8/04-compilation-and-export
+  type: mcq
+  prompt: >-
+    A model runs fine eagerly and even compiles with a few graph breaks, but
+    fails to export. Why is export stricter?
+  options:
+    - "Export runs the model twice as fast, exposing bugs"
+    - "An exported graph runs where there is no Python to fall back to, so every operation must be in the graph or export fails"
+    - "Export requires a GPU"
+    - "Export only supports models under a certain size"
+  answer: 1
+  explanation: >-
+    A graph break can fall back to eager Python because Python is still present.
+    Export takes the graph out of PyTorch into a format another runtime loads and
+    runs with no Python, so there is nothing to fall back to and every operation
+    must be captured. This is why export surfaces problems the other tools
+    tolerated, such as an operation with no equivalent in the target format. M10
+    is about the other side of that boundary.
+  tags: [pytorch, export]
+
+# ---- Lesson 05: reproducibility ----
+
+- id: m8/q-021
+  lesson: m8/05-reproducibility
+  type: mcq
+  prompt: >-
+    Why does setting one seed usually fail to make a training run reproducible?
+  options:
+    - "Seeds expire after a few minutes"
+    - "There are several independent sources of randomness and several generators, and one seed controls only one of them"
+    - "PyTorch ignores seeds by default"
+    - "Reproducibility requires a GPU"
+  answer: 1
+  explanation: >-
+    Weight initialization, data shuffling, augmentation and techniques like
+    dropout are independent random sources, and PyTorch, NumPy and Python each
+    have their own generator. Setting PyTorch's seed leaves NumPy's untouched, so
+    augmentation written with NumPy stays random. Controlling randomness means
+    seeding every generator the code uses, which is why recipes set three or four
+    seeds.
+  tags: [pytorch, reproducibility]
+
+- id: m8/q-022
+  lesson: m8/05-reproducibility
+  type: mcq
+  prompt: >-
+    You seed every generator perfectly and still get slightly different bits
+    across runs on the same machine. What causes it?
+  options:
+    - "A hidden random source you missed"
+    - "Floating-point addition is not associative, and parallel code can sum contributions in a run-varying order"
+    - "The seed was too small"
+    - "Cosmic rays flipping bits"
+  answer: 1
+  explanation: >-
+    This is not randomness at all. M3/04 showed (a + b) + c need not equal
+    a + (b + c), and that parallel sums group terms differently than sequential
+    ones. Many operations run parallel code that may sum in whatever order the
+    hardware scheduling produces, which can vary run to run, giving different
+    rounding and different bits. PyTorch's deterministic-algorithms flag fixes the
+    order, at a cost in speed.
+  tags: [pytorch, reproducibility, numerics]
+
+- id: m8/q-023
+  lesson: m8/05-reproducibility
+  type: mcq
+  prompt: >-
+    Seed-identical code with deterministic flags set still gives different bits
+    on a different machine. Why?
+  options:
+    - "The other machine is faulty"
+    - "Deterministic mode fixes the reduction order for a given hardware configuration, not across different core counts or CPU-versus-GPU decompositions"
+    - "Seeds are machine-specific"
+    - "Different machines use different random number algorithms"
+  answer: 1
+  explanation: >-
+    The same operation is summed in a different order on a different number of
+    cores, or on a GPU versus a CPU, because the parallel decomposition differs.
+    Deterministic mode pins the order for one configuration, so it cannot promise
+    bit-identity across configurations. GPUs add a further layer, since libraries
+    may pick different algorithms per hardware or via autotuning, each summing
+    differently.
+  tags: [pytorch, reproducibility]
+
+- id: m8/q-024
+  lesson: m8/05-reproducibility
+  type: mcq
+  prompt: >-
+    What is the honest reproducibility guarantee to make for a reported result?
+  options:
+    - "Bit-identical results on any machine"
+    - "That a re-run with the same code, seeds and recorded environment lands within the run-to-run spread the result already states"
+    - "That the result never changes under any conditions"
+    - "That anyone can get the exact same final loss to full precision"
+  answer: 1
+  explanation: >-
+    Bit-identity anywhere is not achievable in general, so promising it is a claim
+    you cannot keep (M7). The truthful guarantee restates M2's discipline: you
+    measured a distribution with a spread, and reproducing the result means a
+    re-run falls inside that spread. For an experiment about a difference between
+    conditions, a re-run showing the same large non-overlapping effect has
+    reproduced it, even if the medians differ in the third digit.
+  tags: [pytorch, reproducibility, results]
+
+- id: m8/q-025
+  lesson: m8/05-reproducibility
+  type: mcq
+  prompt: >-
+    Two runs of seed-set code on the same laptop give final losses differing in
+    the fourth decimal. A colleague calls it a bug. What is the right response?
+  options:
+    - "Agree, and search for the bug in the training loop"
+    - "Explain it is expected: the seed controls the draws but not the parallel summation order, and disclose seeds, versions, hardware and whether deterministic mode was on"
+    - "Re-run until two match by chance"
+    - "Switch to fp64 to remove all randomness"
+  answer: 1
+  explanation: >-
+    A fourth-decimal difference with seeds set is the expected consequence of
+    non-associative floating-point addition under run-varying parallel order, not
+    a bug, and other generators may also be unseeded. Enabling deterministic mode
+    and seeding everything would approach bit-identity at a speed cost, with some
+    operations lacking a deterministic implementation. The real obligation is
+    disclosure of the environment, so a reader knows which rung of the hierarchy
+    the result sits on.
+  tags: [pytorch, reproducibility]
