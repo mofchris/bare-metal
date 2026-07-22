@@ -765,6 +765,13 @@ article h2,
   text-align: right;
 }
 
+/* The locked variant is a sentence, not a link — it reads left like prose. */
+.next-lesson.next-locked {
+  text-align: left;
+  color: var(--ink-dim);
+  font-size: 0.9rem;
+}
+
 /* ---------------- quiz ---------------- */
 
 .btn {

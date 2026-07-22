@@ -5,7 +5,14 @@
 import { questionCountFor, type LessonLocation } from "../lib/lookup";
 import { lessonHref, quizHref } from "../lib/route";
 
-export function LessonView({ location }: { location: LessonLocation }) {
+export function LessonView({
+  location,
+  nextUnlocked,
+}: {
+  location: LessonLocation;
+  /** False when the next lesson still needs this lesson's quiz (D-023). */
+  nextUnlocked: boolean;
+}) {
   const { module, lesson, next } = location;
   const questionCount = questionCountFor(module, lesson.id);
   return (
@@ -47,11 +54,19 @@ export function LessonView({ location }: { location: LessonLocation }) {
             ))}
           </ul>
         </div>
-        {next && (
-          <p class="next-lesson">
-            Next: <a href={lessonHref(next.id)}>{next.title}</a>
-          </p>
-        )}
+        {next &&
+          (nextUnlocked ? (
+            <p class="next-lesson">
+              Next: <a href={lessonHref(next.id)}>{next.title}</a>
+            </p>
+          ) : (
+            // Offering a link here used to walk the reader straight past the
+            // quiz (D-023). Name what's next, but make the quiz the only door.
+            <p class="next-lesson next-locked">
+              Next: <span class="locked-title">{next.title}</span> — locked until you pass
+              this lesson's quiz.
+            </p>
+          ))}
       </footer>
     </article>
   );

@@ -11,9 +11,10 @@
 // swallowed.
 
 import { useEffect, useState } from "preact/hooks";
-import type { Question } from "../lib/curriculum";
+import type { Lesson, Question } from "../lib/curriculum";
 import { gradeResponse, type QuizResponse } from "../lib/quiz";
 import { PASS_MARK } from "../lib/gating";
+import { lessonHref } from "../lib/route";
 import type { ProgressDb } from "../lib/progress-store";
 
 interface QuizProps {
@@ -27,6 +28,8 @@ interface QuizProps {
   markDoneLessonId?: string;
   /** Module exams pass their module id: completing records the exam result. */
   examModuleId?: string;
+  /** The lesson this quiz unlocks, so passing can offer it directly. */
+  next?: Lesson | null;
 }
 
 interface AnsweredQuestion {
@@ -43,6 +46,7 @@ export function Quiz({
   db,
   markDoneLessonId,
   examModuleId,
+  next,
 }: QuizProps) {
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   // "answering" → inputs live; "feedback" → result + explanation shown.
@@ -114,6 +118,7 @@ export function Quiz({
         saveError={saveError}
         markDoneLessonId={markDoneLessonId}
         examModuleId={examModuleId}
+        next={next}
       />
     );
   }
@@ -253,6 +258,7 @@ function Summary({
   saveError,
   markDoneLessonId,
   examModuleId,
+  next,
 }: {
   backHref: string;
   backLabel: string;
@@ -262,10 +268,12 @@ function Summary({
   saveError: string | null;
   markDoneLessonId?: string;
   examModuleId?: string;
+  next?: Lesson | null;
 }) {
   const correctCount = answered.filter((a) => a.correct).length;
   const scorePct = Math.round((correctCount / answered.length) * 100);
   const gated = markDoneLessonId !== undefined || examModuleId !== undefined;
+  const passed = gated && scorePct >= PASS_MARK;
   const [statusError, setStatusError] = useState<string | null>(null);
 
   // Completing a run records its outcome — once, on first render of the
@@ -327,7 +335,21 @@ function Summary({
         </p>
       )}
       <div class="quiz-actions">
-        <button class="btn" onClick={onRestart}>
+        {/* Passing used to only ANNOUNCE that the next step was open, leaving
+            the reader to go and find it. Offer the step itself, and make it
+            the loud button — on a pass, moving on is the point; retrying is
+            the afterthought. On a fail that ordering flips. */}
+        {passed && next && (
+          <a class="btn" href={lessonHref(next.id)}>
+            Next lesson: {next.title} →
+          </a>
+        )}
+        {passed && examModuleId && (
+          <a class="btn" href="#/">
+            Back to modules — the next one is open →
+          </a>
+        )}
+        <button class={passed ? "btn btn-quiet" : "btn"} onClick={onRestart}>
           Retry quiz
         </button>
         <a href={backHref}>Back to {backLabel}</a>

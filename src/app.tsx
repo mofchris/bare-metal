@@ -213,19 +213,28 @@ function Screen({
       return null;
     };
     return (
-      <Gated db={db} check={lessonGate}>
-        {route.screen === "quiz" ? (
-          <Quiz
-            title={location.module.title}
-            backHref={lessonHref(location.lesson.id)}
-            backLabel={location.lesson.title}
-            questions={questionsFor(location.module, location.lesson.id)}
-            db={db}
-            markDoneLessonId={location.lesson.id}
-          />
-        ) : (
-          <LessonView location={location} />
-        )}
+      <Gated db={db} gateKey={`${route.screen}:${location.lesson.id}`} check={lessonGate}>
+        {({ statuses }) =>
+          route.screen === "quiz" ? (
+            <Quiz
+              title={location.module.title}
+              backHref={lessonHref(location.lesson.id)}
+              backLabel={location.lesson.title}
+              questions={questionsFor(location.module, location.lesson.id)}
+              db={db}
+              markDoneLessonId={location.lesson.id}
+              next={location.next}
+            />
+          ) : (
+            <LessonView
+              location={location}
+              nextUnlocked={
+                location.next !== null &&
+                lessonUnlocked(location.module, location.next.id, statuses)
+              }
+            />
+          )
+        }
       </Gated>
     );
   }
@@ -244,6 +253,7 @@ function Screen({
     return (
       <Gated
         db={db}
+        gateKey={`exam:${module.id}`}
         check={(statuses, exams) => {
           if (!moduleUnlocked(module, exams)) {
             return `This module is locked. Pass the previous module's exam (${PASS_MARK}%) to open it.`;
