@@ -10,77 +10,141 @@ sources:
   - "Hennessy & Patterson, Computer Architecture: A Quantitative Approach, 6th ed., ch. 4 (data-level parallelism, GPUs)"
 ---
 
-## Two answers to the same problem
+## What this lesson answers
 
-Lesson 01 posed the problem: memory is ~100× slower than arithmetic. The CPU
-lessons showed one answer — **hide the wait for a single thread**. A **thread**
-is one independent sequence of instructions the hardware runs; your Python
-program is one. Big caches, branch prediction, and out-of-order execution all
-spend silicon (transistors, chip area, power) to keep _one_ such sequence
-unblocked. Call that a **latency machine**.
+Lessons 01 to 04 described one way to build a fast processor. There is a second
+way, and it is the one machine learning actually runs on. It starts from the
+same problem as the first and reaches the opposite conclusion.
 
-The GPU gives the opposite answer: **don't hide the wait — outnumber it**.
-Instead of a handful of heavyweight cores, provide tens of thousands of simple
-execution lanes and keep _far more threads resident than lanes_ — "resident"
-meaning loaded onto the chip with their state ready to go, waiting for a turn.
-When a group of threads stalls on memory, the scheduler swaps in another group
-in a single cycle. With enough threads in flight, the memory latency is still
-there — it's just always someone else's problem. Call that a **throughput
-machine**: each individual thread runs _slower_ than on a CPU; the aggregate
-runs orders of magnitude faster.
+This lesson explains what that opposite conclusion is, and why the work of
+training a model happens to suit it so well.
 
-The general word for a chip like this, bought specifically to do the maths
-faster than a CPU could, is an **accelerator** — GPUs are the common case, but
-the term also covers TPUs, NPUs, and the rest. You'll see it used generically
-from M2 onward.
+## What were the CPU's tricks actually buying?
 
-## SIMT: how the lanes are organized
+The problem from lesson 01 was that memory takes about 100 nanoseconds while
+the core wants a value every cycle. Every CPU technique you have met is an
+answer to it.
 
-GPU threads execute in fixed lockstep groups — NVIDIA calls a group of **32
-threads a warp** — all running the same instruction at the same time on
-different data. That's **SIMT**: single instruction, multiple threads. It's
-lesson 02's SIMD wearing a thread costume, and the costume has a price: if
-threads in a warp take different `if` branches, the warp runs _both_ paths
-with the non-participating lanes switched off and their results discarded.
-Divergent, branchy code can waste most of the machine. Regular, uniform code —
-"do the same arithmetic to every element of this tensor" — wastes none of it.
+Caches keep recently used data close so the wait usually does not happen.
+Out-of-order execution finds other instructions to run during a wait that does
+happen. Branch prediction keeps the pipeline fed across an `if`.
 
-## The memory side is also built for throughput
+Notice what all three have in common. They spend transistors and chip area on
+making **one thread** run without stopping. A thread is one independent
+sequence of instructions; your Python program is one thread. A processor built
+this way is a **latency machine**, because its silicon is spent shortening or
+hiding the wait faced by a single sequence of work.
 
-GPU memory (**HBM**, high-bandwidth memory, on datacenter parts) delivers on
-the order of **1–3 TB/s** — terabytes per second, a thousand GB/s each, so ten
-to thirty times a laptop's ~100 GB/s. The roofline from lesson 04 applies
-unchanged, just with bigger numbers: a card with 50 TFLOPS of fp32 (tera =
-trillion, so 50 trillion operations per second) and 2 TB/s of bandwidth has
-its ridge point at 25 FLOPs/byte. Higher peaks, same physics, same plot — and
-still, elementwise ops sit memory-bound even on an H100, NVIDIA's flagship
-datacenter GPU. There is no hardware where low arithmetic intensity is free.
+That approach has a cost. Caches, reorder buffers and predictors occupy most of
+a modern CPU core's area, so a chip only has room for a handful of cores.
 
-## Why ML and GPUs found each other
+## What does a GPU do instead?
 
-A training step is dominated by matrix multiplies over big tensors: enormous,
-regular, branch-free, **data-parallel** work — meaning the same operation
-applied to many data elements that don't depend on each other — with reuse
-that scales with size (lesson 03). That is _exactly_ the shape a throughput
-machine wants. The fit is so good that modern GPUs grew dedicated matmul
-hardware (**tensor cores**, execution units that do a small matrix multiply as
-a single instruction) — covered properly in M8.
+A GPU accepts the wait rather than hiding it, and covers it with sheer numbers.
 
-And the mirror image — what does NOT fit: branchy sequential logic, small
-irregular workloads, anything without enough parallel work to keep tens of
-thousands of lanes busy. Consider a **large language model** (LLM) writing
-text: it emits one **token** at a time — a token being a chunk of text, very
-roughly a word-piece — and each one requires reading the entire model to
-produce. That step is called **decode**, and a batch of one token being
-decoded has painfully little parallel work in it, which is a preview of why
-inference serving (M7) is its own discipline.
+The design drops the expensive machinery. Without large caches, deep reorder
+buffers and elaborate predictors, each execution lane becomes small, so tens of
+thousands of lanes fit on one chip.
 
-## Where this leaves you
+The GPU then keeps far more threads loaded than it has lanes to run them on.
+Threads in this state are called **resident**, meaning their working values are
+already held on the chip and ready to go.
 
-You now hold the complete mental frame of M1: a memory hierarchy fighting a
-100× gap (L01), a latency machine's tricks (L02), three budgets and the
-exchange rate between them (L03), the one plot that unifies them (L04), and
-the throughput machine that bets everything on parallelism (L05). M8 opens
-the GPU up properly — memory coalescing, occupancy, kernel anatomy. Until
-then, every lab in the next modules runs on the latency machine in front of
-you, where honest measurement is possible.
+Now the key move. When a group of threads stalls waiting for memory, the
+hardware scheduler switches to a different resident group within a single cycle,
+because that group's values are already in place and nothing has to be loaded.
+The 100 nanosecond wait has not been shortened at all. It is simply always some
+other group's turn to wait.
+
+A processor built this way is a **throughput machine**. Each individual thread
+runs slower than it would on a CPU, because it has none of the tricks helping
+it. The total work finished per second is far higher, because so many threads
+are in flight.
+
+The general term for a chip bought to perform the arithmetic faster than a CPU
+could is an **accelerator**. GPUs are the common case, and the word also covers
+Google's TPUs and the NPUs in laptop chips.
+
+## What is a warp, and why does branching hurt one?
+
+GPU threads do not run individually. The hardware groups them into fixed sets
+that execute in lockstep, and NVIDIA calls a group of 32 threads a **warp**.
+Every thread in a warp performs the same instruction in the same cycle, each on
+its own data.
+
+That arrangement is called **SIMT**, for single instruction, multiple threads.
+It resembles the SIMD of lesson 02, where one instruction operated on eight
+lanes of one register, except that here each lane is a thread with its own
+address to read from.
+
+Lockstep creates a problem at branches. Suppose an `if` sends 20 threads of a
+warp down one path and 12 down the other. The warp cannot run two different
+instructions at once, so the hardware runs both paths in sequence. During the
+first path, the 12 threads that did not take it are switched off and their
+results discarded; during the second, the other 20 are.
+
+Count the cost. The warp spends the time of both paths and gets the work of
+one, so heavily branching code can waste most of the machine. Code that
+performs the same arithmetic on every element of a tensor never branches apart
+and wastes none of it.
+
+## Does the roofline still apply?
+
+It applies unchanged, with larger numbers.
+
+GPU memory on datacenter parts is **HBM**, meaning high-bandwidth memory, and
+it delivers 1 to 3 TB/s. TB/s means terabytes per second, and one terabyte is a
+thousand gigabytes, so that is ten to thirty times a laptop's 100 GB/s.
+
+Take a card with 50 TFLOPS of fp32 compute, where TFLOPS means trillions of
+floating-point operations per second, and 2 TB/s of bandwidth. Its ridge point
+is 50 TFLOPS ÷ 2 TB/s = **25 FLOPs per byte**, compared with 4 on your laptop.
+
+Read what that higher ridge means. The compute grew faster than the bandwidth
+did, so a GPU needs _more_ arithmetic per byte than a CPU before it is
+compute-bound. An elementwise operation at 0.083 FLOPs per byte is 300 times
+below the laptop's ridge and 3000 times below this card's. Low arithmetic
+intensity is not free on any hardware, and it gets relatively worse on faster
+hardware.
+
+## Why did machine learning and GPUs suit each other?
+
+A training step is dominated by matrix multiplications over large tensors. Look
+at the properties of that work against what a throughput machine needs.
+
+It is **data-parallel**, meaning the same operation applies to many elements
+that do not depend on each other, so there are millions of independent threads
+available. It barely branches, so warps stay together. Its arithmetic intensity
+grows with size, as lesson 03 showed, so it sits far to the right of even a
+GPU's high ridge point.
+
+The match was good enough that hardware changed to suit it further. Modern GPUs
+contain **tensor cores**, which are execution units that perform a small matrix
+multiplication as a single instruction rather than building it from individual
+multiply-adds.
+
+Now the mirror image. Work that does _not_ suit a throughput machine is
+branching sequential logic, small irregular problems, and anything without
+enough independent work to fill tens of thousands of lanes.
+
+Text generation is the important example. A **large language model** produces
+text one **token** at a time, where a token is a chunk of text roughly the size
+of a word fragment. Producing each token requires reading the whole model, and
+that step is called **decode**. Generating one token for one user involves very
+little independent arithmetic while requiring an enormous read, which places it
+far to the left of the ridge point. The most expensive hardware ever built for
+machine learning spends that step waiting on memory.
+
+## Check your understanding
+
+You are given a GPU with 60 TFLOPS of fp32 compute and 3 TB/s of bandwidth, and
+two workloads: multiplying two 4096×4096 matrices, and adding a bias value to
+every element of a 4096×4096 tensor.
+
+Compute the card's ridge point, compute each workload's arithmetic intensity,
+and say which one the card suits. A correct answer computes a ridge point of
+60 ÷ 3 = 20 FLOPs per byte; gives the matrix multiply an intensity of N ÷ 6 =
+4096 ÷ 6 ≈ 683, far to the right of 20 and therefore compute-bound; gives the
+bias addition 1 FLOP over 8 bytes moved, which is 0.125 and far to the left,
+therefore memory-bound; and concludes the card is suited to the matrix multiply
+while the bias addition would leave almost all of its arithmetic hardware idle.

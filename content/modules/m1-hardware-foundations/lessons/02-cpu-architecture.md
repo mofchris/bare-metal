@@ -253,7 +253,7 @@ often and pays 15 to 20 cycles when it does.
 `numpy.sum` runs compiled machine code instead, with no interpreter between the
 instruction and the numbers. It processes 8 lanes per instruction, and its
 branches are the regular, predictable kind that loops produce. The arithmetic
-alone therefore accounts for hundreds of times the throughput.
+alone therefore accounts for hundreds of times more additions per second.
 
 Measured speedups usually land between 100× and 1000× rather than higher,
 because adding a million numbers requires reading a million numbers, and the
