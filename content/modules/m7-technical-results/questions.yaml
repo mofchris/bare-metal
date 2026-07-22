@@ -1,0 +1,306 @@
+# M7 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
+
+# ---- Lesson 01: the shape of a result ----
+
+- id: m7/q-001
+  lesson: m7/01-shape-of-a-result
+  type: mcq
+  prompt: "Why is 'our server handles 800 requests per second' not a result?"
+  options:
+    - "Because requests per second is the wrong metric to report"
+    - "Because there is nothing to compare it against, so the number distinguishes nothing"
+    - "Because 800 is too small a number to be meaningful"
+    - "Because it does not say which programming language was used"
+  answer: 1
+  explanation: >-
+    The figure is consistent with the implementation being excellent or being
+    terrible, so it rules nothing out, and a measurement that rules nothing out
+    is not evidence. A baseline converts a number into a comparison, and only
+    comparisons carry information. The metric itself is fine; what is missing is
+    the alternative it is being measured against.
+  tags: [results, baselines]
+
+- id: m7/q-002
+  lesson: m7/01-shape-of-a-result
+  type: short
+  prompt: >-
+    The four parts every empirical claim needs are the question, the method, the
+    finding, and one more that is most often missing. Which? (one word)
+  accept:
+    - "baseline"
+    - "the baseline"
+    - "a baseline"
+  explanation: >-
+    The baseline. It must be the obvious thing done competently rather than
+    deliberately weak code, it must run under identical conditions on the same
+    machine with the same warmup and interleaving, and it must be stated, since
+    a reader who cannot see what you compared against cannot evaluate the
+    comparison.
+  tags: [results, baselines]
+
+- id: m7/q-003
+  lesson: m7/01-shape-of-a-result
+  type: mcq
+  prompt: >-
+    You optimize a matmul and compare against a Python loop you wrote yourself,
+    rather than against NumPy. What is wrong with that baseline?
+  options:
+    - "Nothing; any comparison point is a valid baseline"
+    - "The baseline must be the sensible default done competently, or the comparison proves nothing about your optimization"
+    - "Python loops cannot be timed accurately"
+    - "The baseline should always be the fastest known implementation"
+  answer: 1
+  explanation: >-
+    Beating deliberately poor code demonstrates that the poor code was poor. If
+    the obvious thing a competent person would reach for is a NumPy call, that
+    is the baseline, and beating it is the claim worth making. Note the opposite
+    error is not required either: the baseline need not be the world's fastest
+    implementation, only the reasonable default.
+  tags: [results, baselines]
+
+- id: m7/q-004
+  lesson: m7/01-shape-of-a-result
+  type: mcq
+  prompt: >-
+    You measured that int8 quantization cut median latency 40% for one model, on
+    one laptop, at batch size 1. Which sentence stays inside the evidence?
+  options:
+    - "Quantization is the most effective inference optimization"
+    - "Quantization makes inference 40% faster"
+    - "On this laptop, int8 quantization cut this model's median latency by 40% at batch size 1"
+    - "Quantization cut latency by 40%"
+  answer: 2
+  explanation: >-
+    Watch the scope grow across the wrong options. Dropping the machine, model
+    and batch size generalizes beyond what was varied. Claiming something about
+    "inference" asserts a property of the whole activity. Claiming it is the most
+    effective optimization was never measured at all, since nothing else was
+    tested. Each step feels like tidying and each adds scope the experiment did
+    not cover.
+  tags: [results, claims]
+
+- id: m7/q-005
+  lesson: m7/01-shape-of-a-result
+  type: mcq
+  prompt: >-
+    When reading a paper, what is the fastest way to judge how much its abstract
+    is supported?
+  options:
+    - "Count the number of citations it has"
+    - "Find the strongest sentence in the abstract, then find the experiment supporting it, and assess the distance between them"
+    - "Check whether the authors are from a well-known institution"
+    - "Read the related work section first"
+  answer: 1
+  explanation: >-
+    The measurement in a paper is usually sound; the sentence built on top of it
+    is usually wider. Locating the strongest claim and then the specific
+    experiment behind it makes that gap visible, and the gap is the thing you are
+    assessing. This is the same check applied to your own writing, run in
+    reverse.
+  tags: [results, reading]
+
+# ---- Lesson 02: threats to validity ----
+
+- id: m7/q-006
+  lesson: m7/02-threats-to-validity
+  type: mcq
+  prompt: >-
+    You rewrote the data loader and also increased the batch size, then measured
+    a speedup. Which kind of validity is threatened?
+  options:
+    - "Internal validity: a second change could explain the result on its own"
+    - "External validity: the result may not hold on other machines"
+    - "Construct validity: step time is the wrong metric"
+    - "None; the speedup is real either way"
+  answer: 0
+  explanation: >-
+    Internal validity asks whether the change you are crediting actually caused
+    the effect. A second simultaneous difference is called a confound, and here
+    the batch size change could produce the entire speedup by itself (M5/03).
+    The measured number is real; the attribution is unsupported. Change one
+    thing, measure, then change the next.
+  tags: [validity, internal]
+
+- id: m7/q-007
+  lesson: m7/02-threats-to-validity
+  type: short
+  prompt: >-
+    A second difference between your two conditions that could explain the
+    result on its own. What is it called? (one word)
+  accept:
+    - "confound"
+    - "a confound"
+    - "confounder"
+    - "confounding variable"
+  explanation: >-
+    A confound. They are usually mundane rather than exotic: a second change
+    bundled in, a benchmark run after the laptop cooled, a warm run compared
+    against a cold one. M2's interleaving, warmup and spread reporting remove
+    most of them; the rest is scope discipline.
+  tags: [validity, internal]
+
+- id: m7/q-008
+  lesson: m7/02-threats-to-validity
+  type: mcq
+  prompt: >-
+    A kernel is memory-bound on your laptop, where the ridge point is 4 FLOPs
+    per byte. On a GPU whose ridge point is 25 it could be a different story.
+    Which validity does that illustrate?
+  options:
+    - "Internal validity"
+    - "External validity: how far the finding travels beyond the tested conditions"
+    - "Construct validity"
+    - "Statistical validity"
+  answer: 1
+  explanation: >-
+    The measurement can be flawless and the conclusion still fails to
+    generalize, because the hardware's ridge point moved. Systems results are
+    structurally weak here: one machine, one dataset, one size, one software
+    version, each a dimension along which the result might not hold. The fix is
+    not to test everything but to state the conditions inside the claim.
+  tags: [validity, external]
+
+- id: m7/q-009
+  lesson: m7/02-threats-to-validity
+  type: mcq
+  prompt: >-
+    You care about user experience and report mean latency. Which threat is
+    that, and what should you report instead?
+  options:
+    - "Internal; report more runs"
+    - "External; report results from more machines"
+    - "Construct: the metric does not stand for the thing you care about, so report p99"
+    - "No threat; the mean is a standard summary"
+  answer: 2
+  explanation: >-
+    Construct validity asks whether your metric represents what you actually
+    care about. M2/04 showed that a session making about 100 requests hits the
+    p99 roughly once, so the tail is what a user experiences while the mean
+    conceals it. The measurement of the mean may be impeccable, and it answers a
+    question nobody asked.
+  tags: [validity, construct]
+
+- id: m7/q-010
+  lesson: m7/02-threats-to-validity
+  type: mcq
+  prompt: >-
+    Why should a 3% improvement measured on one machine be trusted less than a
+    40% improvement measured the same way?
+  options:
+    - "Small improvements are always measurement error"
+    - "Large effects tend to survive changes of setup, while small ones frequently do not"
+    - "3% is below every machine's noise floor by definition"
+    - "There is no difference; both were measured identically"
+  answer: 1
+  explanation: >-
+    The ASPLOS 2009 result from M2/01 showed benchmark numbers moving because of
+    link order and environment-variable size, since those shift stack addresses
+    and cache behaviour. If a result can move for reasons like that, a
+    few-percent effect measured in exactly one configuration may not exist in
+    another. A 40% effect measured carefully will probably still be an
+    improvement elsewhere.
+  tags: [validity, external]
+
+# ---- Lesson 03: negative results ----
+
+- id: m7/q-011
+  lesson: m7/03-negative-results
+  type: mcq
+  prompt: >-
+    Twenty groups test an optimization that genuinely does nothing, and only
+    apparent improvements get written up. What does the literature show?
+  options:
+    - "Nothing, since a null effect produces no publications"
+    - "Several papers reporting that it works, because noise produced apparent gains in a few groups and the nulls were filtered out"
+    - "An even split between positive and negative reports"
+    - "One paper, from whichever group measured most carefully"
+  answer: 1
+  explanation: >-
+    This is publication bias. Measurement noise scatters results, so a few groups
+    see an apparent improvement by chance, and if only those are published the
+    record contains consistent positive evidence for an effect that does not
+    exist. The consistency comes from the filtering, not from the effect. The
+    practical consequence: when a widely-reported technique does nothing on your
+    workload, your first hypothesis need not be that you erred.
+  tags: [negative-results, bias]
+
+- id: m7/q-012
+  lesson: m7/03-negative-results
+  type: mcq
+  prompt: >-
+    Why does reporting the experiments that failed make your successful result
+    more credible rather than less?
+  options:
+    - "It makes the write-up longer and more thorough"
+    - "It shows you could detect a null result, and that the reported effect survived against alternatives"
+    - "It lowers the reader's expectations before the result"
+    - "It is a convention rather than evidence"
+  answer: 1
+  explanation: >-
+    A report of successes alone cannot distinguish an author who tried five
+    things and found one, from an author who tried one thing that worked. Those
+    imply very different confidence. Stating that three changes did nothing
+    measurable and this one produced 27% demonstrates that your method was
+    capable of returning a null, which is exactly what makes the non-null
+    believable.
+  tags: [negative-results]
+
+- id: m7/q-013
+  lesson: m7/03-negative-results
+  type: mcq
+  prompt: >-
+    Which of these is a genuine finding rather than a failed experiment?
+  options:
+    - "The change was not tested because the setup broke"
+    - "No measurable difference: the medians moved by 1 ms and the interquartile ranges overlap substantially"
+    - "The result looked wrong so it was discarded"
+    - "The benchmark was run once and the number seemed low"
+  answer: 1
+  explanation: >-
+    M2/02 established that substantially overlapping intervals mean no
+    measurable difference, and that this is a valid experimental result rather
+    than a failure. It is also distinct from the other kind of negative result,
+    where a change actively made things worse. A write-up should say which of
+    the two occurred, since they point at different explanations.
+  tags: [negative-results, statistics]
+
+- id: m7/q-014
+  lesson: m7/03-negative-results
+  type: mcq
+  prompt: >-
+    Which sentence does not belong in a limitations section?
+  options:
+    - "This was measured on one laptop, and I expect the result to depend on cache size"
+    - "This was only tested on one machine, but it would obviously generalize"
+    - "Accuracy was measured on the validation split, not a held-out test set"
+    - "Batch size was fixed at 1, so nothing here speaks to batched serving"
+  answer: 1
+  explanation: >-
+    That sentence asserts generalization without evidence while appearing modest
+    about it, which uses the limitations section to smuggle in a stronger claim.
+    State what you tested; if you have a reason to expect it generalizes, give
+    the reason and label it as expectation rather than result. The other three
+    each mark a real boundary a reader could not otherwise know.
+  tags: [negative-results, limitations]
+
+- id: m7/q-015
+  lesson: m7/03-negative-results
+  type: mcq
+  prompt: >-
+    Gradient checkpointing cost you 31% more time and saved only 8% of memory,
+    because the batch was tiny and activations were a small line item. What is
+    the transferable conclusion?
+  options:
+    - "Gradient checkpointing does not work as described"
+    - "Itemize memory before choosing a memory technique, since each technique targets a different line of the bill"
+    - "The measurement must have been wrong"
+    - "Larger batches should always be used"
+  answer: 1
+  explanation: >-
+    The compute cost of checkpointing appeared in full because it is paid per
+    recomputed segment regardless. The saving did not, because it only shrinks
+    activations, and M5/02 showed activations are the batch-scaled item, which is
+    small when the batch is small. The technique behaved exactly as described and
+    was aimed at the wrong line. That reasoning is the useful part of the failure.
+  tags: [negative-results, memory]

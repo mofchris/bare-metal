@@ -1,0 +1,11 @@
+# M7 — Reading and writing technical results. Outline: docs/CURRICULUM.md.
+# Placed early because it needs only M2's measurement discipline as its
+# substance, and every claim read or written afterwards benefits from it.
+id: m7-technical-results
+title: "Reading and writing technical results"
+prereqs:
+  - m2-measurement
+lessons:
+  - 01-shape-of-a-result
+  - 02-threats-to-validity
+  - 03-negative-results
