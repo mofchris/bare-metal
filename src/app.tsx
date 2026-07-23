@@ -6,7 +6,7 @@
 // load failure, unknown lesson id — because a blank or half-drawn screen is
 // a silent failure (CLAUDE.md).
 
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Curriculum } from "./lib/curriculum";
 import { localDateKey } from "./lib/stats";
 import { TICK_SECONDS } from "./lib/study-time";
@@ -14,6 +14,7 @@ import { getAuth, syncNow } from "./lib/sync";
 import { loadCurriculum } from "./lib/load-curriculum";
 import { parseRoute, type Route } from "./lib/route";
 import { findLesson, questionsFor } from "./lib/lookup";
+import { checkpointById, checkpointQuestions, type Checkpoint } from "./lib/checkpoints";
 import { openProgressDb, type ProgressDb } from "./lib/progress-store";
 import { Home } from "./components/home";
 import { LessonView } from "./components/lesson-view";
@@ -275,6 +276,23 @@ function Screen({
       </Gated>
     );
   }
+  if (route.screen === "checkpoint") {
+    const checkpoint = checkpointById(load.curriculum.modules, route.firstModuleId);
+    if (!checkpoint) {
+      return (
+        <div class="error-block">
+          <h2>Checkpoint not found</h2>
+          <p>
+            No checkpoint starts at "{route.firstModuleId}". <a href="#/">Back home.</a>
+          </p>
+        </div>
+      );
+    }
+    // Ungated on purpose: a checkpoint is optional review. It reuses Quiz with
+    // no exam or lesson id, so it records attempts and feeds spaced review but
+    // sets no status and gates nothing.
+    return <CheckpointScreen checkpoint={checkpoint} db={db} />;
+  }
   if (route.screen === "review") {
     return <Review curriculum={load.curriculum} db={db} />;
   }
@@ -285,4 +303,35 @@ function Screen({
     return <Backup db={db} />;
   }
   return <Home curriculum={load.curriculum} db={db} />;
+}
+
+/**
+ * A checkpoint quiz over two modules. The question sample is drawn once per
+ * visit (useMemo keyed on the checkpoint id) so re-renders — a study-time tick,
+ * an answer — do not reshuffle mid-quiz; navigating away and back draws a fresh
+ * mix. No examModuleId or markDoneLessonId, so nothing is gated or marked done.
+ */
+function CheckpointScreen({
+  checkpoint,
+  db,
+}: {
+  checkpoint: Checkpoint;
+  db: ProgressDb | null;
+}) {
+  const questions = useMemo(
+    () => checkpointQuestions(checkpoint),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resample per visit
+    [checkpoint.id],
+  );
+  const a = checkpoint.first.title.split(":")[0]!;
+  const b = checkpoint.second.title.split(":")[0]!;
+  return (
+    <Quiz
+      title={`Checkpoint ${checkpoint.number} · ${a} + ${b}`}
+      backHref="#/"
+      backLabel="Home"
+      questions={questions}
+      db={db}
+    />
+  );
 }

@@ -8,10 +8,12 @@
 // due), or continue (next unfinished lesson). The user should never have to
 // decide what studying means today.
 
+import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { Curriculum, Lesson, Module } from "../lib/curriculum";
-import { examHref, lessonHref, quizHref } from "../lib/route";
+import { checkpointHref, examHref, lessonHref, quizHref } from "../lib/route";
 import { questionCountFor } from "../lib/lookup";
+import { checkpointById, CHECKPOINT_SIZE, type Checkpoint } from "../lib/checkpoints";
 import { dueQuestionIds, nextDueAt } from "../lib/srs";
 import { exportReminder, type ReminderState } from "../lib/backup";
 import {
@@ -117,19 +119,38 @@ export function Home({
 
       <div class="home-grid">
         <section class="home-modules rise" style={{ animationDelay: "90ms" }}>
-          {curriculum.modules.map((module) => (
-            <ModuleBlock
-              key={module.id}
-              module={module}
-              statuses={statuses}
-              exams={exams}
-              unlocked={moduleUnlocked(module, exams)}
-              prereqTitles={module.prereqs.map(
-                (p) =>
-                  (curriculum.modules.find((m) => m.id === p)?.title ?? p).split(":")[0]!,
-              )}
-            />
-          ))}
+          {curriculum.modules.map((module, i) => {
+            // A checkpoint follows the SECOND module of each pair (odd index).
+            const checkpoint =
+              i % 2 === 1
+                ? checkpointById(curriculum.modules, curriculum.modules[i - 1]!.id)
+                : null;
+            return (
+              <Fragment key={module.id}>
+                <ModuleBlock
+                  module={module}
+                  statuses={statuses}
+                  exams={exams}
+                  unlocked={moduleUnlocked(module, exams)}
+                  prereqTitles={module.prereqs.map(
+                    (p) =>
+                      (curriculum.modules.find((m) => m.id === p)?.title ?? p).split(
+                        ":",
+                      )[0]!,
+                  )}
+                />
+                {checkpoint && (
+                  <CheckpointRow
+                    checkpoint={checkpoint}
+                    ready={
+                      moduleUnlocked(checkpoint.first, exams) &&
+                      moduleUnlocked(checkpoint.second, exams)
+                    }
+                  />
+                )}
+              </Fragment>
+            );
+          })}
         </section>
 
         <aside class="home-rail rise" style={{ animationDelay: "180ms" }}>
@@ -276,6 +297,34 @@ function ModuleBlock({
           </p>
         </>
       )}
+    </section>
+  );
+}
+
+/* An optional checkpoint quiz between two modules. Never gates anything; it is
+   offered once both its modules are reachable, and muted before that. */
+function CheckpointRow({
+  checkpoint,
+  ready,
+}: {
+  checkpoint: Checkpoint;
+  ready: boolean;
+}) {
+  const a = checkpoint.first.title.split(":")[0]!;
+  const b = checkpoint.second.title.split(":")[0]!;
+  const label = `Checkpoint ${checkpoint.number} · ${a} + ${b}`;
+  return (
+    <section class={ready ? "checkpoint-row" : "checkpoint-row not-ready"}>
+      {ready ? (
+        <a href={checkpointHref(checkpoint.id)}>{label}</a>
+      ) : (
+        <span class="locked-title">{label}</span>
+      )}
+      <span class="lesson-meta">
+        {ready
+          ? `optional · ${CHECKPOINT_SIZE} mixed questions from both modules`
+          : `opens once you reach ${b}`}
+      </span>
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lessonHref, parseRoute, quizHref } from "./route";
+import { checkpointHref, lessonHref, parseRoute, quizHref } from "./route";
 
 describe("parseRoute", () => {
   it("treats empty, root, and unknown hashes as home", () => {
@@ -41,5 +41,17 @@ describe("parseRoute", () => {
       lessonId: "m1/01-memory-hierarchy",
     });
     expect(parseRoute("#/quiz/")).toEqual({ screen: "home" });
+  });
+
+  it("parses checkpoint routes and round-trips through checkpointHref", () => {
+    expect(parseRoute("#/checkpoint/m1-hardware-foundations")).toEqual({
+      screen: "checkpoint",
+      firstModuleId: "m1-hardware-foundations",
+    });
+    expect(parseRoute(checkpointHref("m3-numerics"))).toEqual({
+      screen: "checkpoint",
+      firstModuleId: "m3-numerics",
+    });
+    expect(parseRoute("#/checkpoint/")).toEqual({ screen: "home" });
   });
 });

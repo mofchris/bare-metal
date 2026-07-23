@@ -538,6 +538,28 @@ a:hover {
   font-size: 0.9rem;
 }
 
+/* Optional checkpoint quiz between two module blocks. Set slightly inset and
+   copper-tinted so it reads as an offered pause, not a required step. */
+.checkpoint-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 0.9rem;
+  padding: 0.55rem 0.8rem;
+  border-left: 2px solid var(--copper);
+  background: color-mix(in srgb, var(--copper) 7%, transparent);
+  border-radius: 0 4px 4px 0;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.checkpoint-row.not-ready {
+  border-left-color: var(--ink-dim);
+  background: none;
+}
+
 /* The signature: a trace runs down the lesson list; each lesson is a via.
    Hollow ring = untouched, copper ring = started, filled copper = done.
    The rail encodes the truth that lessons are a dependency chain. */
