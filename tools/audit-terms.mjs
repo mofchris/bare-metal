@@ -76,6 +76,7 @@ const SKIP = new Set([
   "page",
   "shape",
   "contiguous",
+  "runtime",
 ]);
 
 const findings = [];
