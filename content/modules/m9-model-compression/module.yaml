@@ -1,0 +1,15 @@
+# M9 — Model compression. Outline: docs/CURRICULUM.md. Takes M3/03's int8
+# concepts (scale, zero-point, calibration) into practice, and adds pruning and
+# distillation. Needs M3 for numerics and M5 for the training-loop mechanics
+# that QAT and distillation modify.
+id: m9-model-compression
+title: "Model compression: smaller, faster, mostly as good"
+prereqs:
+  - m3-numerics
+  - m5-training-mechanics
+lessons:
+  - 01-post-training-quantization
+  - 02-calibration-in-practice
+  - 03-quantization-aware-training
+  - 04-pruning
+  - 05-distillation

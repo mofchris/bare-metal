@@ -1,0 +1,493 @@
+# M9 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
+
+# ---- Lesson 01: post-training quantization ----
+
+- id: m9/q-001
+  lesson: m9/01-post-training-quantization
+  type: mcq
+  prompt: "What makes post-training quantization (PTQ) cheap?"
+  options:
+    - "It only quantizes half the model"
+    - "It converts a finished float32 model to integers with no further training"
+    - "It runs entirely on the GPU"
+    - "It skips the weights and quantizes only activations"
+  answer: 1
+  explanation: >-
+    PTQ takes the trained weights, computes a scale and zero-point from their
+    known range (M3/03), and replaces the floats with integers, needing neither
+    the training data nor the pipeline. The weights are easy because their range
+    is visible in the file. The activations are the hard part, since their range
+    depends on inputs you do not have at conversion time, which is why there is
+    more than one kind of PTQ.
+  tags: [compression, quantization]
+
+- id: m9/q-002
+  lesson: m9/01-post-training-quantization
+  type: mcq
+  prompt: "What distinguishes dynamic quantization from static quantization?"
+  options:
+    - "Dynamic uses fp16 and static uses int8"
+    - "Dynamic quantizes activations on the fly during inference; static fixes their scales ahead of time via calibration"
+    - "Dynamic runs on CPU, static on GPU"
+    - "Dynamic quantizes weights, static quantizes activations"
+  answer: 1
+  explanation: >-
+    Both quantize the weights ahead of time. They differ on activations, whose
+    range depends on the input. Dynamic measures each activation's range live and
+    quantizes it during inference, needing no calibration. Static freezes
+    activation scales in advance by measuring ranges on sample data first, so
+    inference is pure integer arithmetic with no live range-finding.
+  tags: [compression, quantization]
+
+- id: m9/q-003
+  lesson: m9/01-post-training-quantization
+  type: mcq
+  prompt: >-
+    A language model is dominated by a few very large weight matrices, with small
+    activations at each step. Which PTQ kind is the natural first choice?
+  options:
+    - "Static, because it is always more accurate"
+    - "Dynamic, because the win is reading int8 weights and small activations make live quantization cheap, with no calibration data needed"
+    - "Neither; large models cannot be quantized"
+    - "Static, because the activations are small"
+  answer: 1
+  explanation: >-
+    The layer is memory-bound on weights, so most of the benefit is the 4× fewer
+    bytes read for int8 weights (M1/03, M3/03). The activations are small, so
+    quantizing them live costs little, and dynamic quantization avoids needing
+    calibration data. This is why dynamic quantization is the usual first reach
+    for the large weight matrices in language models.
+  tags: [compression, quantization]
+
+- id: m9/q-004
+  lesson: m9/01-post-training-quantization
+  type: mcq
+  prompt: >-
+    A vision model has large activation maps flowing through many convolutions.
+    Why is static quantization the better fit?
+  options:
+    - "Vision models cannot use dynamic quantization"
+    - "Its large activations would make dynamic's live range-finding expensive every inference, so paying it once at calibration is the better trade"
+    - "Static quantization is always faster than dynamic"
+    - "Convolutions require fixed scales by design"
+  answer: 1
+  explanation: >-
+    Dynamic quantization measures and quantizes each activation live, and for
+    large activation maps that repeated cost is significant on every inference.
+    Static quantization pays it once during calibration and then runs pure
+    integer arithmetic. The general rule is a measurement question (M2): convert
+    both ways and compare latency and accuracy, but this is why the answer
+    differs by model.
+  tags: [compression, quantization]
+
+- id: m9/q-005
+  lesson: m9/01-post-training-quantization
+  type: short
+  prompt: >-
+    Static quantization freezes activation scales in advance by first measuring
+    activation ranges on sample data. What is that step called? (one word)
+  accept:
+    - "calibration"
+    - "calibrating"
+  explanation: >-
+    Calibration. Because an activation's range depends on the input and static
+    quantization commits to scales in advance, it runs representative inputs
+    through the model, records how large activations actually get, and freezes
+    scales covering those ranges. Its dependence on representative data is a real
+    failure mode, which lesson 02 covers.
+  tags: [compression, calibration]
+
+# ---- Lesson 02: calibration in practice ----
+
+- id: m9/q-006
+  lesson: m9/02-calibration-in-practice
+  type: mcq
+  prompt: >-
+    Why is calibrating to the full minimum-to-maximum range often the wrong
+    choice?
+  options:
+    - "It is too slow to compute"
+    - "Neural network activations are often heavy-tailed, so a few outliers stretch the range and coarsen the tick for the many ordinary values"
+    - "The minimum and maximum are hard to measure"
+    - "It always causes values to clip"
+  answer: 1
+  explanation: >-
+    Min-max guarantees nothing clips, but activations frequently have almost all
+    values in a narrow band and a small fraction far outside it. M3/03's example
+    showed weights in ±2 plus outliers at ±15 giving a step of 30 ÷ 255 ≈ 0.118,
+    seven times coarser than a ±2 range would give. The many pay for the few, so
+    the real question is what range to cover, accepting that covering less clips
+    the rest.
+  tags: [compression, calibration]
+
+- id: m9/q-007
+  lesson: m9/02-calibration-in-practice
+  type: mcq
+  prompt: "What trade does percentile calibration make?"
+  options:
+    - "It uses more calibration data for a wider range"
+    - "It covers most values, say 99.9%, and clips the rare extremes, so the tick shrinks and the bulk of values are represented more precisely"
+    - "It quantizes each channel separately"
+    - "It raises precision to fp16 for outliers"
+  answer: 1
+  explanation: >-
+    Clipping the extreme 0.1% adds error on those few values, which saturate at
+    the ruler's end. In exchange the range shrinks to what the bulk occupies, so
+    the tick size drops and the other 99.9% are represented more finely. For a
+    heavy-tailed distribution this is usually a large net win, but clipping is
+    only safe when the outliers were not carrying important information.
+  tags: [compression, calibration]
+
+- id: m9/q-008
+  lesson: m9/02-calibration-in-practice
+  type: mcq
+  prompt: >-
+    Within a layer, some channels have much wider value ranges than others. Which
+    calibration approach addresses this, and how?
+  options:
+    - "Percentile calibration, by clipping the wide channels"
+    - "Per-channel calibration, by giving each output channel its own scale so a loud channel does not coarsen the quiet ones"
+    - "Dynamic quantization, by measuring live"
+    - "Using more calibration data"
+  answer: 1
+  explanation: >-
+    A single layer-wide scale must stretch to cover the widest channel, which
+    coarsens every quieter one. Per-channel scales let each channel be quantized
+    to its own range. It is standard and cheap for weights, whose channels are
+    known statically, and used more carefully for activations because per-channel
+    activation scales interact with how the integer matmul is implemented.
+  tags: [compression, calibration]
+
+- id: m9/q-009
+  lesson: m9/02-calibration-in-practice
+  type: mcq
+  prompt: >-
+    You calibrate a vision model on daytime images and deploy it on night images.
+    What can go wrong, and does it raise an error?
+  options:
+    - "Nothing; calibration data does not need to match deployment"
+    - "The real activations may fall outside the frozen range and clip, or well inside it and waste resolution, with no error raised"
+    - "The model refuses to run on out-of-range inputs"
+    - "The scales recompute themselves automatically"
+  answer: 1
+  explanation: >-
+    Static scales are frozen to whatever ranges the calibration data produced, so
+    a mismatched distribution silently produces clipping or wasted resolution and
+    lower accuracy, with nothing erroring. This is M7's construct validity: a
+    scale frozen from an unrepresentative sample answers the wrong question. The
+    obligation is to know what distribution your calibration set represents.
+  tags: [compression, calibration, validity]
+
+- id: m9/q-010
+  lesson: m9/02-calibration-in-practice
+  type: mcq
+  prompt: "Roughly how much calibration data is needed, and how do you know it is enough?"
+  options:
+    - "The full training set, always"
+    - "A few hundred representative samples, checked by seeing whether the chosen scales stop moving as you add more"
+    - "Exactly one batch"
+    - "As much as a full training run uses"
+  answer: 1
+  explanation: >-
+    Calibration estimates a range rather than training, so a few hundred
+    representative samples usually suffice to see the ranges stabilize. You can
+    check stabilization directly: calibrate on more data and see whether the
+    scales move meaningfully; if not, you have enough. The kind of data matters
+    far more than the amount, since the scales freeze to whatever distribution it
+    represents.
+  tags: [compression, calibration]
+
+# ---- Lesson 03: quantization-aware training ----
+
+- id: m9/q-011
+  lesson: m9/03-quantization-aware-training
+  type: mcq
+  prompt: "Why does quantizing a finished model lose accuracy at all?"
+  options:
+    - "Integer arithmetic is fundamentally less accurate"
+    - "The weights were tuned to float32 precision, and rounding them is a perturbation the model never saw during training and never compensated for"
+    - "Quantization changes the model architecture"
+    - "The calibration data is always wrong"
+  answer: 1
+  explanation: >-
+    A model reached its exact weights by a long float32 search (M5). Quantizing
+    rounds each weight to the nearest tick, a change the model was never given a
+    chance to adjust to. A robust model barely moves; a sensitive one, operating
+    where small weight changes have large effects, can lose real accuracy. The
+    fix is to stop surprising it: show it the rounding during training.
+  tags: [compression, qat]
+
+- id: m9/q-012
+  lesson: m9/03-quantization-aware-training
+  type: mcq
+  prompt: "What does quantization-aware training actually do to the forward pass?"
+  options:
+    - "It trains the model entirely in int8"
+    - "It inserts fake quantization: values are rounded to int8 and back to float, so the forward pass computes with rounded values while weights stay float32"
+    - "It freezes the weights and trains only the scales"
+    - "It removes the smallest weights during training"
+  answer: 1
+  explanation: >-
+    QAT does not train in integers. Weights are stored and updated in float32.
+    On the forward pass it takes a weight or activation, quantizes it to int8 and
+    back to float, so the value used carries the int8 rounding error while
+    staying float. The loss then reflects the rounded model, so the gradients push
+    toward weights that are good after rounding, which is the goal.
+  tags: [compression, qat]
+
+- id: m9/q-013
+  lesson: m9/03-quantization-aware-training
+  type: mcq
+  prompt: >-
+    The quantization step rounds to a staircase, whose derivative is zero almost
+    everywhere. How does QAT get a usable gradient through it?
+  options:
+    - "It computes the exact derivative of the staircase"
+    - "The straight-through estimator: the backward pass treats the rounding as the identity and passes the gradient through unchanged"
+    - "It skips the backward pass for quantized layers"
+    - "It uses numerical differentiation"
+  answer: 1
+  explanation: >-
+    A staircase has zero gradient almost everywhere and undefined at the jumps,
+    so honest backprop would deliver no signal. The straight-through estimator is
+    a deliberate approximation: round on the forward pass, but on the backward
+    pass pretend it was the identity. M5/01 established that gradients only need
+    to point roughly downhill, so this approximate gradient is enough to train.
+  tags: [compression, qat, gradients]
+
+- id: m9/q-014
+  lesson: m9/03-quantization-aware-training
+  type: mcq
+  prompt: "When is QAT worth its cost over PTQ?"
+  options:
+    - "Always; QAT is strictly better"
+    - "When PTQ's accuracy drop is unacceptable and you have the training data, pipeline and compute, since QAT costs a training run"
+    - "Only for language models"
+    - "Never; PTQ is always sufficient"
+  answer: 1
+  explanation: >-
+    QAT recovers accuracy PTQ lost, at the price of a training run needing the
+    data and pipeline that PTQ was prized for not needing. So it is not a better
+    PTQ but a more expensive tool for the cases PTQ cannot handle. Try PTQ first
+    and measure the drop honestly (M2, M7); reach for QAT only if the drop is too
+    large and you have the training setup.
+  tags: [compression, qat]
+
+- id: m9/q-015
+  lesson: m9/03-quantization-aware-training
+  type: mcq
+  prompt: >-
+    Why is the straight-through estimator acceptable even though it is
+    mathematically incorrect?
+  options:
+    - "It is corrected by a second backward pass"
+    - "M5/01 showed gradients only need to point roughly downhill for the search to work, and it gives an approximately-right gradient"
+    - "The error cancels out over many steps exactly"
+    - "It is only used for the first epoch"
+  answer: 1
+  explanation: >-
+    The estimator gives the gradient the weight would have had without rounding,
+    which is approximately the right direction. Since training only needs
+    gradients that point roughly downhill, that is enough to make the search
+    work. It is one of several places in the field where an inexact gradient is
+    accepted because it works, and knowing it is deliberate stops it looking like
+    magic.
+  tags: [compression, qat, gradients]
+
+# ---- Lesson 04: pruning ----
+
+- id: m9/q-016
+  lesson: m9/04-pruning
+  type: mcq
+  prompt: "Why can pruning 90% of a model's weights to zero save no time on dense hardware?"
+  options:
+    - "The zeros still take up memory"
+    - "A dense matrix multiply still loads and multiplies each zero, and checking-and-branching to skip it would cost more than the multiply (M1/02)"
+    - "Pruning also slows the surviving weights"
+    - "The model has to be retrained after pruning"
+  answer: 1
+  explanation: >-
+    Removing the smallest weights scatters zeros with no pattern, which is
+    unstructured pruning. A dense matmul runs SIMD over contiguous memory, so a
+    zero is still loaded and multiplied; it changes the result by nothing and
+    saves nothing. Skipping it would need a per-element branch that is
+    unpredictable and costs more than the multiply, so dense hardware runs the
+    pruned matrix at dense speed.
+  tags: [compression, pruning]
+
+- id: m9/q-017
+  lesson: m9/04-pruning
+  type: mcq
+  prompt: "How does structured pruning produce an actual speedup?"
+  options:
+    - "It zeros more weights than unstructured pruning"
+    - "It removes whole groups like channels or rows, so the matrix genuinely becomes smaller and a smaller dense operation is simply faster"
+    - "It compresses the zeros more efficiently"
+    - "It runs the model in int8"
+  answer: 1
+  explanation: >-
+    Removing a whole output channel means the matrix producing it has fewer rows,
+    so there is genuinely less arithmetic and less memory traffic, with no
+    per-element checking and no unpredictable branches. The hardware runs a
+    smaller dense operation at full efficiency. The cost is that removing whole
+    groups is coarser, so it hurts accuracy more than scattering the same number
+    of zeros.
+  tags: [compression, pruning]
+
+- id: m9/q-018
+  lesson: m9/04-pruning
+  type: short
+  prompt: >-
+    The kind of pruning that scatters zeros with no pattern, so dense hardware
+    cannot skip them. What is it called? (one word)
+  accept:
+    - "unstructured"
+    - "unstructured pruning"
+  explanation: >-
+    Unstructured pruning. Removing the smallest-magnitude weights is the simplest
+    rule and often nearly free to accuracy, but the zeros land wherever a small
+    weight happened to be, so a dense matmul still processes them. It can shrink
+    the stored file if the zeros are stored compactly, but it does not shrink the
+    compute.
+  tags: [compression, pruning]
+
+- id: m9/q-019
+  lesson: m9/04-pruning
+  type: mcq
+  prompt: >-
+    Why is "we pruned 90% of the weights" a misleading claim about performance?
+  options:
+    - "90% is an exaggeration in most papers"
+    - "It counts zeros, and zeros are not automatically time saved; the honest number is measured speedup on named hardware against a baseline"
+    - "Sparsity always reduces accuracy more than reported"
+    - "The percentage should be of parameters, not weights"
+  answer: 1
+  explanation: >-
+    M1 showed that on dense hardware an unstructured zero is loaded and
+    multiplied like any other number, so the sparsity fraction does not imply a
+    speedup. M7's discipline applies: the honest claim states the measured
+    speedup on named hardware against a baseline. A 90% figure with no latency
+    measurement is marketing; paired with "3× faster with a 1% accuracy drop" it
+    is a result.
+  tags: [compression, pruning, results]
+
+- id: m9/q-020
+  lesson: m9/04-pruning
+  type: mcq
+  prompt: "Why can a trained network often lose many weights with little accuracy loss?"
+  options:
+    - "Weights are stored redundantly for error correction"
+    - "Trained networks are usually over-parameterized, so many weights are small enough to be near-inconsequential"
+    - "Pruning automatically retrains the whole network"
+    - "The largest weights are the least important"
+  answer: 1
+  explanation: >-
+    Trained networks typically have far more weights than the task strictly needs,
+    and many end up small enough that their contribution is negligible. Removing
+    the smallest-magnitude ones discards mostly-inconsequential connections, often
+    followed by a short retraining so the survivors compensate. The accuracy side
+    of pruning frequently works; it is the speed side that is the trap.
+  tags: [compression, pruning]
+
+# ---- Lesson 05: distillation ----
+
+- id: m9/q-021
+  lesson: m9/05-distillation
+  type: mcq
+  prompt: "In distillation, what is the teacher and what is the student?"
+  options:
+    - "The teacher is the dataset; the student is the model"
+    - "The teacher is a large trained model; the student is a small model trained to reproduce the teacher's outputs"
+    - "The teacher labels data; the student checks the labels"
+    - "They are two copies of the same model"
+  answer: 1
+  explanation: >-
+    The teacher already works well but is too large or slow to deploy; the student
+    is small enough to deploy. Rather than train the student on the original
+    labels alone, you train it to match what the teacher produces. The interesting
+    question is why that beats training the small model on the labels directly,
+    which is what the soft targets answer.
+  tags: [compression, distillation]
+
+- id: m9/q-022
+  lesson: m9/05-distillation
+  type: mcq
+  prompt: >-
+    What does a teacher's soft target carry that a hard label does not?
+  options:
+    - "Nothing; both say the same class"
+    - "A probability over all classes, encoding how classes relate and how confident the teacher is, which the single-class label discards"
+    - "The exact pixel values of the training image"
+    - "A smaller file size"
+  answer: 1
+  explanation: >-
+    A hard label is a 1 for the correct class and 0 for the rest. The teacher's
+    soft target might be 90% dog, 7% wolf, 2% cat, which also says this dog looks
+    somewhat like a wolf and very unlike a cat. That relational knowledge took the
+    large model and full dataset to acquire, and a student trained on soft targets
+    learns from it, which is why it can beat the same model trained on hard labels.
+  tags: [compression, distillation]
+
+- id: m9/q-023
+  lesson: m9/05-distillation
+  type: mcq
+  prompt: >-
+    A very confident teacher outputs 99.3% for the right class. Why is temperature
+    raised during distillation?
+  options:
+    - "To make the teacher more accurate"
+    - "To soften the distribution so the small but informative probabilities grow large enough to teach from, without changing the ranking"
+    - "To speed up the student's training"
+    - "To convert the outputs to integers"
+  answer: 1
+  explanation: >-
+    The small probabilities are the useful part, the class relationships, but at
+    99.3% for one class they barely influence training. Raising temperature spreads
+    the probability so the same example becomes, say, 70% dog, 12% wolf, 5% cat:
+    the ranking and relationships are preserved but now large enough to teach from.
+    Like the percentile setting in lesson 02, it is a knob to tune by measuring.
+  tags: [compression, distillation]
+
+- id: m9/q-024
+  lesson: m9/05-distillation
+  type: mcq
+  prompt: >-
+    How does distillation differ in kind from quantization and pruning?
+  options:
+    - "It is faster to run"
+    - "It trains a genuinely different, smaller architecture, rather than reducing the trained model; the teacher only supplies a better training signal"
+    - "It does not need any training data"
+    - "It only works on vision models"
+  answer: 1
+  explanation: >-
+    Quantization shrinks the representation of each number and pruning removes
+    numbers, both starting from the trained model and reducing it. Distillation
+    trains a new, smaller architecture from scratch, with the teacher providing a
+    richer signal than the labels alone. So the student can be shaped for the
+    target hardware from the start, at the cost of a full training run and the
+    need for a good teacher to exist first.
+  tags: [compression, distillation]
+
+- id: m9/q-025
+  lesson: m9/05-distillation
+  type: mcq
+  prompt: >-
+    A student trained directly on labels reaches 82%; the same architecture
+    distilled from a teacher reaches 86%. How is that possible if the teacher
+    learned from those same labels?
+  options:
+    - "The teacher must have had extra data"
+    - "The teacher's soft targets encode class relationships and confidence that the hard labels discard, so the student learns from a richer signal than the labels alone"
+    - "It is not possible; the numbers must be wrong"
+    - "Distillation always doubles accuracy"
+  answer: 1
+  explanation: >-
+    The hard labels give one correct class per example and nothing more. The
+    teacher's soft targets give a probability over all classes that also encodes
+    how classes relate and how confident it is, information the large model and
+    full dataset produced but the labels throw away. Learning from that richer
+    signal is why the distilled student can beat the same architecture trained on
+    hard labels, helped by temperature exposing the small informative
+    probabilities.
+  tags: [compression, distillation]
