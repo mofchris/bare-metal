@@ -1,0 +1,393 @@
+# M10 question bank. Ids are stable forever (see docs/DATA_MODEL.md).
+# Question standard: see the header of m1's questions.yaml (D-026).
+
+# ---- Lesson 01: why a second runtime ----
+
+- id: m10/q-001
+  lesson: m10/01-why-a-second-runtime
+  type: mcq
+  prompt: "What is ONNX, as opposed to ONNX Runtime?"
+  options:
+    - "ONNX is the runtime; ONNX Runtime is the file format"
+    - "ONNX is a standard file format for a model's operations and weights; ONNX Runtime is a program that loads and runs such a file"
+    - "They are two names for the same thing"
+    - "ONNX is a training framework; ONNX Runtime is a deployment library"
+  answer: 1
+  explanation: >-
+    ONNX (Open Neural Network Exchange) is a standard way to write down a model's
+    operations and weights so a tool other than the one that trained it can load
+    it. ONNX Runtime is one program that reads that format and executes the graph
+    fast. The shared format decouples where a model is built from where it runs,
+    so a PyTorch model can run on hardware PyTorch never supported.
+  tags: [runtime, onnx]
+
+- id: m10/q-002
+  lesson: m10/01-why-a-second-runtime
+  type: mcq
+  prompt: >-
+    Which of these does a deployment runtime shed that a training framework
+    carries?
+  options:
+    - "The model weights"
+    - "Autograd, per-operation Python and dispatcher cost, and unused flexibility like data-dependent branching"
+    - "The ability to do matrix multiplication"
+    - "The model's architecture"
+  answer: 1
+  explanation: >-
+    A runtime built for inference never had the tape (M5, M8/03), makes the
+    dispatcher's per-operation choices once at load rather than per inference
+    (M8/01), and does not carry the machinery for arbitrary Python and
+    data-dependent shapes (M8/04). The exact speedup depends on the model and
+    machine, which is why the honest statement is the mechanism — fixed costs
+    paid once at load — not a number.
+  tags: [runtime, overhead]
+
+- id: m10/q-003
+  lesson: m10/01-why-a-second-runtime
+  type: mcq
+  prompt: >-
+    Why can a runtime perform optimizations that eager-mode PyTorch structurally
+    cannot?
+  options:
+    - "It runs on faster hardware"
+    - "It loads the whole graph before running, so it can see across operations, while eager mode executes one at a time and cannot look ahead"
+    - "It uses lower precision by default"
+    - "It skips operations it deems unimportant"
+  answer: 1
+  explanation: >-
+    Eager mode executes one operation when Python reaches it and does not know
+    what comes next (M8/01). A runtime sees the entire computation at once, so it
+    can combine consecutive operations or precompute constant parts — decisions
+    that require seeing across operations. Local decisions made one operation at a
+    time cannot capture global structure.
+  tags: [runtime, graph]
+
+- id: m10/q-004
+  lesson: m10/01-why-a-second-runtime
+  type: mcq
+  prompt: >-
+    A model's inference time is dominated by streaming one very large weight
+    matrix from memory. Why might exporting to a runtime barely help?
+  options:
+    - "Runtimes cannot load large weights"
+    - "The model is memory-bound, and a runtime cannot move M1's roofline; it can trim overhead but not make the memory faster"
+    - "Export always slows large models down"
+    - "The weights must be quantized first"
+  answer: 1
+  explanation: >-
+    M1's roofline is hardware. If a model's time is spent streaming large weights
+    (M1/03), a runtime removes overhead around that streaming but cannot make the
+    memory system faster. A runtime does not make a memory-bound operation
+    compute-bound, nor fix a slow algorithm. Whether export helps is a
+    measurement against the PyTorch baseline (M2, M7), not a guarantee.
+  tags: [runtime, roofline]
+
+- id: m10/q-005
+  lesson: m10/01-why-a-second-runtime
+  type: short
+  prompt: >-
+    A program whose only job is to load a fixed model graph and execute it fast,
+    with none of the training or debugging machinery. What is it called?
+    (one word)
+  accept:
+    - "runtime"
+    - "a runtime"
+    - "inference runtime"
+  explanation: >-
+    A runtime. It has already made, once at load time, every per-operation choice
+    that a framework repeats at inference, and it never carried the autograd and
+    flexibility a framework needs for development. That is what it sheds; seeing
+    the whole graph is what it adds.
+  tags: [runtime]
+
+# ---- Lesson 02: export ----
+
+- id: m10/q-006
+  lesson: m10/02-export
+  type: mcq
+  prompt: "How does PyTorch's ONNX exporter historically capture the graph, and what does that inherit?"
+  options:
+    - "By analysing the source code, so it captures all control flow"
+    - "By tracing — running the model once on an example — so it inherits every tracing weakness from M8/04"
+    - "By asking the user to write the graph by hand"
+    - "By recording the backward pass"
+  answer: 1
+  explanation: >-
+    The exporter runs the model on a sample input and writes down the operations
+    it saw, which is tracing. So M8/04's warnings apply with higher stakes,
+    because the traced graph is leaving PyTorch: a branch not taken is absent, a
+    loop is unrolled to the example's count, an input-dependent shape is frozen.
+    On export these often surface as a failure rather than a silent mistake.
+  tags: [runtime, export, tracing]
+
+- id: m10/q-007
+  lesson: m10/02-export
+  type: short
+  prompt: >-
+    ONNX's numbered version of its operator list, which both the exporter and the
+    runtime must agree on. What is it called? (one word)
+  accept:
+    - "opset"
+    - "operator set"
+    - "the opset"
+  explanation: >-
+    An opset. Each of your model's operations must have an equivalent in the
+    target opset or the exporter cannot write it down, and the loading runtime
+    must support that opset or cannot read it. This is why standard models export
+    smoothly while a model with a custom or unusual operation often does not.
+  tags: [runtime, export, opset]
+
+- id: m10/q-008
+  lesson: m10/02-export
+  type: mcq
+  prompt: >-
+    Your model uses one operation that has no equivalent in the target opset. Why
+    does export fail rather than warn?
+  options:
+    - "The exporter is overly strict by design"
+    - "The exported graph runs where there is no Python to fall back on, so an operation not in the graph has nowhere to execute"
+    - "Warnings are disabled during export"
+    - "The operation is too slow to include"
+  answer: 1
+  explanation: >-
+    M8/04 established that an exported graph runs with no Python fallback, unlike
+    torch.compile which can drop to eager for an unsupported piece. So every
+    operation must be expressible in the graph, or the export cannot complete.
+    The fix is to replace the operation, decompose it into supported ones, or
+    register it as a custom operator the runtime is taught to run.
+  tags: [runtime, export]
+
+- id: m10/q-009
+  lesson: m10/02-export
+  type: mcq
+  prompt: >-
+    Which property makes a model hard or unsafe to export, per M8/04?
+  options:
+    - "Having many layers"
+    - "Data-dependent control flow or shapes, and operations with no ONNX equivalent"
+    - "Using float32 weights"
+    - "Being trained with Adam"
+  answer: 1
+  explanation: >-
+    Export fails on exactly the things that make a model more than a fixed
+    sequence of standard operations: a branch on the input (tracing bakes in one
+    path), shapes that depend on the data (frozen to the example's), and custom
+    or niche operations absent from the opset. This is the dynamism M8/04 said a
+    static graph cannot express.
+  tags: [runtime, export]
+
+- id: m10/q-010
+  lesson: m10/02-export
+  type: mcq
+  prompt: >-
+    After exporting, why must you check the exported and original models on
+    several varied inputs rather than just the example input?
+  options:
+    - "To measure inference speed"
+    - "Because the example is the one input the trace was built from, so only varied inputs reveal a baked-in branch or frozen shape"
+    - "Because ONNX requires at least ten test inputs"
+    - "To recalibrate the quantization scales"
+  answer: 1
+  explanation: >-
+    A trace records the example's path, so testing that same example proves
+    nothing. Running varied inputs, including ones that take other branches and
+    shapes, and confirming outputs match within a tolerance is what surfaces a
+    baked-in branch. The tolerance is needed because the exported graph may order
+    arithmetic differently, so bit-identity is not expected (M3/01, M8/05).
+  tags: [runtime, export, validity]
+
+# ---- Lesson 03: graph optimisation ----
+
+- id: m10/q-011
+  lesson: m10/03-graph-optimisation
+  type: mcq
+  prompt: "What does constant folding do, and why does it need the whole graph?"
+  options:
+    - "It rounds constants to fewer bits; any operation can do it locally"
+    - "It computes graph parts whose result never changes between inferences once at load, which requires seeing that a value is constant across the whole graph"
+    - "It removes constants from the model to save memory"
+    - "It folds the model into fewer layers by retraining"
+  answer: 1
+  explanation: >-
+    If an operation's inputs are all fixed weights, its result is identical every
+    inference, so a runtime computes it once at load and stores it. Eager mode
+    cannot, because knowing a value is constant across inferences is a property of
+    the whole graph over time, not of one operation seen in isolation (M8/01). It
+    removes genuinely redundant work but nothing input-dependent.
+  tags: [runtime, optimization]
+
+- id: m10/q-012
+  lesson: m10/03-graph-optimisation
+  type: mcq
+  prompt: >-
+    A graph adds a bias, applies ReLU, then scales, all elementwise on a large
+    tensor. Fusion combines them. What is the larger saving and why?
+  options:
+    - "The overhead saving, because three dispatched operations become one"
+    - "The memory saving, because three round trips through memory become one and the chain is memory-bound (M1/03)"
+    - "The arithmetic saving, because fusion does fewer operations"
+    - "There is no saving; fusion only tidies the graph"
+  answer: 1
+  explanation: >-
+    Each unfused elementwise operation reads the whole tensor and writes it back,
+    so three make three round trips through memory. Fusion reads once, does all
+    three operations in registers, and writes once. M1/03 showed an elementwise
+    chain is memory-bound and spends nearly all its time moving bytes, so cutting
+    three round trips to one is close to cutting the time by two-thirds. The
+    overhead saving (one dispatch instead of three) is real but smaller.
+  tags: [runtime, fusion]
+
+- id: m10/q-013
+  lesson: m10/03-graph-optimisation
+  type: mcq
+  prompt: "Why does fusion keep the model's outputs essentially the same?"
+  options:
+    - "It retrains the model to match"
+    - "It does the identical arithmetic on the identical numbers, only skipping the memory round trips between operations"
+    - "It rounds all results to a fixed precision"
+    - "It only fuses operations that produce zero"
+  answer: 1
+  explanation: >-
+    Fusion performs the same add, activation and scale on the same values; it just
+    avoids writing intermediates to memory and reading them back. The one caveat
+    is that keeping intermediates in registers without rounding to memory can
+    change the last bits, because when rounding happens affects the result
+    (M3/04, M8/05). It is the intended arithmetic, which is why the export check
+    uses a tolerance rather than exact equality.
+  tags: [runtime, fusion, numerics]
+
+- id: m10/q-014
+  lesson: m10/03-graph-optimisation
+  type: mcq
+  prompt: "Why is loading a model into a runtime not instant?"
+  options:
+    - "The file has to be decompressed"
+    - "Constant folding and fusion happen at load time — work done once so every later inference is faster"
+    - "The runtime retrains the last layer"
+    - "The weights are converted to int8 during load"
+  answer: 1
+  explanation: >-
+    The graph optimizations run when the model loads, which is the exact trade
+    lesson 01 described: pay a one-time cost so that every inference afterward is
+    faster. A runtime can also emit the optimized graph, which is the honest way
+    to see what it actually fused rather than assuming.
+  tags: [runtime, optimization]
+
+- id: m10/q-015
+  lesson: m10/03-graph-optimisation
+  type: short
+  prompt: >-
+    The optimization that combines several consecutive operations into one that
+    produces the same result in a single pass over memory. What is it called?
+    (one word)
+  accept:
+    - "fusion"
+    - "operator fusion"
+    - "kernel fusion"
+  explanation: >-
+    Fusion. It attacks both of M1's non-arithmetic costs at once: the memory
+    round trips between operations (the larger saving for a memory-bound chain)
+    and the per-operation overhead from M8/01 (the smaller one). It needs the
+    whole-graph view to recognize a fusable chain, which eager mode cannot see.
+  tags: [runtime, fusion]
+
+# ---- Lesson 04: execution providers ----
+
+- id: m10/q-016
+  lesson: m10/04-execution-providers
+  type: mcq
+  prompt: "What is an execution provider?"
+  options:
+    - "A cloud service that runs models for you"
+    - "A back-end that knows how to run graph operations on a particular kind of hardware, one of which claims each operation"
+    - "The person who deploys the model"
+    - "A compression algorithm for the graph"
+  answer: 1
+  explanation: >-
+    ONNX Runtime has a CPU provider, a CUDA provider, and others. At load it asks
+    providers, in a priority order you set, which operations each can run; a
+    provider claims what it supports and the rest falls through, ultimately to the
+    CPU provider which supports everything. So one graph can run split across
+    providers — the same fallback idea as M8/04's graph breaks, one level down.
+  tags: [runtime, providers]
+
+- id: m10/q-017
+  lesson: m10/04-execution-providers
+  type: mcq
+  prompt: >-
+    Why is a graph that bounces repeatedly between a GPU provider and the CPU
+    provider not automatically faster than the CPU doing all of it?
+  options:
+    - "The GPU provider is always slower"
+    - "Each crossing moves data between the providers' memories — M4/01's host-device transfer — which can cost more than it saves"
+    - "The CPU provider cannot run neural networks"
+    - "Providers cannot be mixed in one graph"
+  answer: 1
+  explanation: >-
+    Every switch from one provider to another moves the data between their
+    separate memories over a bus with its own bandwidth ceiling (M4/01). A graph
+    that crosses back and forth many times can spend more time moving data than
+    the faster provider saves, so a provider claiming most but not all of a graph
+    is not automatically a win. It is a measurement (M2, M7).
+  tags: [runtime, providers, transfer]
+
+- id: m10/q-018
+  lesson: m10/04-execution-providers
+  type: mcq
+  prompt: >-
+    What is the difference between intra-operation and inter-operation threading?
+  options:
+    - "Intra-op runs on CPU, inter-op on GPU"
+    - "Intra-op parallelizes work inside one operation; inter-op runs independent operations of the graph concurrently"
+    - "They are two names for the same thing"
+    - "Intra-op is for training, inter-op for inference"
+  answer: 1
+  explanation: >-
+    Intra-operation threading splits one operation, like a big matmul, across
+    threads — the data-parallel work of M1/05. Inter-operation threading runs
+    independent branches of the graph at once — the independence M1/02 exploited,
+    now at operation level. A single inference of a typical sequential model is
+    mostly served by intra-operation threading, because each operation needs the
+    previous one's output.
+  tags: [runtime, threading]
+
+- id: m10/q-019
+  lesson: m10/04-execution-providers
+  type: mcq
+  prompt: >-
+    Why can setting the intra-operation thread count to the full logical core
+    count make a single compute-bound inference slower?
+  options:
+    - "The operating system reserves half the cores"
+    - "Logical cores from hyper-threading share execution units and cache (M6/04), so contending threads run at reduced speed with less cache each"
+    - "More threads always use more memory"
+    - "The runtime cannot use more than two threads"
+  answer: 1
+  explanation: >-
+    M6/04 established that hyper-threaded siblings share execution units and cache,
+    and dense arithmetic on both runs at half speed each. Splitting a
+    compute-bound matmul across more threads than physical cores puts contending
+    threads on shared units and shrinks each thread's cache share. Coordination
+    overhead also grows with thread count. The best count is measured, often near
+    the physical core count.
+  tags: [runtime, threading, cpu]
+
+- id: m10/q-020
+  lesson: m10/04-execution-providers
+  type: mcq
+  prompt: >-
+    Adding threads to a memory-bound operation does not speed it up. Which earlier
+    result explains this?
+  options:
+    - "M5/02's memory bill"
+    - "M1/03's roofline: a memory-bound operation is limited by bandwidth, so more threads just wait on an already-saturated memory system together"
+    - "M2/04's percentiles"
+    - "M3/04's non-associativity"
+  answer: 1
+  explanation: >-
+    M1/03 established that a memory-bound operation's ceiling is bandwidth, not
+    compute. Adding threads adds demand for a bandwidth that is already saturated,
+    so the threads wait on memory together and finish no sooner. This is why the
+    best thread count can be even lower for memory-bound work than for
+    compute-bound work, and why it must be found by measurement.
+  tags: [runtime, threading, roofline]

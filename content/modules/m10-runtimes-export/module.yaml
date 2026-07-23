@@ -1,0 +1,13 @@
+# M10 — Runtimes and export: ONNX Runtime. Outline: docs/CURRICULUM.md.
+# The other side of M8/04's export boundary: what a dedicated runtime does with
+# a graph that PyTorch's eager mode cannot. Prereq M8, because you export FROM
+# PyTorch and must understand graph capture first.
+id: m10-runtimes-export
+title: "Runtimes and export: ONNX Runtime"
+prereqs:
+  - m8-pytorch-execution
+lessons:
+  - 01-why-a-second-runtime
+  - 02-export
+  - 03-graph-optimisation
+  - 04-execution-providers

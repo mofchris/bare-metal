@@ -105,6 +105,12 @@ the drift this ledger prevents:
 | straight-through estimator                             | m9/03          | round forward, treat rounding as the identity backward — an approximate gradient                                             |
 | pruning (structured/unstructured)                      | m9/04          | zero weights; unstructured scatters zeros (no speedup on dense HW), structured removes whole channels                        |
 | distillation, teacher/student, soft target             | m9/05          | train a small student to match a large teacher's per-class probabilities, not just the label                                 |
+| runtime, ONNX                                          | m10/01         | a program that loads a fixed model graph and runs it fast; ONNX = the exchange file format                                   |
+| constant folding                                       | m10/03         | precompute graph parts whose result never changes, once at load                                                              |
+| operator fusion                                        | m10/03         | combine consecutive operations into one pass over memory (M1/03's memory win)                                                |
+| opset                                                  | m10/02         | ONNX's numbered operator-list version; exporter and runtime must agree                                                       |
+| execution provider                                     | m10/04         | a hardware back-end that claims the graph operations it can run                                                              |
+| intra-/inter-op threading                              | m10/04         | parallelize inside one operation vs run independent operations at once                                                       |
 | shard                                                  | m4/03          | one large archive file packing many samples, read as a stream                                                                |
 
 ## ML terms
