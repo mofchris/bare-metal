@@ -131,26 +131,34 @@ remains unanswered.
 
 ---
 
-## STAGE C — Practical Labs
+## STAGE C — Practical Labs — **CUT 2026-07-25 (D-033)**
 
-**Deliverables:**
+**This stage is cut, not deferred.** The Fall 2027 roadmap assigns the
+artifact burden to the two flagship repositories (cheapserve-mlsys,
+trace-to-speed), and D-027 settled that Metal is the general knowledge base
+rather than competence evidence — so a Metal lab would exist only to make a
+concept stick, which is not worth an entire stage while the curriculum sits at
+10 modules of 14. The ten labs L1.1–L5.2 were already removed from the
+curriculum on 2026-07-22 because they were referenced as if they existed while
+no files backed them; this amendment makes the plan match the repo.
 
-- Lab harness framework: runs my code locally on my laptop, measures it,
-  verifies targets (speed/accuracy), reports honestly, and feeds results back
-  into the web app (result token or results file import)
-- First 3 labs live (e.g., data-loader optimization, timing methodology,
-  quantization exercise), each flagged runnable vs simulated
-- Per-lab documentation of what the harness measures and its limitations
+**What was given up** (recorded so the reversal stays legible): a lab harness
+that ran his code locally, measured it, verified speed/accuracy targets and fed
+results back into the web app; three labs (data-loader optimization, timing
+methodology, quantization); per-lab documentation of what the harness measures
+and its limitations. Measurement work now happens in the flagship repositories
+instead, which is where the roadmap wants the evidence — M11 teaches
+operator-level and memory profiling and points at cheapserve as the thing to
+profile.
 
-**Tests:**
+**Knock-on edits to earlier stages, listed rather than silently applied:**
+line 45 ("every module → lessons → labs"), lines 52–53 (the lab-runner
+companion in the deployment decision) and line 80 (Stage A's "labs follow the
+Stage C harness") all describe a lab-bearing product. They are left as written
+because Gates 0 and A are already signed and rewriting signed text would
+falsify the record — read them against this amendment.
 
-- Automated: harness detects both passing and failing solutions correctly
-  (test with deliberately bad solutions); measurement variance documented
-- Manual (me): I complete lab 1 end-to-end and the measurements make sense to
-  me — if I can't interpret the output, the lab fails the gate regardless of
-  code correctness
-
-**⛔ GATE C sign-off:** \_\_\_\_\_\_\_\_\_\_\_\_\_\_
+**⛔ GATE C sign-off:** n/a — stage cut, see D-033.
 
 ---
 

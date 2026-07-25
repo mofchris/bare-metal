@@ -6,6 +6,7 @@ import {
   CHECKPOINT_SIZE,
   type Checkpoint,
 } from "./checkpoints";
+import { summariseHistory } from "./question-selection";
 import type { Module, Question } from "./curriculum";
 
 /** A module with `n` throwaway questions, enough for the sampling tests. */
@@ -74,7 +75,7 @@ describe("checkpoint question sampling", () => {
 
   it("draws CHECKPOINT_SIZE questions split evenly when both banks are large", () => {
     const cp = pairFrom(moduleWith("m1", 20), moduleWith("m2", 20));
-    const sample = checkpointQuestions(cp, CHECKPOINT_SIZE, seededRng());
+    const sample = checkpointQuestions(cp, { count: CHECKPOINT_SIZE, rng: seededRng() });
     expect(sample).toHaveLength(12);
     const fromA = sample.filter((q) => q.id.startsWith("m1/")).length;
     const fromB = sample.filter((q) => q.id.startsWith("m2/")).length;
@@ -84,7 +85,7 @@ describe("checkpoint question sampling", () => {
 
   it("takes more from the richer bank when one module is short", () => {
     const cp = pairFrom(moduleWith("m1", 3), moduleWith("m2", 20));
-    const sample = checkpointQuestions(cp, 12, seededRng());
+    const sample = checkpointQuestions(cp, { count: 12, rng: seededRng() });
     expect(sample).toHaveLength(12);
     expect(sample.filter((q) => q.id.startsWith("m1/")).length).toBe(3);
     expect(sample.filter((q) => q.id.startsWith("m2/")).length).toBe(9);
@@ -92,19 +93,19 @@ describe("checkpoint question sampling", () => {
 
   it("never returns more than the two banks hold", () => {
     const cp = pairFrom(moduleWith("m1", 5), moduleWith("m2", 4));
-    const sample = checkpointQuestions(cp, 12, seededRng());
+    const sample = checkpointQuestions(cp, { count: 12, rng: seededRng() });
     expect(sample).toHaveLength(9);
   });
 
   it("draws no duplicate questions", () => {
     const cp = pairFrom(moduleWith("m1", 20), moduleWith("m2", 20));
-    const sample = checkpointQuestions(cp, 12, seededRng());
+    const sample = checkpointQuestions(cp, { count: 12, rng: seededRng() });
     expect(new Set(sample.map((q) => q.id)).size).toBe(sample.length);
   });
 
   it("alternates between the two modules rather than clumping", () => {
     const cp = pairFrom(moduleWith("m1", 20), moduleWith("m2", 20));
-    const sample = checkpointQuestions(cp, 12, seededRng());
+    const sample = checkpointQuestions(cp, { count: 12, rng: seededRng() });
     // With a balanced split and interleaving, no three consecutive questions
     // should come from the same module.
     for (let i = 0; i + 2 < sample.length; i++) {
@@ -113,5 +114,26 @@ describe("checkpoint question sampling", () => {
       const allB = trio.every((q) => q.id.startsWith("m2/"));
       expect(allA || allB).toBe(false);
     }
+  });
+
+  it("reaches for unanswered questions when the checkpoint is retaken", () => {
+    // D-030: the complaint was that a retake replayed the same list. With
+    // history supplied, a second run must avoid what the first one served.
+    const cp = pairFrom(moduleWith("m1", 20), moduleWith("m2", 20));
+    const first = checkpointQuestions(cp, { count: 12, rng: seededRng(1) });
+
+    const history = summariseHistory(
+      first.map((q, i) => ({
+        questionId: q.id,
+        at: new Date(Date.parse("2026-07-01T10:00:00.000Z") + i * 1000).toISOString(),
+        correct: true,
+        givenAnswer: "a",
+        sessionId: "run-1",
+      })),
+    );
+
+    const second = checkpointQuestions(cp, { count: 12, history, rng: seededRng(2) });
+    const repeated = second.filter((q) => first.some((f) => f.id === q.id));
+    expect(repeated).toEqual([]);
   });
 });

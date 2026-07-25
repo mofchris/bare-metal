@@ -5,9 +5,11 @@
 // anything. Pairs are derived from curriculum order, so they extend
 // automatically as modules are authored.
 //
-// Depends on: curriculum.ts (types). Depended on by: route.ts, app.tsx, home.tsx.
+// Depends on: curriculum.ts (types), question-selection.ts (which questions a
+// given run serves). Depended on by: route.ts, app.tsx, home.tsx.
 
 import type { Module, Question } from "./curriculum";
+import { selectQuestions, type QuestionHistory } from "./question-selection";
 
 export interface Checkpoint {
   /** Stable id — the first module's id, which uniquely names the pair. */
@@ -47,38 +49,55 @@ export function checkpointById(
   return checkpointPairs(modules).find((c) => c.id === firstModuleId) ?? null;
 }
 
+export interface CheckpointSampleOptions {
+  /** How many questions to draw. Defaults to CHECKPOINT_SIZE. */
+  count?: number;
+  /**
+   * Per-question attempt history, from summariseHistory(). Supplying it makes
+   * the draw rotate through the banks instead of sampling blind (D-030);
+   * omitting it degrades to "everything is unseen", which is the correct
+   * behaviour on a fresh install and keeps this callable from tests that do
+   * not care about rotation.
+   */
+  history?: ReadonlyMap<string, QuestionHistory>;
+  /** Injected so tests are deterministic; the app passes Math.random. */
+  rng?: () => number;
+}
+
 /**
- * A balanced, shuffled sample across the two modules — as even a split as the
- * banks allow, up to `count` total. If one module has fewer questions, the
- * other makes up the difference. Questions alternate between the two rather
- * than clumping. `rng` is injected so tests are deterministic; the app passes
- * Math.random so each attempt gets a fresh mix.
+ * A balanced sample across the two modules — as even a split as the banks
+ * allow, up to `count` total. If one module has fewer questions, the other
+ * makes up the difference. Questions alternate between the two rather than
+ * clumping.
+ *
+ * Selection within each bank is delegated to question-selection.ts, so a
+ * checkpoint retaken next week reaches for questions he has not answered
+ * before rather than re-rolling the dice over the whole bank. With 217
+ * questions in the curriculum and a 12-question checkpoint, that is 18 takes
+ * before anything is forced to repeat (cleanTakes(217, 12)).
  */
 export function checkpointQuestions(
   checkpoint: Checkpoint,
-  count = CHECKPOINT_SIZE,
-  rng: () => number = Math.random,
+  options: CheckpointSampleOptions = {},
 ): Question[] {
-  const a = shuffle(checkpoint.first.questions, rng);
-  const b = shuffle(checkpoint.second.questions, rng);
+  const {
+    count = CHECKPOINT_SIZE,
+    history = new Map<string, QuestionHistory>(),
+    rng = Math.random,
+  } = options;
 
   // Aim for half from each. When one bank is short, take more from the other,
   // but never more than a bank actually has.
   const half = Math.floor(count / 2);
-  const fromA = Math.min(a.length, Math.max(half, count - b.length));
-  const fromB = Math.min(b.length, count - fromA);
+  const firstBank = checkpoint.first.questions;
+  const secondBank = checkpoint.second.questions;
+  const fromA = Math.min(firstBank.length, Math.max(half, count - secondBank.length));
+  const fromB = Math.min(secondBank.length, count - fromA);
 
-  return interleave(a.slice(0, fromA), b.slice(0, fromB));
-}
-
-/** Fisher–Yates over a copy, using the injected rng. */
-function shuffle<T>(items: readonly T[], rng: () => number): T[] {
-  const out = items.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [out[i], out[j]] = [out[j]!, out[i]!];
-  }
-  return out;
+  return interleave(
+    selectQuestions(firstBank, history, fromA, rng),
+    selectQuestions(secondBank, history, fromB, rng),
+  );
 }
 
 /** a[0], b[0], a[1], b[1], … keeping any leftover tail of the longer list. */

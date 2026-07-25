@@ -6,8 +6,9 @@
 // load failure, unknown lesson id — because a blank or half-drawn screen is
 // a silent failure (CLAUDE.md).
 
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { Curriculum } from "./lib/curriculum";
+import { useEffect, useRef, useState } from "preact/hooks";
+import type { Curriculum, Question } from "./lib/curriculum";
+import { summariseHistory } from "./lib/question-selection";
 import { localDateKey } from "./lib/stats";
 import { TICK_SECONDS } from "./lib/study-time";
 import { getAuth, syncNow } from "./lib/sync";
@@ -291,7 +292,9 @@ function Screen({
     // Ungated on purpose: a checkpoint is optional review. It reuses Quiz with
     // no exam or lesson id, so it records attempts and feeds spaced review but
     // sets no status and gates nothing.
-    return <CheckpointScreen checkpoint={checkpoint} db={db} />;
+    // Keyed so moving between checkpoints remounts and draws a fresh sample
+    // rather than reusing the previous checkpoint's questions.
+    return <CheckpointScreen key={checkpoint.id} checkpoint={checkpoint} db={db} />;
   }
   if (route.screen === "review") {
     return <Review curriculum={load.curriculum} db={db} />;
@@ -306,10 +309,12 @@ function Screen({
 }
 
 /**
- * A checkpoint quiz over two modules. The question sample is drawn once per
- * visit (useMemo keyed on the checkpoint id) so re-renders — a study-time tick,
- * an answer — do not reshuffle mid-quiz; navigating away and back draws a fresh
- * mix. No examModuleId or markDoneLessonId, so nothing is gated or marked done.
+ * A checkpoint quiz over two modules. The sample is drawn ONCE per visit and
+ * held in state, so re-renders — a study-time tick, an answer — cannot
+ * reshuffle mid-quiz; navigating away and back draws a fresh mix. Selection is
+ * seen-aware (D-030): it reads the attempt history first so a retake reaches
+ * for questions he has not answered before. No examModuleId or
+ * markDoneLessonId, so nothing is gated or marked done.
  */
 function CheckpointScreen({
   checkpoint,
@@ -318,11 +323,28 @@ function CheckpointScreen({
   checkpoint: Checkpoint;
   db: ProgressDb | null;
 }) {
-  const questions = useMemo(
-    () => checkpointQuestions(checkpoint),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resample per visit
-    [checkpoint.id],
-  );
+  const [questions, setQuestions] = useState<Question[] | null>(null);
+  // True once a draw has used real history. Guards the case where this screen
+  // mounts while the database is still opening: the blind draw shows something
+  // immediately, and the arrival of `db` upgrades it exactly once.
+  const drawnWithHistory = useRef(false);
+
+  useEffect(() => {
+    if (drawnWithHistory.current) return;
+    let cancelled = false;
+    void (async () => {
+      const history = db ? summariseHistory(await db.allAttempts()) : undefined;
+      if (cancelled) return;
+      if (db) drawnWithHistory.current = true;
+      setQuestions(checkpointQuestions(checkpoint, { history }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkpoint, db]);
+
+  if (questions === null) return <p class="muted">Drawing your questions…</p>;
+
   const a = checkpoint.first.title.split(":")[0]!;
   const b = checkpoint.second.title.split(":")[0]!;
   return (
