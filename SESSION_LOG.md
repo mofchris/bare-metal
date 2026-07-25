@@ -620,3 +620,86 @@ profiling) — **but it is blocked on the labs decision below.**
    started, since each carries a real design decision.
 
 **New DECISIONS.md entries these sessions:** D-027, D-028 (both ratified).
+
+## Session 2026-07-25 (twenty-seventh block — process repair, labs cut, seen-aware question selection)
+
+**Stage:** B | **Gate status:** Gate B unsigned
+
+**Trigger:** Christopher asked where the previous agent had stopped. The answer
+was that it had stopped cleanly at M10 and held for a go-ahead — but that the
+log had not been written for two days, so the repo could not actually answer
+his question on its own. He then sent a batch of feature requests, delegated
+the calls to me ("do what you determine is right"), and added one instruction
+by name: the quotes must include original lines from Ego, Isagi and Nagi.
+
+**Done this session:**
+
+- **Backfilled the missing log** (entry above), flagged as a reconstruction
+  rather than passed off as a live record, because the detail that lived only
+  in the previous agent's context is genuinely gone.
+- **Verified the previous run's claims instead of trusting them:** 43 lessons,
+  217 questions, 81 tests green, tree clean, local `main` identical to
+  `origin/main`. All accurate.
+- **D-033 — labs cut.** Closes the question D-027 left open and had been
+  blocking M11 for three sessions. BUILD_PLAN Stage C is amended in place per
+  standing rule 2, with what was given up written down. Earlier signed stages
+  still mention labs; that text was deliberately LEFT ALONE rather than
+  rewritten, because editing signed gate text to match a later decision would
+  falsify the record.
+- **D-029 to D-032 logged and ratified**, one per request, with the option
+  chosen and the rejected options kept.
+- **`src/lib/question-selection.ts` + 12 tests.** The engine behind D-030.
+
+**The design finding that made this cheap.** `attempts` is already append-only
+ground truth carrying a questionId, a correctness flag and a timestamp for
+every answer ever graded — so "has he seen this, when, was he right" is
+DERIVED, exactly as srsState is. No new object store, no schema version bump,
+and therefore none of the blocked-upgrade risk that produced the 2026-07-19
+hotfix. The feature that looked like it needed a migration needed none.
+
+**The design decision worth remembering: rotation, not randomness.** Shuffling
+cannot promise "you won't see that question again for N takes" — independent
+draws collide, so a question can reappear on the very next take. Serving the
+least recently seen questions first can promise it, and the promise is
+asserted in a test rather than claimed in a commit message: a 30-question bank
+survives six five-question takes with zero repeats.
+
+**Wired into the checkpoint quiz** (the only place today with a pool big
+enough to show it — 217 questions, 12 per checkpoint, so 18 clean takes).
+`checkpointQuestions` moved to an options object; `CheckpointScreen` now reads
+history before drawing, holds the sample in state so a study-time tick cannot
+reshuffle mid-quiz, and is keyed by checkpoint id so moving between
+checkpoints redraws.
+
+**Browser verification — the previous run's open caveat is now closed.** I
+could drive a browser, so the D-028 checkpoint rows have been SEEN rendering:
+"Checkpoint 1 · Hardware foundations + Numerics — opens once you reach
+Numerics" on Home, and the checkpoint quiz itself drawing 12 questions. Seeded
+14 M1 attempts directly into IndexedDB, reloaded, and confirmed the draw
+changed and still returned 12 with no console errors; the seeded rows were
+then deleted, leaving the local dev database clean. Christopher's real
+progress was never touched — the dev server is a different origin from the
+deployed app, so they are separate databases.
+
+**94 tests green** (81 → 94), typecheck clean, production build clean.
+
+**In progress / half-finished:** nothing. But the selection engine is
+DELIBERATELY not yet wired into lesson quizzes, and that is not an oversight:
+a lesson has ~5 questions and its quiz serves ~5, so the quiz IS the bank and
+there is nothing to rotate. Wiring it there changes nothing until the pools
+grow. Christopher will therefore see NO difference on a lesson retry yet —
+only on checkpoints.
+
+**Next session should start with:** template expansion in the content compiler
+(D-030) — the piece that grows per-lesson pools and switches lesson-quiz
+rotation on. Then D-029's daily quiz, then D-031's quotes (which needs a
+sourcing pass, not a writing pass), then M11–M14.
+
+**Open questions for Christopher:** none blocking. He has been told plainly
+that his 20-takes and 6-takes-without-rephrasing targets are not being met and
+why — roughly 6 clean takes is the honest number, and 30 conceptually distinct
+questions per lesson does not exist in a lesson that teaches five ideas.
+
+**New DECISIONS.md entries this session:** D-029, D-030, D-031, D-032, D-033
+(all ratified; D-029 through D-032 were logged as pending earlier in the same
+session and ratified once he delegated).
