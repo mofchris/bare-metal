@@ -538,3 +538,85 @@ The ledger proved itself mid-session: while writing m4/02 I introduced "epoch" i
 **Next session should start with:** Christopher's read of the questions in the app, particularly whether the new applied ones are the right difficulty. The obvious remaining content gap is that the curriculum still has no labs, and ten of them are named in BUILD_PLAN and docs/CURRICULUM.md while none exist as files.
 **Open questions for Christopher:** none outstanding.
 **New DECISIONS.md entries this session:** none — this applies D-026 to the question bank rather than deciding anything new.
+
+## Sessions 2026-07-22 / 2026-07-23 (blocks 27–31) — BACKFILLED 2026-07-25
+
+**⚠ This entry is a reconstruction, not a live log.** Five sessions' worth of
+work shipped across six commits without a single SESSION_LOG entry, which
+CLAUDE.md defines as a failed session regardless of code quality. It was
+noticed at the start of the 2026-07-25 session and written from the only
+surviving evidence: commit messages, diffstats, D-027, D-028, and the state of
+the working tree. **Anything that lived only in the authoring agent's head at
+the time — rejected phrasings, near-misses, judgement calls made and not
+committed — is gone.** Treat the detail below as accurate but thin.
+
+**Stage:** B | **Gate status:** Gate B unsigned
+
+**Done (commit by commit):**
+
+- `38dfa08` **D-027 — curriculum restructured to the Fall 2027 roadmap's MLSys
+  syllabus.** Cross-referencing the roadmap PDF against the built curriculum
+  found the disagreement ran both ways: five roadmap topics had no home in
+  Metal at all, while Metal planned two modules (GPU architecture and kernels,
+  ML compilers) the roadmap never asks for. Those two were demoted to optional
+  MX1/MX2. Nine modules added, numbered in dependency order so the app's
+  prereq gating matches the learning order. The framing that settled it is
+  Christopher's: the two flagship repositories are competence evidence, Metal
+  is the general knowledge base, so the roadmap's STUDY column is Metal's
+  contract and its OUTPUT column belongs to the repositories.
+- `2948685` **M6 — the operating system underneath** (5 lessons, 25 questions)
+- `f1e7c99` **M7 — reading and writing technical results** (3 lessons, 15 questions)
+- `08c691f` **M8 — the PyTorch execution model** (5 lessons, 25 questions)
+- `8863068` **D-028 — optional checkpoint quizzes after every two modules.**
+  Sampled from the two modules' existing banks rather than newly authored, so
+  there is zero fabrication risk and the checkpoint auto-syncs as questions are
+  edited. Ungated by design: records attempts and feeds SRS, gates nothing.
+  `src/lib/checkpoints.ts` pairs consecutive modules in curriculum order, so
+  pairs extend automatically as later modules land.
+- `067a4a1` **M9 — model compression** (5 lessons, 25 questions)
+- `ae9b8d8` **M10 — runtimes and export: ONNX Runtime** (4 lessons, 20 questions)
+- `a25d6bb` **Audit fix** — `runtime` is an ordinary English word and was
+  firing as a false positive in `tools/audit-terms.mjs`.
+
+**The term audit earned its keep again**, catching three cross-module problems
+across this run that a human reviewer would plausibly have shipped: a `pinning`
+collision in M6 (memory pinning vs process pinning), `percentile calibration`
+being attributed to M9 when M3/03 actually owns it, and the `runtime` false
+positive above.
+
+**M10 and the no-invented-benchmarks line.** ONNX Runtime is the easiest place
+in the whole curriculum to quote a "2× faster" that cannot be backed up. The
+lessons teach mechanism instead and hand the number back to Christopher to
+measure: fusion's memory win derives from M1/03 (three elementwise round trips
+collapse to one), and "more threads can be slower" derives from M6/04's
+hyper-threading plus M1/03's bandwidth ceiling. Each lesson closes by saying
+the real figure is something you measure against a PyTorch baseline — which
+makes it his to produce in cheapserve rather than mine to assert.
+
+**State verified 2026-07-25 (re-checked, not taken on trust):** 43 lessons and
+217 questions on disk across M1–M10; 81 tests green in 16 files; working tree
+clean; local `main` identical to `origin/main` at `a25d6bb`.
+
+**In progress / half-finished:** nothing. The run ended cleanly at a reported
+checkpoint, holding for Christopher's go-ahead on M11 rather than continuing.
+
+**Not verified, carried forward:** the D-028 checkpoint rows have never been
+seen rendered — the authoring agent could not drive a browser, so the feature
+is covered by logic and tests only. Home should show copper-tinted
+"Checkpoint N" rows between module pairs (C1–C5 exist now; C6 appears when
+M13+M14 land). Worth a look on the next open.
+
+**Next session should start with:** M11 — Profiling ML workloads (prereq M8;
+operator-level and memory profiling, distinct from M2/03's generic Python
+profiling) — **but it is blocked on the labs decision below.**
+
+**Open questions for Christopher:**
+
+1. **Labs: yes or no?** Asked at D-027, still unanswered, and it now blocks:
+   M11 is the most lab-shaped module remaining, and a lab retrofitted later
+   costs more than one authored in place.
+2. A batch of feature requests arrived 2026-07-25 — daily quiz, question-bank
+   variety, daily quotes. Captured as pending D-029, D-030, D-031 rather than
+   started, since each carries a real design decision.
+
+**New DECISIONS.md entries these sessions:** D-027, D-028 (both ratified).
