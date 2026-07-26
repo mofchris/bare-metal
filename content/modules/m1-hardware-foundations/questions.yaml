@@ -626,8 +626,11 @@
   lesson: m1/01-memory-hierarchy
   type: mcq
   vars:
-    line_bytes: [64, 128]
-    element_bytes: [2, 8]
+    # 64 bytes is the line size m1/01 actually teaches. An earlier version also
+    # asked about 128-byte lines, which the lesson never mentions — that is how
+    # a templated question ends up testing something the reader was never told.
+    line_bytes: [64]
+    element_bytes: [2, 8, 16]
   derive:
     values_per_line: line_bytes / element_bytes
     assumed_float32: line_bytes / 4

@@ -63,7 +63,9 @@ export function RunTrend({ runs }: { runs: RunSummary[] }) {
               onClick={() => setSelected(run.sessionId)}
             >
               <span class="run-bar" style={{ height: `${Math.max(pct, 4)}%` }} />
-              <span class="run-tag">{run.kind ? KIND_TAGS[run.kind] : "?"}</span>
+              {/* No tag at all for runs recorded before the kind was stored —
+                  a row of "?" marks says nothing and just adds noise. */}
+              {run.kind && <span class="run-tag">{KIND_TAGS[run.kind]}</span>}
             </button>
           );
         })}

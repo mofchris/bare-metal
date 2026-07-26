@@ -1574,15 +1574,21 @@ article h2,
   align-items: baseline;
   gap: 0.6rem;
   flex-wrap: wrap;
-  margin-top: 0.5rem;
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 2px solid var(--copper);
+  background: color-mix(in srgb, var(--copper) 8%, transparent);
+  border-radius: 0 3px 3px 0;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.9rem;
 }
 .run-detail-kind {
   color: var(--copper-bright);
+  font-weight: 600;
 }
 .run-detail-score {
   color: var(--ink);
+  font-weight: 600;
 }
 .run-detail-date {
   color: var(--ink-dim);

@@ -26,6 +26,7 @@ import {
   isDailyReviewDue,
 } from "../lib/daily-review";
 import { questionCountFor } from "../lib/lookup";
+import { LESSON_QUIZ_SIZE } from "../lib/question-selection";
 import { quoteForDay } from "../lib/quotes";
 import {
   noteToShow,
@@ -424,9 +425,13 @@ function ModuleBlock({
                   <span class="lesson-meta">
                     {record?.bestScorePct !== undefined &&
                       `best ${record.bestScorePct}% · `}
+                    {/* The QUIZ length, not the bank size. This used to print
+                        the bank ("30 questions") which read as "you answered
+                        30" — Christopher asked when he had ever done that. He
+                        had not; the quiz is five, drawn from a bank of 30. */}
                     {open
                       ? questions > 0
-                        ? `${questions} questions`
+                        ? `${Math.min(questions, LESSON_QUIZ_SIZE)}-question quiz`
                         : "no questions yet"
                       : `needs ${PASS_MARK}% on previous`}
                   </span>
