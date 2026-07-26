@@ -232,6 +232,7 @@ function Screen({
           ) : (
             <LessonView
               location={location}
+              db={db}
               nextUnlocked={
                 location.next !== null &&
                 lessonUnlocked(location.module, location.next.id, statuses)

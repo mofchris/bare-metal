@@ -777,3 +777,90 @@ as naturally as the hand-written ones.
 
 **New DECISIONS.md entries this session:** none new — this implements D-029,
 D-030 and D-031, all ratified in the previous block.
+
+## Session 2026-07-26 (twenty-ninth block — reading progress, mobile wrap fix, five requests logged)
+
+**Stage:** B | **Gate status:** Gate B unsigned
+
+**Trigger:** Christopher started actually reading M1 on his phone and sent a
+stream of feedback while doing it. That is the loop working — five separate
+items, four of them things only a real reader hits.
+
+**Built and shipped:**
+
+- **D-035 reading progress + bookmark.** A fixed 3px copper bar across the top
+  of a lesson showing how far through it he is, and a "you stopped 45% through
+  this lesson" prompt offering to jump back. Positions are stored as a
+  FRACTION, not a pixel offset, because the same lesson reflows to a completely
+  different height on his phone than on the laptop. Saved through the existing
+  `meta` store — no schema bump, the third feature running for free off that
+  decision. The prompt OFFERS rather than jumps: being flung down the page on
+  load is disorienting, and a lesson read to the end restores to the top.
+- **Mobile text-wrap fix** (his screenshot). `.lesson-meta` carried
+  `white-space: nowrap`, which is harmless on the short strings it was designed
+  for ("6 questions", "2/5 passed") and broke the two full sentences on the
+  Sync page — the Restore paragraph ran clean off the side of a 375px screen.
+  Dropped the nowrap rather than patching one call site: four places use the
+  class for prose, and the short strings almost never wrap anyway. Verified no
+  horizontal overflow on Home, Sync, a lesson, and Progress at 375px.
+
+**The bug browser testing caught, which tests would not have.** The first
+version of ReadingProgress drew the bar on mount, and that initial draw went
+through the same code path as a scroll — including the save. `lastSavedAt`
+starts at zero, so the throttle always let it through, and opening a lesson
+immediately wrote "position 0", destroying the bookmark microseconds before the
+component tried to offer it. Every unit test passed; the resume prompt simply
+never appeared. Fixed by splitting draw from save and persisting only after a
+real scroll, which also fixes the quieter case of opening a lesson, not
+reading, and leaving.
+
+**Verification note, recorded because it limits what was checked:** the Browser
+pane does not composite frames, so real scroll events never fire and smooth
+scrolling never animates. The bar and the save path were exercised with
+dispatched scroll events (45% scroll produced a 45.002% bar and a stored
+0.45002), and the resume button was verified by capturing the scroll target it
+requests (top: 2252 against an expected 2224 — the difference is the prompt's
+own height, still in the DOM when the target is computed). Actual finger-scroll
+on his phone is unverified by me.
+
+**Logged, not built** — five requests arrived this session:
+
+- **D-034** in-lesson practice problems with graded difficulty and revealable
+  hints. He hit it at m1/03, which says "work three examples by hand" and then
+  works all three for him. THE AUDIT FOUND IT IS SYSTEMIC: 34 of 43 lessons
+  print "A correct answer says..." in the same paragraph as the question, so
+  there is nowhere in Metal he can attempt something before being told. Pending.
+- **D-036** his ten-paragraph DRAM-internals write-up. Sound material that
+  genuinely closes a gap m1/03 leaves open — the lesson asserts latency cannot
+  be widened away and only explains it by analogy. Accepted as a SOURCE to work
+  from, not text to paste: it needs real references for the enforced `sources`
+  field, and as written it introduces a dozen ungrounded terms, which would
+  regress exactly what D-025 and D-026 fixed. Pending his choice of placement.
+- **D-037** harsher quotes when he breaks his streak, Ego-flavoured. Pending one
+  policy answer: he asked for nothing invented but also floated "rephrasing"
+  lines to fit the platform, and those two pull apart. Recommendation is to keep
+  the quoted words verbatim and put the study-context framing in the app's own
+  voice.
+- **D-038** offer study-sync sign-in on first open instead of making a new user
+  find the Sync page. Ratified, with the honest limit recorded that Metal cannot
+  detect whether he has used the other two apps — separate origins — so the
+  prompt must be worded to work either way.
+- **D-032** in-app what's-new remains ratified and unbuilt.
+
+**Field note:** he is signed in as `derjager` and synced on his phone, which
+closes the live sync E2E test left open since 2026-07-19.
+
+**155 tests green** (was 140), typecheck clean, build clean.
+
+**In progress / half-finished:** nothing.
+
+**Next session should start with:** his answers on D-036 placement and D-037
+phrasing policy, both of which block content work. Then D-034, which is the
+biggest of the open items and the one most likely to change how he studies.
+
+**Open questions for Christopher:** D-036 (new M1 lesson, or fold into m1/01?),
+D-037 (verbatim quotes with app-voice framing, confirmed?), and whether the
+m1/03 "work three examples" sentence should be reworded now or left until the
+real practice feature lands.
+
+**New DECISIONS.md entries this session:** D-034, D-035, D-036, D-037, D-038.

@@ -1,22 +1,29 @@
 // Lesson screen: objectives, the lesson body, sources, and next-lesson nav.
-// Depends on: lib/curriculum (types), lib/route, lib/lookup (LessonLocation).
-// Depended on by: app.tsx.
+// Depends on: lib/curriculum (types), lib/route, lib/lookup (LessonLocation),
+// components/reading-progress. Depended on by: app.tsx.
 
 import { questionCountFor, type LessonLocation } from "../lib/lookup";
 import { lessonHref, quizHref } from "../lib/route";
+import { ReadingProgress } from "./reading-progress";
+import type { ProgressDb } from "../lib/progress-store";
 
 export function LessonView({
   location,
   nextUnlocked,
+  db,
 }: {
   location: LessonLocation;
   /** False when the next lesson still needs this lesson's quiz (D-023). */
   nextUnlocked: boolean;
+  db: ProgressDb | null;
 }) {
   const { module, lesson, next } = location;
   const questionCount = questionCountFor(module, lesson.id);
   return (
     <article>
+      {/* Keyed by lesson id so moving between lessons resets the bar and
+          re-reads that lesson's own saved position (D-035). */}
+      <ReadingProgress key={location.lesson.id} lessonId={location.lesson.id} db={db} />
       <nav class="crumbs">
         <a href="#/">← All modules</a>
       </nav>
