@@ -864,3 +864,77 @@ m1/03 "work three examples" sentence should be reworded now or left until the
 real practice feature lands.
 
 **New DECISIONS.md entries this session:** D-034, D-035, D-036, D-037, D-038.
+
+## Session 2026-07-26 (thirtieth block — "handle all except the quote stuff")
+
+**Stage:** B | **Gate status:** Gate B unsigned
+
+**Trigger:** Christopher delegated the whole open queue except D-037.
+
+**Shipped, in order:**
+
+- **D-034 — practice problems inside lessons.** A lesson declares them in
+  frontmatter and places them with a `{{practice:N}}` marker, so a problem sits
+  where the argument reaches it rather than being swept to the end. Rendered as
+  native `<details>` elements: hints and answers stay hidden until asked for
+  with NO JavaScript, which means it works offline, with a keyboard, and inside
+  the pre-rendered lesson HTML with no component to keep in sync. The compiler
+  rejects a problem that is never placed, a marker with no problem, and a list
+  whose difficulty goes backwards — he asked for rising difficulty, so that is
+  enforced rather than trusted.
+- **m1/03 fixed.** It said "work three examples by hand" and then worked all
+  three. Now three real problems at levels 1, 2 and 3, with hints, and the
+  arithmetic he was promised. The prose says what it now does.
+- **D-032 — in-app what's-new**, compiled from `content/release-notes.yaml`.
+  Never fires on a fresh install: there is no "since last time" for a first
+  open, so the current version is recorded silently and the NEXT release is
+  what gets announced. Behaviour changes only — a notice that fired on every
+  content edit would appear most days and be dismissed unread.
+- **D-038 — first-open sign-in offer**, with the detection limit recorded in
+  the code: Metal cannot tell whether he has used the GRE or Network+ sims
+  (separate origins), so the wording works either way instead of claiming to
+  know.
+- **D-036 — new lesson `m1/01b-dram-internals`**, from his own write-up.
+
+**The two judgement calls worth reading in D-036.** First, the id is `01b`, not
+a renumber: lesson ids key his stored progress, so shifting 02 to 03 would
+orphan every record he has, while module.yaml controls order anyway. Second,
+his claim that on-package memory "improves latency somewhat" could NOT be
+sourced — the bandwidth half is well supported, a specific latency figure is
+not — so rather than assert it, the lesson derives the point from physics: a
+signal covers ~15 cm/ns on a board trace, so a chip 3 cm away is a 0.4 ns round
+trip against a ~41 ns access, about 1%. That is a stronger version of his
+argument and needs no source beyond arithmetic.
+
+**Two bugs the tooling caught on me, both worth recording:**
+
+- The compiler rejected my own new lesson because I authored three practice
+  problems and never placed their markers. That check existed for about twenty
+  minutes before it caught its author.
+- The term audit then flagged that inserting a lesson BEFORE m1/02 and m1/03
+  meant it used `clock` and `bandwidth` ahead of the lessons owning them.
+  Both are now grounded in place in 01b, ledger ownership moved, and a stale
+  known-accepted row for `bandwidth` deleted since that forward reference no
+  longer exists. Audit CLEAN.
+
+**Verified in the browser:** practice blocks render with all details closed,
+answer text absent from the page until opened, levels labelled 1/2/3, correct
+hint counts, no `<div>` nested in a `<p>`; what's-new absent on a fresh install
+but shown after an older version is recorded, dismissing it sticks across a
+reload; sign-in offer shows, dismisses, and stays gone. Zero horizontal
+overflow at 375px. No console errors. Test data cleaned up after each check.
+
+**171 tests green** (was 155). 44 lessons, 268 questions.
+
+**In progress / half-finished:** nothing.
+
+**Next session should start with:** M11 — Profiling ML workloads. The feature
+queue is now empty except D-037, which is waiting on his phrasing decision.
+
+**Open questions for Christopher:** D-037 only — whether quoted lines stay
+verbatim with the study-context framing in Metal's own voice, rather than
+rephrasing characters' words. Also worth his eye: whether the new DRAM lesson
+reads at the right level, since it is the densest thing in M1.
+
+**New DECISIONS.md entries this session:** none new — D-034, D-036 and D-038
+were implemented and D-036 ratified with its reasoning recorded.
