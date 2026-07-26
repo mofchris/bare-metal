@@ -8,6 +8,7 @@ export type Route =
   | { screen: "lesson"; lessonId: string }
   | { screen: "quiz"; lessonId: string }
   | { screen: "review" }
+  | { screen: "daily" }
   | { screen: "dashboard" }
   | { screen: "backup" }
   | { screen: "exam"; moduleId: string }
@@ -16,6 +17,7 @@ export type Route =
 /** Parse a location.hash value. Anything unrecognized falls back to home. */
 export function parseRoute(hash: string): Route {
   if (hash === "#/review") return { screen: "review" };
+  if (hash === "#/daily") return { screen: "daily" };
   if (hash === "#/dashboard") return { screen: "dashboard" };
   if (hash === "#/backup") return { screen: "backup" };
   if (hash.startsWith("#/exam/") && hash.length > "#/exam/".length) {
@@ -52,6 +54,9 @@ export function quizHref(lessonId: string): string {
 export function examHref(moduleId: string): string {
   return `#/exam/${moduleId}`;
 }
+
+/** Build the href for the daily review quiz (D-029). */
+export const DAILY_REVIEW_HREF = "#/daily";
 
 /** Build the href for a checkpoint quiz, identified by its first module's id. */
 export function checkpointHref(firstModuleId: string): string {

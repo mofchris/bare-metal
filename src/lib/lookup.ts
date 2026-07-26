@@ -38,6 +38,15 @@ export function questionCountFor(module: Module, lessonId: string): number {
   return questionsFor(module, lessonId).length;
 }
 
+/** Flat lesson id → lesson title, so a cross-lesson quiz can name a lesson. */
+export function lessonTitles(curriculum: Curriculum): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const module of curriculum.modules) {
+    for (const lesson of module.lessons) map.set(lesson.id, lesson.title);
+  }
+  return map;
+}
+
 /** Flat id → question index across all modules (for the review deck). */
 export function questionById(curriculum: Curriculum): Map<string, Question> {
   const map = new Map<string, Question>();

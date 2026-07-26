@@ -30,6 +30,12 @@ interface QuizProps {
   examModuleId?: string;
   /** The lesson this quiz unlocks, so passing can offer it directly. */
   next?: Lesson | null;
+  /** Called once when the run reaches its summary — the daily review uses this
+      to record that today's review has been taken (D-029). */
+  onCompleted?: () => void;
+  /** Lesson id → title, so a missed question can name the lesson to reread.
+      Absent for single-lesson quizzes, where the lesson is already obvious. */
+  lessonTitles?: ReadonlyMap<string, string>;
 }
 
 interface AnsweredQuestion {
@@ -47,6 +53,8 @@ export function Quiz({
   markDoneLessonId,
   examModuleId,
   next,
+  onCompleted,
+  lessonTitles,
 }: QuizProps) {
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   // "answering" → inputs live; "feedback" → result + explanation shown.
@@ -119,6 +127,8 @@ export function Quiz({
         markDoneLessonId={markDoneLessonId}
         examModuleId={examModuleId}
         next={next}
+        onCompleted={onCompleted}
+        lessonTitles={lessonTitles}
       />
     );
   }
@@ -259,6 +269,8 @@ function Summary({
   markDoneLessonId,
   examModuleId,
   next,
+  onCompleted,
+  lessonTitles,
 }: {
   backHref: string;
   backLabel: string;
@@ -269,6 +281,8 @@ function Summary({
   markDoneLessonId?: string;
   examModuleId?: string;
   next?: Lesson | null;
+  onCompleted?: () => void;
+  lessonTitles?: ReadonlyMap<string, string>;
 }) {
   const correctCount = answered.filter((a) => a.correct).length;
   const scorePct = Math.round((correctCount / answered.length) * 100);
@@ -290,6 +304,13 @@ function Summary({
     Promise.all(writes).catch((e: unknown) =>
       setStatusError(e instanceof Error ? e.message : String(e)),
     );
+  }, []);
+
+  // Reaching the summary counts as having taken the quiz, whatever the score —
+  // Christopher's rule for the daily review is that it goes away once he
+  // "tries to complete" it, not only when he passes it.
+  useEffect(() => {
+    onCompleted?.();
   }, []);
   return (
     <div>
@@ -316,6 +337,19 @@ function Summary({
           <li key={question.id} class={correct ? "correct" : "incorrect"}>
             <span class="quiz-review-mark">{correct ? "✓" : "✗"}</span>
             {question.prompt}
+            {/* Remediation for a missed question is the lesson that grounds it
+                (D-029). The lesson prose already explains this properly, so
+                sending him there beats writing a second, parallel explanation
+                that would drift from the first. */}
+            {!correct && (
+              <a class="quiz-review-relearn" href={lessonHref(question.lesson)}>
+                Reread
+                {lessonTitles?.get(question.lesson)
+                  ? `: ${lessonTitles.get(question.lesson)}`
+                  : " the lesson"}{" "}
+                →
+              </a>
+            )}
           </li>
         ))}
       </ul>

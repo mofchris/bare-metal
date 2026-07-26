@@ -19,7 +19,12 @@ import { TICK_SECONDS } from "./lib/study-time";
 import { getAuth, syncNow } from "./lib/sync";
 import { loadCurriculum } from "./lib/load-curriculum";
 import { parseRoute, type Route } from "./lib/route";
-import { findLesson, type LessonLocation } from "./lib/lookup";
+import { findLesson, lessonTitles, type LessonLocation } from "./lib/lookup";
+import {
+  dailyReviewPool,
+  dailyReviewQuestions,
+  DAILY_REVIEW_TAKEN_KEY,
+} from "./lib/daily-review";
 import { checkpointById, checkpointQuestions, type Checkpoint } from "./lib/checkpoints";
 import { openProgressDb, type ProgressDb } from "./lib/progress-store";
 import { Home } from "./components/home";
@@ -286,6 +291,9 @@ function Screen({
     // rather than reusing the previous checkpoint's questions.
     return <CheckpointScreen key={checkpoint.id} checkpoint={checkpoint} db={db} />;
   }
+  if (route.screen === "daily") {
+    return <DailyReviewScreen curriculum={load.curriculum} db={db} />;
+  }
   if (route.screen === "review") {
     return <Review curriculum={load.curriculum} db={db} />;
   }
@@ -310,6 +318,10 @@ function Screen({
 function useDrawnQuestions(
   db: ProgressDb | null,
   draw: (history: ReadonlyMap<string, QuestionHistory>) => Question[],
+  /** Set false while the caller is still assembling what to draw FROM — the
+      daily review has to read lesson statuses first, and drawing before that
+      lands would silently produce an empty quiz. */
+  ready = true,
 ): Question[] | null {
   const [questions, setQuestions] = useState<Question[] | null>(null);
   // The draw closure is rebuilt every render; keeping it in a ref means the
@@ -322,7 +334,7 @@ function useDrawnQuestions(
   const drawnWithHistory = useRef(false);
 
   useEffect(() => {
-    if (drawnWithHistory.current) return;
+    if (!ready || drawnWithHistory.current) return;
     let cancelled = false;
     void (async () => {
       const history = db
@@ -335,7 +347,7 @@ function useDrawnQuestions(
     return () => {
       cancelled = true;
     };
-  }, [db]);
+  }, [db, ready]);
 
   return questions;
 }
@@ -343,6 +355,74 @@ function useDrawnQuestions(
 /** Shown while the attempt history is read and the sample drawn. */
 function DrawingQuestions() {
   return <p class="muted">Drawing your questions…</p>;
+}
+
+/**
+ * The daily review quiz (D-029): a mixed set drawn from lessons already
+ * completed. Ungated and unscored against any lesson — taking it records
+ * attempts and feeds the review schedule, but unlocks nothing. Reaching the
+ * summary marks today's review as taken, whatever the score.
+ */
+function DailyReviewScreen({
+  curriculum,
+  db,
+}: {
+  curriculum: Curriculum;
+  db: ProgressDb | null;
+}) {
+  const [pool, setPool] = useState<Question[] | null>(null);
+
+  useEffect(() => {
+    if (!db) {
+      setPool([]);
+      return;
+    }
+    let cancelled = false;
+    db.lessonStatuses()
+      .then((statuses) => {
+        if (!cancelled) setPool(dailyReviewPool(curriculum, statuses));
+      })
+      .catch(() => {
+        if (!cancelled) setPool([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [db, curriculum]);
+
+  const questions = useDrawnQuestions(
+    db,
+    (history) => dailyReviewQuestions(pool ?? [], history),
+    pool !== null,
+  );
+
+  if (pool === null || questions === null) return <DrawingQuestions />;
+  if (pool.length === 0) {
+    return (
+      <div class="error-block">
+        <h2>Nothing to review yet</h2>
+        <p>
+          The daily review draws on lessons you have already passed. Finish your first
+          lesson quiz and it will start appearing. <a href="#/">Back home.</a>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <Quiz
+      title="Daily review"
+      backHref="#/"
+      backLabel="Home"
+      questions={questions}
+      db={db}
+      lessonTitles={lessonTitles(curriculum)}
+      onCompleted={() => {
+        // Fire-and-forget: failing to record "taken today" must not break the
+        // summary he is looking at. Worst case the card reappears.
+        void db?.setMeta(DAILY_REVIEW_TAKEN_KEY, localDateKey(new Date()));
+      }}
+    />
+  );
 }
 
 /**

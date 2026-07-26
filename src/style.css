@@ -1225,3 +1225,45 @@ article h2,
   height: 100%;
   background: var(--copper);
 }
+
+/* Daily review prompt (D-029) — the first thing on screen once a day, so it
+   reads as an offer rather than a warning: copper edge, not the alarm colour. */
+.daily-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 1.4rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--copper) 38%, var(--hairline));
+  border-left: 3px solid var(--copper);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--copper) 8%, var(--board));
+}
+.daily-card-text h3 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--copper-bright);
+}
+.daily-card-text p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 52ch;
+}
+.daily-card-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* A missed question links to the lesson that grounds it — the remediation is
+   the authored lesson, not a second explanation written alongside it. */
+.quiz-review-relearn {
+  display: inline-block;
+  margin-left: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}

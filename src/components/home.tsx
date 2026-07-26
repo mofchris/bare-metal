@@ -11,7 +11,20 @@
 import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { Curriculum, Lesson, Module } from "../lib/curriculum";
-import { checkpointHref, examHref, lessonHref, quizHref } from "../lib/route";
+import {
+  checkpointHref,
+  DAILY_REVIEW_HREF,
+  examHref,
+  lessonHref,
+  quizHref,
+} from "../lib/route";
+import {
+  dailyReviewPool,
+  DAILY_REVIEW_DISMISSED_KEY,
+  DAILY_REVIEW_SIZE,
+  DAILY_REVIEW_TAKEN_KEY,
+  isDailyReviewDue,
+} from "../lib/daily-review";
 import { questionCountFor } from "../lib/lookup";
 import { checkpointById, CHECKPOINT_SIZE, type Checkpoint } from "../lib/checkpoints";
 import { dueQuestionIds, nextDueAt } from "../lib/srs";
@@ -42,6 +55,9 @@ interface ProgressData {
   due: number;
   nextDue: string | null;
   reminder: ReminderState;
+  /** Local day the daily review was last taken / dismissed (D-029). */
+  dailyTakenDay: string | undefined;
+  dailyDismissedDay: string | undefined;
 }
 
 const attemptDaysOf = (attempts: AttemptRecord[]): Set<string> =>
@@ -66,22 +82,40 @@ export function Home({
       db.allStudyTime(),
       db.allSrsStates(),
       db.getMeta("lastExportAt"),
+      db.getMeta(DAILY_REVIEW_TAKEN_KEY),
+      db.getMeta(DAILY_REVIEW_DISMISSED_KEY),
     ])
-      .then(([statuses, exams, attempts, studyTime, srs, lastExportAt]) => {
-        const now = new Date();
-        setData({
+      .then(
+        ([
           statuses,
           exams,
           attempts,
           studyTime,
-          due: dueQuestionIds(srs, now).length,
-          nextDue: nextDueAt(srs, now),
-          reminder: exportReminder(lastExportAt ?? null, attempts.length > 0, now),
-        });
-      })
+          srs,
+          lastExportAt,
+          dailyTakenDay,
+          dailyDismissedDay,
+        ]) => {
+          const now = new Date();
+          setData({
+            statuses,
+            exams,
+            attempts,
+            studyTime,
+            due: dueQuestionIds(srs, now).length,
+            nextDue: nextDueAt(srs, now),
+            reminder: exportReminder(lastExportAt ?? null, attempts.length > 0, now),
+            dailyTakenDay,
+            dailyDismissedDay,
+          });
+        },
+      )
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, [db]);
 
+  // Dismissing writes to storage, but the card must vanish on the click rather
+  // than after a round-trip; this holds that until the next load reads it back.
+  const [dismissedNow, setDismissedNow] = useState(false);
   const statuses = data?.statuses ?? new Map<string, LessonProgressRecord>();
   const exams = data?.exams ?? new Map<string, ExamResultRecord>();
   const lessons = curriculum.modules.flatMap((m) => m.lessons);
@@ -96,6 +130,20 @@ export function Home({
       ),
     )[0];
 
+  // The daily review is offered once a day, only once something has been
+  // completed to review, and only after progress has actually loaded — showing
+  // it against an empty `statuses` would flash a card that then disappears.
+  const dailyPool = data ? dailyReviewPool(curriculum, statuses) : [];
+  const dailyReviewOffered =
+    data !== null &&
+    !dismissedNow &&
+    dailyPool.length > 0 &&
+    isDailyReviewDue(
+      localDateKey(new Date()),
+      data.dailyTakenDay,
+      data.dailyDismissedDay,
+    );
+
   return (
     <div>
       {error && <p class="warn-banner">Couldn't read progress records: {error}</p>}
@@ -107,6 +155,19 @@ export function Home({
           Browser storage can be wiped without warning:{" "}
           <a href="#/backup">export a backup file</a>.
         </p>
+      )}
+
+      {dailyReviewOffered && (
+        <DailyReviewCard
+          questionCount={Math.min(dailyPool.length, DAILY_REVIEW_SIZE)}
+          onDismiss={() => {
+            // Optimistic: hide it immediately, then persist. If the write
+            // fails the card returns on the next load, which is the safe way
+            // round — a lost dismissal is an annoyance, a lost review is not.
+            setDismissedNow(true);
+            void db?.setMeta(DAILY_REVIEW_DISMISSED_KEY, localDateKey(new Date()));
+          }}
+        />
       )}
 
       <Hero
@@ -470,6 +531,40 @@ function HowItWorks() {
           mastery numbers up top do the honest bookkeeping.
         </li>
       </ul>
+    </section>
+  );
+}
+
+/**
+ * The once-a-day prompt to review completed material (D-029). It sits above
+ * everything else because it is meant to be the first thing seen on opening
+ * the app, and it offers exactly two ways out — take it or dismiss it — which
+ * is Christopher's rule: it stays until one of those happens.
+ */
+function DailyReviewCard({
+  questionCount,
+  onDismiss,
+}: {
+  questionCount: number;
+  onDismiss: () => void;
+}) {
+  return (
+    <section class="daily-card rise">
+      <div class="daily-card-text">
+        <h3>Today's review</h3>
+        <p>
+          {questionCount} questions drawn from lessons you've already passed. Nothing is
+          locked behind it — it just keeps old material warm.
+        </p>
+      </div>
+      <div class="daily-card-actions">
+        <a class="btn" href={DAILY_REVIEW_HREF}>
+          Start review →
+        </a>
+        <button class="btn btn-quiet" onClick={onDismiss}>
+          Not today
+        </button>
+      </div>
     </section>
   );
 }
