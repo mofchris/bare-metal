@@ -22,7 +22,8 @@ try {
   const questions = curriculum.modules.reduce((n, m) => n + m.questions.length, 0);
   console.log(
     `content compiled: ${curriculum.modules.length} module(s), ${lessons} lesson(s), ` +
-      `${questions} question(s) → ${outFile} (version ${curriculum.contentVersion})`,
+      `${questions} question(s), ${curriculum.quotes.length} quote(s) → ${outFile} ` +
+      `(version ${curriculum.contentVersion})`,
   );
 } catch (e) {
   if (e instanceof ContentError) {

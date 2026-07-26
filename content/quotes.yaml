@@ -1,0 +1,63 @@
+# Opening quotes (D-031). One is shown each day on the home screen, chosen by
+# day-of-year modulo the length of this list — so the list can be ANY size and
+# still work. It does not need to reach 365, and adding a line never disturbs
+# the others.
+#
+# ---------------------------------------------------------------------------
+# CHRISTOPHER: THIS FILE IS DELIBERATELY SHORT, AND IT IS YOURS TO GROW.
+#
+# You asked for 365 with a name attached to each. I did not write 365, for one
+# reason: I would have had to invent most of them. Checking just three lines
+# against sources caught me about to put the "devour everyone in front of me"
+# line in Ego's mouth when it is Isagi's — that is exactly the misattribution
+# you would have spotted in a second and I would not have. Filling a calendar
+# that way would have put fabricated words next to real characters' names,
+# which is the one thing this project does not do.
+#
+# So the app is built to run on a list of any length, and this is a seed. Add
+# a line whenever one lands — it takes ten seconds:
+#
+#   - text: "the line, as it was actually said"
+#     who: "Character Name"
+#     series: "Series Name"
+#
+# Then run `npm run build:content`. The compiler will tell you loudly if a
+# field is missing. Check the ones below too — you have watched these, I have
+# not.
+# ---------------------------------------------------------------------------
+
+- text: "I'll devour everyone in front of me to reach the top."
+  who: "Yoichi Isagi"
+  series: "Blue Lock"
+
+- text: "I'm not a genius. But I'll eat geniuses alive by stealing every weapon they show me."
+  who: "Yoichi Isagi"
+  series: "Blue Lock"
+
+- text: "If you don't become the world's best egoist, you can't become the world's best striker."
+  who: "Jinpachi Ego"
+  series: "Blue Lock"
+
+- text: "Is eleven guys working together what soccer is? That is why this country stays weak."
+  who: "Jinpachi Ego"
+  series: "Blue Lock"
+
+- text: "That's a hassle."
+  who: "Seishiro Nagi"
+  series: "Blue Lock"
+
+- text: "Set your heart ablaze."
+  who: "Kyojuro Rengoku"
+  series: "Demon Slayer"
+
+- text: "No matter how many people you lose, you have no choice but to go on living."
+  who: "Tanjiro Kamado"
+  series: "Demon Slayer"
+
+- text: "Arise."
+  who: "Sung Jinwoo"
+  series: "Solo Leveling"
+
+- text: "If you win, you live. If you lose, you die. If you don't fight, you can't win."
+  who: "Eren Yeager"
+  series: "Attack on Titan"

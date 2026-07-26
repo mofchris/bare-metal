@@ -1267,3 +1267,32 @@ article h2,
   font-family: var(--font-mono);
   font-size: 0.8rem;
 }
+
+/* The day's opening line (D-031). Quiet by design — it sets a tone on opening,
+   it is not a call to action, so it must not compete with the hero beneath it. */
+.daily-quote {
+  margin: 0.75rem 0 1.1rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid color-mix(in srgb, var(--copper) 45%, transparent);
+}
+.daily-quote blockquote {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--ink);
+  max-width: 62ch;
+}
+.daily-quote figcaption {
+  margin-top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--copper);
+}
+.daily-quote-series {
+  color: var(--ink-dim);
+}
+.daily-quote-series::before {
+  content: "· ";
+}

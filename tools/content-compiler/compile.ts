@@ -16,7 +16,13 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 import { marked } from "marked";
-import type { Curriculum, Lesson, Module, Question } from "../../src/lib/curriculum.ts";
+import type {
+  Curriculum,
+  Lesson,
+  Module,
+  Question,
+  Quote,
+} from "../../src/lib/curriculum.ts";
 import { evaluateExpression } from "./expression.ts";
 
 export class ContentError extends Error {
@@ -53,17 +59,48 @@ export function compileContent(contentRoot: string): Curriculum {
   }
 
   validateCrossReferences(modules, problems);
+  const quotes = readQuotes(join(contentRoot, "quotes.yaml"), problems);
 
   if (problems.length > 0) throw new ContentError(problems);
 
   const sorted = topologicalSort(modules);
   // Hash of everything the app will see: any content change produces a new
   // version, which is how the service worker will know to refetch (D-008).
+  // Quotes are part of "everything the app will see" — leaving them out meant
+  // editing quotes.yaml shipped a file the service worker considered unchanged.
   const contentVersion = createHash("sha256")
-    .update(JSON.stringify(sorted))
+    .update(JSON.stringify({ modules: sorted, quotes }))
     .digest("hex")
     .slice(0, 16);
-  return { contentVersion, modules: sorted };
+  return { contentVersion, modules: sorted, quotes };
+}
+
+/**
+ * Opening quotes (D-031). The file is OPTIONAL — a curriculum without one is
+ * valid and simply shows no quote — but if it exists every entry is validated,
+ * because a half-filled quote would render as a line with nobody's name on it.
+ */
+function readQuotes(file: string, problems: string[]): Quote[] {
+  if (!existsSync(file)) return [];
+  const parsed = parseYamlFile(file, problems);
+  if (parsed === null) return [];
+  if (!Array.isArray(parsed)) {
+    problems.push(`${file}: expected a YAML list of quotes`);
+    return [];
+  }
+  const quotes: Quote[] = [];
+  parsed.forEach((entry, i) => {
+    const where = `${file} entry ${i + 1}`;
+    if (!isRecord(entry)) {
+      problems.push(`${where}: expected a mapping`);
+      return;
+    }
+    const text = requireString(entry, "text", where, problems);
+    const who = requireString(entry, "who", where, problems);
+    const series = requireString(entry, "series", where, problems);
+    if (text && who && series) quotes.push({ text, who, series });
+  });
+  return quotes;
 }
 
 /* ---------------- module ---------------- */

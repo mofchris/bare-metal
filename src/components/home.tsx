@@ -26,6 +26,8 @@ import {
   isDailyReviewDue,
 } from "../lib/daily-review";
 import { questionCountFor } from "../lib/lookup";
+import { quoteForDay } from "../lib/quotes";
+import type { Quote } from "../lib/curriculum";
 import { checkpointById, CHECKPOINT_SIZE, type Checkpoint } from "../lib/checkpoints";
 import { dueQuestionIds, nextDueAt } from "../lib/srs";
 import { exportReminder, type ReminderState } from "../lib/backup";
@@ -156,6 +158,8 @@ export function Home({
           <a href="#/backup">export a backup file</a>.
         </p>
       )}
+
+      <DailyQuote quote={quoteForDay(curriculum.quotes, new Date())} />
 
       {dailyReviewOffered && (
         <DailyReviewCard
@@ -566,5 +570,21 @@ function DailyReviewCard({
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * The day's opening line (D-031). Renders nothing when no quotes are authored,
+ * so the home screen never shows an empty frame waiting to be filled.
+ */
+function DailyQuote({ quote }: { quote: Quote | null }) {
+  if (!quote) return null;
+  return (
+    <figure class="daily-quote">
+      <blockquote>{quote.text}</blockquote>
+      <figcaption>
+        {quote.who} <span class="daily-quote-series">{quote.series}</span>
+      </figcaption>
+    </figure>
   );
 }

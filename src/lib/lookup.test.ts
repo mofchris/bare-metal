@@ -12,6 +12,7 @@ const lesson = (id: string) => ({
 
 const curriculum: Curriculum = {
   contentVersion: "test",
+  quotes: [],
   modules: [
     {
       id: "m1",

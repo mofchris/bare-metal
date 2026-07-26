@@ -47,7 +47,16 @@ export interface Module {
   questions: Question[];
 }
 
+/** One opening quote, shown on the home screen a day at a time (D-031). */
+export interface Quote {
+  text: string;
+  who: string; // the character who said it
+  series: string;
+}
+
 export interface Curriculum {
   contentVersion: string; // hash of compiled content; cache-busting for the SW
   modules: Module[]; // topologically sorted by prereqs
+  /** May be empty — the home screen simply shows no quote in that case. */
+  quotes: Quote[];
 }
