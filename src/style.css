@@ -1594,3 +1594,80 @@ article h2,
   color: var(--ink-dim);
   margin-left: auto;
 }
+
+/* The animated node network behind the hero (D-039). Sits behind everything,
+   never intercepts a tap, and is masked at the left so it never fights the
+   headline for contrast. */
+.hero-constellation {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 45%);
+  mask-image: linear-gradient(to right, transparent 0%, black 45%);
+}
+.hero > *:not(.hero-constellation) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Whole-curriculum progress + projected finish (D-039). */
+.curriculum-progress {
+  margin: 1.4rem 0 0;
+  max-width: 34rem;
+}
+.curriculum-progress-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 0.35rem;
+}
+.curriculum-progress-num b {
+  color: var(--copper-bright);
+}
+.curriculum-progress-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--mask-2);
+  overflow: hidden;
+}
+.curriculum-progress-track i {
+  display: block;
+  height: 100%;
+  background: var(--copper);
+  border-radius: 4px;
+  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.curriculum-progress-eta {
+  margin-top: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+.curriculum-progress-eta b {
+  color: var(--ink);
+}
+
+/* Per-lesson progress: a hairline under the row, so a part-read lesson reads
+   as started rather than as untouched. */
+.lesson-progress {
+  display: block;
+  grid-column: 1 / -1;
+  height: 2px;
+  margin-top: 0.35rem;
+  background: var(--mask-2);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.lesson-progress i {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--copper) 70%, transparent);
+}

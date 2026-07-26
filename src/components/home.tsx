@@ -61,6 +61,12 @@ import type {
   ProgressDb,
 } from "../lib/progress-store";
 import { RunTrend, StreakCalendar, WeakestAreas } from "./panels";
+import { Constellation } from "./constellation";
+import {
+  curriculumProgress,
+  lessonProgressFraction,
+  paceEstimate,
+} from "../lib/completion";
 
 interface ProgressData {
   statuses: Map<string, LessonProgressRecord>;
@@ -79,6 +85,8 @@ interface ProgressData {
   signInPromptDismissed: string | undefined;
   /** "<lessonId>|<fraction>" for the lesson he was last reading (D-035). */
   lastRead: string | undefined;
+  /** lessonId → how far through it he has scrolled, for the per-lesson bars. */
+  readFractions: Map<string, number>;
 }
 
 const attemptDaysOf = (attempts: AttemptRecord[]): Set<string> =>
@@ -108,6 +116,7 @@ export function Home({
       db.getMeta(RELEASE_NOTES_SEEN_KEY),
       db.getMeta(SIGN_IN_PROMPT_KEY),
       db.getMeta(LAST_READ_KEY),
+      db.allReadingPositions(),
     ])
       .then(
         ([
@@ -122,6 +131,7 @@ export function Home({
           releaseNotesSeen,
           signInPromptDismissed,
           lastRead,
+          readFractions,
         ]) => {
           const now = new Date();
           setData({
@@ -137,6 +147,7 @@ export function Home({
             releaseNotesSeen,
             signInPromptDismissed,
             lastRead,
+            readFractions,
           });
           // Record the current version straight away so a fresh install is
           // never shown a changelog for changes it never experienced — and so
@@ -297,6 +308,7 @@ export function Home({
                   statuses={statuses}
                   exams={exams}
                   unlocked={moduleUnlocked(module, exams)}
+                  readFractions={data?.readFractions ?? new Map()}
                   prereqTitles={module.prereqs.map(
                     (p) =>
                       (curriculum.modules.find((m) => m.id === p)?.title ?? p).split(
@@ -363,12 +375,14 @@ function ModuleBlock({
   exams,
   unlocked,
   prereqTitles,
+  readFractions,
 }: {
   module: Module;
   statuses: Map<string, LessonProgressRecord>;
   exams: Map<string, ExamResultRecord>;
   unlocked: boolean;
   prereqTitles: string[];
+  readFractions: Map<string, number>;
 }) {
   const passed = passedLessonCount(module, statuses);
   const exam = exams.get(module.id);
@@ -404,6 +418,10 @@ function ModuleBlock({
             {module.lessons.map((lesson) => {
               const questions = questionCountFor(module, lesson.id);
               const record = statuses.get(lesson.id);
+              const lessonPct = lessonProgressFraction(
+                record,
+                readFractions.get(lesson.id) ?? null,
+              );
               const open = lessonUnlocked(module, lesson.id, statuses);
               const cls = lessonPassed(record)
                 ? "done"
@@ -435,6 +453,18 @@ function ModuleBlock({
                         : "no questions yet"
                       : `needs ${PASS_MARK}% on previous`}
                   </span>
+                  {/* Per-lesson progress (D-039). Reading counts before the
+                      quiz is passed — a half-read lesson IS half done, and
+                      showing it as zero is the discouraging lie the research
+                      warns about. Hidden at zero so untouched rows stay quiet. */}
+                  {open && lessonPct > 0 && (
+                    <span
+                      class="lesson-progress"
+                      title={`${Math.round(lessonPct * 100)}% through this lesson`}
+                    >
+                      <i style={{ width: `${lessonPct * 100}%` }} />
+                    </span>
+                  )}
                 </li>
               );
             })}
@@ -512,6 +542,8 @@ function Hero({
   totalLessons: number;
   continueLesson: Lesson | undefined;
 }) {
+  const overall = curriculumProgress(curriculum, data?.statuses ?? new Map());
+  const pace = data ? paceEstimate(overall, data.studyTime, new Date()) : null;
   const questionTotal = curriculum.modules.reduce((n, m) => n + m.questions.length, 0);
 
   // Fresh device: sell the loop once, then push lesson 1.
@@ -574,6 +606,12 @@ function Hero({
           ? ` · next review ${new Date(data.nextDue).toLocaleDateString()}`
           : ""}
       </p>
+      <CurriculumBar
+        pct={overall.pct}
+        passed={overall.passed}
+        total={overall.total}
+        pace={pace}
+      />
       <p class="hero-actions">
         {due > 0 ? (
           <a class="btn btn-lg" href="#/review">
@@ -600,23 +638,11 @@ function Hero({
   );
 }
 
-/* Flat-color PCB trace behind the hero — the decorative element. Solid
-   strokes only: gradients band on LCD panels (learned the hard way). The
-   dash slowly draws and retreats; reduced-motion freezes it. */
+/* The decorative element behind the hero: a drifting node network (D-039),
+   replacing the static PCB trace at Christopher's request. See
+   components/constellation.tsx for why it is canvas and how it stays cheap. */
 function TraceDecor() {
-  return (
-    <svg
-      class="hero-trace"
-      viewBox="0 0 480 120"
-      fill="none"
-      aria-hidden="true"
-      preserveAspectRatio="xMaxYMid meet"
-    >
-      <path class="hero-trace-path" d="M0 90 H150 L190 50 H300 L340 90 H440" />
-      <circle cx="446" cy="90" r="5" class="hero-trace-via" />
-      <circle cx="300" cy="50" r="4" class="hero-trace-via" />
-    </svg>
-  );
+  return <Constellation />;
 }
 
 /* First-run rail: teach the loop in the app's own visual language. */
@@ -746,5 +772,57 @@ function SignInCard({ onDismiss }: { onDismiss: () => void }) {
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Whole-curriculum progress and, once there is enough history, a projected
+ * finish date (D-039). The bar is here because a visible progress bar is the
+ * strongest motivating element the research found — stronger than points or
+ * badges — and because the module bars alone never answer "how far through the
+ * whole thing am I".
+ *
+ * The date is DERIVED FROM HIS OWN PACE and simply absent until the numbers
+ * mean something. An invented date would be planned against.
+ */
+function CurriculumBar({
+  pct,
+  passed,
+  total,
+  pace,
+}: {
+  pct: number;
+  passed: number;
+  total: number;
+  pace: ReturnType<typeof paceEstimate>;
+}) {
+  return (
+    <div class="curriculum-progress">
+      <div class="curriculum-progress-top">
+        <span class="curriculum-progress-label">Whole curriculum</span>
+        <span class="curriculum-progress-num">
+          {passed}/{total} · <b>{pct}%</b>
+        </span>
+      </div>
+      <div class="curriculum-progress-track">
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <p class="curriculum-progress-eta">
+        {pace ? (
+          <>
+            At {pace.minutesPerActiveDay} min a study day, finishing around{" "}
+            <b>
+              {pace.finishDate.toLocaleDateString(undefined, {
+                month: "long",
+                year: "numeric",
+              })}
+            </b>{" "}
+            — about {pace.daysRemaining} days at your current pace.
+          </>
+        ) : (
+          "Finish date appears once a few lessons and study days are on record."
+        )}
+      </p>
+    </div>
   );
 }

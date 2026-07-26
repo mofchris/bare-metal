@@ -26,7 +26,7 @@ export function studyTimeId(day: string, installId: string): string {
 }
 
 /** Total tracked seconds per day (summed across devices). */
-export function secondsByDay(records: StudyTimeRecord[]): Map<string, number> {
+export function secondsByDay(records: readonly StudyTimeRecord[]): Map<string, number> {
   const out = new Map<string, number>();
   for (const r of records) out.set(r.day, (out.get(r.day) ?? 0) + r.seconds);
   return out;
