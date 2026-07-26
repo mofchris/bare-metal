@@ -1,0 +1,37 @@
+# What changed, shown once in-app on first open after an update (D-032).
+#
+# NEWEST FIRST — the app announces entry one and nothing else. Add a new entry
+# at the TOP when a release changes BEHAVIOUR. Do not add one for content edits
+# (new lessons, reworded prose, extra questions): those happen most days, and a
+# notice that appears most days gets dismissed unread, which defeats the point.
+#
+#   - version: "2026-07-26"       # any stable string; compared, never parsed
+#     headline: "One line, what it means for you"
+#     changes:
+#       - "One sentence per change, in plain language."
+#
+# A fresh install is never shown a changelog — there is no "since last time".
+
+- version: "2026-07-26"
+  headline: "Quizzes rotate, and lessons remember where you stopped"
+  changes:
+    - >-
+      Retaking a quiz now reaches for questions you have not answered yet
+      instead of replaying the same list. M1's bank grew from 27 questions to
+      73 to make that real.
+    - >-
+      Lesson quizzes are 5 questions and module exams 20, spread across a
+      module's lessons, rather than serving every question in the bank.
+    - >-
+      A "Today's review" card appears once a day, drawn from lessons you have
+      already passed. Take it or dismiss it and it stays gone until tomorrow.
+    - >-
+      Missed questions now link back to the lesson that teaches them.
+    - >-
+      A progress bar runs across the top of a lesson, and returning to a
+      part-read lesson offers to pick up where you stopped.
+    - >-
+      Lessons can now carry practice problems with revealable hints, so you can
+      attempt something before seeing the answer. m1/03 has the first three.
+    - >-
+      A quote appears on the home screen, changing daily.

@@ -13,6 +13,7 @@ const lesson = (id: string) => ({
 const curriculum: Curriculum = {
   contentVersion: "test",
   quotes: [],
+  releaseNotes: [],
   modules: [
     {
       id: "m1",

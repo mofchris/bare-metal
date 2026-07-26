@@ -35,6 +35,11 @@ export const TURNSTILE_SITE_KEY = IS_PROD
 const AUTH_KEY = "study-sync-auth";
 const APP_ID = "metal";
 
+/** Meta-store key recording that the first-open sign-in offer was waved away
+    (D-038). Per-device by design: dismissing it on the laptop should not hide
+    it on a phone that has never been signed in. */
+export const SIGN_IN_PROMPT_KEY = "signInPromptDismissed";
+
 export interface AuthState {
   token: string;
   username: string;

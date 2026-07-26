@@ -27,7 +27,13 @@ import {
 } from "../lib/daily-review";
 import { questionCountFor } from "../lib/lookup";
 import { quoteForDay } from "../lib/quotes";
-import type { Quote } from "../lib/curriculum";
+import {
+  noteToShow,
+  RELEASE_NOTES_SEEN_KEY,
+  versionToRecord,
+} from "../lib/release-notes";
+import { getAuth, SIGN_IN_PROMPT_KEY } from "../lib/sync";
+import type { Quote, ReleaseNote } from "../lib/curriculum";
 import { checkpointById, CHECKPOINT_SIZE, type Checkpoint } from "../lib/checkpoints";
 import { dueQuestionIds, nextDueAt } from "../lib/srs";
 import { exportReminder, type ReminderState } from "../lib/backup";
@@ -60,6 +66,10 @@ interface ProgressData {
   /** Local day the daily review was last taken / dismissed (D-029). */
   dailyTakenDay: string | undefined;
   dailyDismissedDay: string | undefined;
+  /** Newest release version already announced in-app (D-032). */
+  releaseNotesSeen: string | undefined;
+  /** Whether the sign-in offer has been dismissed on this device (D-038). */
+  signInPromptDismissed: string | undefined;
 }
 
 const attemptDaysOf = (attempts: AttemptRecord[]): Set<string> =>
@@ -86,6 +96,8 @@ export function Home({
       db.getMeta("lastExportAt"),
       db.getMeta(DAILY_REVIEW_TAKEN_KEY),
       db.getMeta(DAILY_REVIEW_DISMISSED_KEY),
+      db.getMeta(RELEASE_NOTES_SEEN_KEY),
+      db.getMeta(SIGN_IN_PROMPT_KEY),
     ])
       .then(
         ([
@@ -97,6 +109,8 @@ export function Home({
           lastExportAt,
           dailyTakenDay,
           dailyDismissedDay,
+          releaseNotesSeen,
+          signInPromptDismissed,
         ]) => {
           const now = new Date();
           setData({
@@ -109,7 +123,20 @@ export function Home({
             reminder: exportReminder(lastExportAt ?? null, attempts.length > 0, now),
             dailyTakenDay,
             dailyDismissedDay,
+            releaseNotesSeen,
+            signInPromptDismissed,
           });
+          // Record the current version straight away so a fresh install is
+          // never shown a changelog for changes it never experienced — and so
+          // the NEXT release is announced properly (D-032).
+          const current = versionToRecord(curriculum.releaseNotes);
+          if (
+            current !== undefined &&
+            current !== null &&
+            releaseNotesSeen === undefined
+          ) {
+            void db.setMeta(RELEASE_NOTES_SEEN_KEY, current);
+          }
         },
       )
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
@@ -118,6 +145,8 @@ export function Home({
   // Dismissing writes to storage, but the card must vanish on the click rather
   // than after a round-trip; this holds that until the next load reads it back.
   const [dismissedNow, setDismissedNow] = useState(false);
+  const [noteDismissed, setNoteDismissed] = useState(false);
+  const [signInDismissed, setSignInDismissed] = useState(false);
   const statuses = data?.statuses ?? new Map<string, LessonProgressRecord>();
   const exams = data?.exams ?? new Map<string, ExamResultRecord>();
   const lessons = curriculum.modules.flatMap((m) => m.lessons);
@@ -146,6 +175,23 @@ export function Home({
       data.dailyDismissedDay,
     );
 
+  // What changed since he last opened the app (D-032). Never on a fresh
+  // install — noteToShow returns null when nothing has been recorded yet.
+  const releaseNote =
+    data && !noteDismissed
+      ? noteToShow(curriculum.releaseNotes, data.releaseNotesSeen)
+      : null;
+
+  // Offer study-sync sign-in to someone who has not signed in and has not
+  // already waved it away (D-038). Metal CANNOT tell whether he has used the
+  // GRE or Network+ sims — separate origins, separate storage — so the offer
+  // is worded to read correctly either way rather than claiming to know.
+  const signInOffered =
+    data !== null &&
+    !signInDismissed &&
+    data.signInPromptDismissed === undefined &&
+    getAuth() === null;
+
   return (
     <div>
       {error && <p class="warn-banner">Couldn't read progress records: {error}</p>}
@@ -157,6 +203,25 @@ export function Home({
           Browser storage can be wiped without warning:{" "}
           <a href="#/backup">export a backup file</a>.
         </p>
+      )}
+
+      {releaseNote && (
+        <WhatsNewCard
+          note={releaseNote}
+          onDismiss={() => {
+            setNoteDismissed(true);
+            void db?.setMeta(RELEASE_NOTES_SEEN_KEY, releaseNote.version);
+          }}
+        />
+      )}
+
+      {signInOffered && (
+        <SignInCard
+          onDismiss={() => {
+            setSignInDismissed(true);
+            void db?.setMeta(SIGN_IN_PROMPT_KEY, "dismissed");
+          }}
+        />
       )}
 
       <DailyQuote quote={quoteForDay(curriculum.quotes, new Date())} />
@@ -586,5 +651,57 @@ function DailyQuote({ quote }: { quote: Quote | null }) {
         {quote.who} <span class="daily-quote-series">{quote.series}</span>
       </figcaption>
     </figure>
+  );
+}
+
+/**
+ * What changed in the release just installed (D-032). Metal is an installed
+ * PWA that updates silently, so without this the behaviour can change under
+ * him between one open and the next with nothing on screen to say so.
+ */
+function WhatsNewCard({ note, onDismiss }: { note: ReleaseNote; onDismiss: () => void }) {
+  return (
+    <section class="whats-new rise">
+      <div>
+        <h3>What's new · {note.version}</h3>
+        <p class="whats-new-headline">{note.headline}</p>
+        <ul>
+          {note.changes.map((change) => (
+            <li key={change}>{change}</li>
+          ))}
+        </ul>
+      </div>
+      <button class="btn btn-quiet" onClick={onDismiss}>
+        Got it
+      </button>
+    </section>
+  );
+}
+
+/**
+ * A one-time offer to sign in with an existing study-sync account (D-038).
+ * One account spans Metal, the GRE sim and the Network+ sim, so somebody
+ * arriving from either of those already has credentials — and today the only
+ * way to discover that is to go looking for the Sync page.
+ */
+function SignInCard({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <section class="sign-in-offer rise">
+      <div>
+        <h3>Already have a study account?</h3>
+        <p>
+          Metal shares one account with the GRE and Network+ sims. Sign in and your
+          progress follows you between your laptop and your phone.
+        </p>
+      </div>
+      <div class="sign-in-offer-actions">
+        <a class="btn" href="#/backup">
+          Sign in →
+        </a>
+        <button class="btn btn-quiet" onClick={onDismiss}>
+          Not now
+        </button>
+      </div>
+    </section>
   );
 }

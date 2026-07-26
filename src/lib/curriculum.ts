@@ -54,9 +54,18 @@ export interface Quote {
   series: string;
 }
 
+/** One release's user-facing notes, newest first (D-032). */
+export interface ReleaseNote {
+  version: string;
+  headline: string;
+  changes: string[];
+}
+
 export interface Curriculum {
   contentVersion: string; // hash of compiled content; cache-busting for the SW
   modules: Module[]; // topologically sorted by prereqs
   /** May be empty — the home screen simply shows no quote in that case. */
   quotes: Quote[];
+  /** Newest first; may be empty. */
+  releaseNotes: ReleaseNote[];
 }

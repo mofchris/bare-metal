@@ -1409,3 +1409,52 @@ article h2,
   margin-top: 0.4rem;
   font-size: 0.92rem;
 }
+
+/* "What's new" (D-032) and the first-open sign-in offer (D-038). Both are
+   one-time prompts above the fold, so they share a shape: bordered card, a
+   clear way out, and nothing that blocks the page underneath. */
+.whats-new,
+.sign-in-offer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 1.4rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--copper) 30%, var(--hairline));
+  border-radius: 4px;
+  background: var(--mask);
+}
+.whats-new h3,
+.sign-in-offer h3 {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--copper-bright);
+}
+.whats-new-headline {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+.whats-new ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  color: var(--ink-dim);
+  max-width: 60ch;
+}
+.whats-new li {
+  margin-bottom: 0.25rem;
+}
+.sign-in-offer p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 56ch;
+}
+.sign-in-offer-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}

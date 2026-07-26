@@ -22,6 +22,7 @@ import type {
   Module,
   Question,
   Quote,
+  ReleaseNote,
 } from "../../src/lib/curriculum.ts";
 import { evaluateExpression } from "./expression.ts";
 
@@ -60,6 +61,10 @@ export function compileContent(contentRoot: string): Curriculum {
 
   validateCrossReferences(modules, problems);
   const quotes = readQuotes(join(contentRoot, "quotes.yaml"), problems);
+  const releaseNotes = readReleaseNotes(
+    join(contentRoot, "release-notes.yaml"),
+    problems,
+  );
 
   if (problems.length > 0) throw new ContentError(problems);
 
@@ -69,10 +74,42 @@ export function compileContent(contentRoot: string): Curriculum {
   // Quotes are part of "everything the app will see" — leaving them out meant
   // editing quotes.yaml shipped a file the service worker considered unchanged.
   const contentVersion = createHash("sha256")
-    .update(JSON.stringify({ modules: sorted, quotes }))
+    .update(JSON.stringify({ modules: sorted, quotes, releaseNotes }))
     .digest("hex")
     .slice(0, 16);
-  return { contentVersion, modules: sorted, quotes };
+  return { contentVersion, modules: sorted, quotes, releaseNotes };
+}
+
+/** Release notes (D-032). Optional file; strictly validated when present. */
+function readReleaseNotes(file: string, problems: string[]): ReleaseNote[] {
+  if (!existsSync(file)) return [];
+  const parsed = parseYamlFile(file, problems);
+  if (parsed === null) return [];
+  if (!Array.isArray(parsed)) {
+    problems.push(`${file}: expected a YAML list of release notes`);
+    return [];
+  }
+  const notes: ReleaseNote[] = [];
+  const seenVersions = new Set<string>();
+  parsed.forEach((entry, i) => {
+    const where = `${file} entry ${i + 1}`;
+    if (!isRecord(entry)) {
+      problems.push(`${where}: expected a mapping`);
+      return;
+    }
+    const version = requireString(entry, "version", where, problems);
+    const headline = requireString(entry, "headline", where, problems);
+    const changes = requireStringArray(entry, "changes", where, problems);
+    if (version !== null && seenVersions.has(version)) {
+      // Versions are compared as strings to decide what to announce; two
+      // entries sharing one would make "already seen" ambiguous.
+      problems.push(`${where}: duplicate version "${version}"`);
+      return;
+    }
+    if (version !== null) seenVersions.add(version);
+    if (version && headline && changes) notes.push({ version, headline, changes });
+  });
+  return notes;
 }
 
 /**
