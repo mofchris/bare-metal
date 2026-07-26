@@ -35,6 +35,7 @@ import { Dashboard } from "./components/dashboard";
 import { Backup } from "./components/backup";
 import { Gated } from "./components/gated";
 import { SyncIndicator } from "./components/sync-indicator";
+import { ReadingBar } from "./components/reading-progress";
 import { lessonHref } from "./lib/route";
 import { examUnlocked, lessonUnlocked, moduleUnlocked, PASS_MARK } from "./lib/gating";
 
@@ -148,6 +149,10 @@ export function App() {
 
   return (
     <div class="shell">
+      {/* Scroll progress on EVERY screen, not just lessons (his request).
+          Keyed by route so a navigation resets it rather than leaving the
+          previous page's fill in place. */}
+      <ReadingBar key={location.hash} />
       <header class="shell-header">
         <h1>
           <a href="#/">Metal</a>
@@ -417,9 +422,10 @@ function DailyReviewScreen({
       questions={questions}
       db={db}
       lessonTitles={lessonTitles(curriculum)}
-      onCompleted={() => {
-        // Fire-and-forget: failing to record "taken today" must not break the
-        // summary he is looking at. Worst case the card reappears.
+      onAttempted={() => {
+        // Fired on the FIRST answer, not at the summary: abandoning the review
+        // halfway still counts as having tried it, so the card does not sit
+        // there afterwards (the bug Christopher reported).
         void db?.setMeta(DAILY_REVIEW_TAKEN_KEY, localDateKey(new Date()));
       }}
     />

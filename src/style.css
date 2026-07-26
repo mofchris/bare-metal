@@ -1275,27 +1275,56 @@ article h2,
   font-size: 0.8rem;
 }
 
-/* The day's opening line (D-031). Quiet by design — it sets a tone on opening,
-   it is not a call to action, so it must not compete with the hero beneath it. */
+/* The day's opening line (D-031). The first version was a small italic line
+   that Christopher said he could "just over look when i open the app", which
+   is a fair description of quiet grey text above a busy dashboard. It now
+   reads as a plate: a big copper quote mark, larger type, real vertical space,
+   and the character's name in the accent colour so the eye lands somewhere. */
 .daily-quote {
-  margin: 0.75rem 0 1.1rem;
-  padding-left: 0.9rem;
-  border-left: 2px solid color-mix(in srgb, var(--copper) 45%, transparent);
+  position: relative;
+  margin: 0.5rem 0 1.6rem;
+  padding: 1.5rem 1.4rem 1.3rem 3.2rem;
+  border: 1px solid color-mix(in srgb, var(--copper) 22%, var(--hairline));
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--copper) 9%, var(--mask)),
+    var(--mask) 60%
+  );
+  overflow: hidden;
+}
+.daily-quote-mark {
+  position: absolute;
+  left: 0.7rem;
+  top: 0.1rem;
+  font-family: var(--font-mono);
+  font-size: 4.5rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--copper) 38%, transparent);
+  user-select: none;
 }
 .daily-quote blockquote {
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.5;
-  font-style: italic;
+  font-size: clamp(1.05rem, 2.4vw, 1.3rem);
+  line-height: 1.45;
+  font-weight: 500;
   color: var(--ink);
-  max-width: 62ch;
+  max-width: 46ch;
 }
 .daily-quote figcaption {
-  margin-top: 0.3rem;
+  margin-top: 0.7rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  color: var(--copper);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.daily-quote-who {
+  color: var(--copper-bright);
+  font-weight: 600;
 }
 .daily-quote-series {
   color: var(--ink-dim);
@@ -1457,4 +1486,42 @@ article h2,
   gap: 0.6rem;
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* "Pick up where you stopped" (D-035). Distinct from the daily-review card so
+   the two never read as the same offer: this one is a link, not a decision. */
+.resume-reading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin: 0 0 1.4rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--copper);
+  border-radius: 0 4px 4px 0;
+  background: var(--mask);
+  text-decoration: none;
+  transition: border-color 120ms ease;
+}
+.resume-reading:hover {
+  border-color: color-mix(in srgb, var(--copper) 45%, var(--hairline));
+  border-left-color: var(--copper-bright);
+}
+.resume-reading-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--copper);
+}
+.resume-reading-title {
+  color: var(--ink);
+  font-weight: 500;
+}
+.resume-reading-pct {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+  margin-left: auto;
 }

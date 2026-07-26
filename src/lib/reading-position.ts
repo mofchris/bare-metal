@@ -12,6 +12,58 @@
 // The meta store already holds arbitrary key/value strings, so this needs no
 // new object store and no schema version bump (same reasoning as D-029).
 
+/** Meta-store key holding the lesson he was last reading, and how far in.
+    Stored as "<lessonId>|<fraction>" — one row rather than two, so the pair
+    can never be read half-updated. */
+export const LAST_READ_KEY = "lastReadLesson";
+
+/** Parse LAST_READ_KEY's value; null if absent or malformed. */
+export function parseLastRead(
+  raw: string | undefined,
+): { lessonId: string; fraction: number } | null {
+  if (raw === undefined) return null;
+  const separator = raw.lastIndexOf("|");
+  if (separator <= 0) return null;
+  const lessonId = raw.slice(0, separator);
+  const fraction = parseStoredFraction(raw.slice(separator + 1));
+  if (fraction === null) return null;
+  return { lessonId, fraction };
+}
+
+/** Serialise for LAST_READ_KEY. */
+export function formatLastRead(lessonId: string, fraction: number): string {
+  return `${lessonId}|${fraction}`;
+}
+
+/**
+ * A one-shot handoff: Home sets this when he clicks "pick up where you left
+ * off", and the lesson screen consumes it to scroll straight there instead of
+ * showing its own prompt. sessionStorage rather than a route parameter so the
+ * URL stays shareable and re-opening the lesson later does not re-trigger it.
+ */
+const RESUME_INTENT_KEY = "metal:resumeIntent";
+
+export function requestResume(lessonId: string): void {
+  try {
+    sessionStorage.setItem(RESUME_INTENT_KEY, lessonId);
+  } catch {
+    // Private modes can refuse sessionStorage; the lesson then simply offers
+    // its normal prompt, which is a fine fallback.
+  }
+}
+
+/** True once, if a resume was requested for this lesson. Clears the flag. */
+export function consumeResumeIntent(lessonId: string): boolean {
+  try {
+    const wanted = sessionStorage.getItem(RESUME_INTENT_KEY);
+    if (wanted !== lessonId) return false;
+    sessionStorage.removeItem(RESUME_INTENT_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Meta-store key holding the reading position for one lesson. */
 export function readingPositionKey(lessonId: string): string {
   return `readingPosition:${lessonId}`;

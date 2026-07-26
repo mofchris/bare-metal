@@ -4,7 +4,7 @@
 
 import { questionCountFor, type LessonLocation } from "../lib/lookup";
 import { lessonHref, quizHref } from "../lib/route";
-import { ReadingProgress } from "./reading-progress";
+import { ReadingBookmark } from "./reading-progress";
 import type { ProgressDb } from "../lib/progress-store";
 
 export function LessonView({
@@ -21,9 +21,10 @@ export function LessonView({
   const questionCount = questionCountFor(module, lesson.id);
   return (
     <article>
-      {/* Keyed by lesson id so moving between lessons resets the bar and
-          re-reads that lesson's own saved position (D-035). */}
-      <ReadingProgress key={location.lesson.id} lessonId={location.lesson.id} db={db} />
+      {/* Keyed by lesson id so moving between lessons re-reads that lesson's
+          own saved position (D-035). The bar itself lives in the app shell,
+          because it belongs on every screen, not only on lessons. */}
+      <ReadingBookmark key={location.lesson.id} lessonId={location.lesson.id} db={db} />
       <nav class="crumbs">
         <a href="#/">← All modules</a>
       </nav>

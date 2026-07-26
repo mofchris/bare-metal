@@ -30,9 +30,12 @@ interface QuizProps {
   examModuleId?: string;
   /** The lesson this quiz unlocks, so passing can offer it directly. */
   next?: Lesson | null;
-  /** Called once when the run reaches its summary — the daily review uses this
-      to record that today's review has been taken (D-029). */
-  onCompleted?: () => void;
+  /** Called once, as soon as the FIRST answer of the run is graded. The daily
+      review uses this to record that today's review has been attempted — the
+      rule Christopher set is that the card goes away once he dismisses it or
+      "tries to complete" it, so abandoning a run halfway still counts and must
+      not leave the card sitting there (D-029). */
+  onAttempted?: () => void;
   /** Lesson id → title, so a missed question can name the lesson to reread.
       Absent for single-lesson quizzes, where the lesson is already obvious. */
   lessonTitles?: ReadonlyMap<string, string>;
@@ -53,7 +56,7 @@ export function Quiz({
   markDoneLessonId,
   examModuleId,
   next,
-  onCompleted,
+  onAttempted,
   lessonTitles,
 }: QuizProps) {
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
@@ -68,6 +71,7 @@ export function Quiz({
   const submit = (response: QuizResponse) => {
     if (!current) return;
     const correct = gradeResponse(current, response);
+    if (answered.length === 0) onAttempted?.();
     setAnswered([...answered, { question: current, response, correct }]);
     setPhase("feedback");
 
@@ -127,7 +131,6 @@ export function Quiz({
         markDoneLessonId={markDoneLessonId}
         examModuleId={examModuleId}
         next={next}
-        onCompleted={onCompleted}
         lessonTitles={lessonTitles}
       />
     );
@@ -269,7 +272,6 @@ function Summary({
   markDoneLessonId,
   examModuleId,
   next,
-  onCompleted,
   lessonTitles,
 }: {
   backHref: string;
@@ -281,7 +283,6 @@ function Summary({
   markDoneLessonId?: string;
   examModuleId?: string;
   next?: Lesson | null;
-  onCompleted?: () => void;
   lessonTitles?: ReadonlyMap<string, string>;
 }) {
   const correctCount = answered.filter((a) => a.correct).length;
@@ -304,13 +305,6 @@ function Summary({
     Promise.all(writes).catch((e: unknown) =>
       setStatusError(e instanceof Error ? e.message : String(e)),
     );
-  }, []);
-
-  // Reaching the summary counts as having taken the quiz, whatever the score —
-  // Christopher's rule for the daily review is that it goes away once he
-  // "tries to complete" it, not only when he passes it.
-  useEffect(() => {
-    onCompleted?.();
   }, []);
   return (
     <div>

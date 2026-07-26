@@ -33,6 +33,12 @@ import {
   versionToRecord,
 } from "../lib/release-notes";
 import { getAuth, SIGN_IN_PROMPT_KEY } from "../lib/sync";
+import {
+  isResumable,
+  LAST_READ_KEY,
+  parseLastRead,
+  requestResume,
+} from "../lib/reading-position";
 import type { Quote, ReleaseNote } from "../lib/curriculum";
 import { checkpointById, CHECKPOINT_SIZE, type Checkpoint } from "../lib/checkpoints";
 import { dueQuestionIds, nextDueAt } from "../lib/srs";
@@ -70,6 +76,8 @@ interface ProgressData {
   releaseNotesSeen: string | undefined;
   /** Whether the sign-in offer has been dismissed on this device (D-038). */
   signInPromptDismissed: string | undefined;
+  /** "<lessonId>|<fraction>" for the lesson he was last reading (D-035). */
+  lastRead: string | undefined;
 }
 
 const attemptDaysOf = (attempts: AttemptRecord[]): Set<string> =>
@@ -98,6 +106,7 @@ export function Home({
       db.getMeta(DAILY_REVIEW_DISMISSED_KEY),
       db.getMeta(RELEASE_NOTES_SEEN_KEY),
       db.getMeta(SIGN_IN_PROMPT_KEY),
+      db.getMeta(LAST_READ_KEY),
     ])
       .then(
         ([
@@ -111,6 +120,7 @@ export function Home({
           dailyDismissedDay,
           releaseNotesSeen,
           signInPromptDismissed,
+          lastRead,
         ]) => {
           const now = new Date();
           setData({
@@ -125,6 +135,7 @@ export function Home({
             dailyDismissedDay,
             releaseNotesSeen,
             signInPromptDismissed,
+            lastRead,
           });
           // Record the current version straight away so a fresh install is
           // never shown a changelog for changes it never experienced — and so
@@ -192,6 +203,15 @@ export function Home({
     data.signInPromptDismissed === undefined &&
     getAuth() === null;
 
+  // Where he stopped reading last time (D-035). Only offered for a lesson he
+  // is genuinely part-way through — not one barely started, and not one he
+  // read to the end.
+  const lastRead = data ? parseLastRead(data.lastRead) : null;
+  const resumeLesson =
+    lastRead && isResumable(lastRead.fraction)
+      ? (lessons.find((l) => l.id === lastRead.lessonId) ?? null)
+      : null;
+
   return (
     <div>
       {error && <p class="warn-banner">Couldn't read progress records: {error}</p>}
@@ -225,6 +245,20 @@ export function Home({
       )}
 
       <DailyQuote quote={quoteForDay(curriculum.quotes, new Date())} />
+
+      {resumeLesson && lastRead && (
+        <a
+          class="resume-reading"
+          href={lessonHref(resumeLesson.id)}
+          onClick={() => requestResume(resumeLesson.id)}
+        >
+          <span class="resume-reading-label">Pick up where you stopped</span>
+          <span class="resume-reading-title">{resumeLesson.title}</span>
+          <span class="resume-reading-pct">
+            {Math.round(lastRead.fraction * 100)}% read
+          </span>
+        </a>
+      )}
 
       {dailyReviewOffered && (
         <DailyReviewCard
@@ -646,9 +680,13 @@ function DailyQuote({ quote }: { quote: Quote | null }) {
   if (!quote) return null;
   return (
     <figure class="daily-quote">
+      <span class="daily-quote-mark" aria-hidden="true">
+        "
+      </span>
       <blockquote>{quote.text}</blockquote>
       <figcaption>
-        {quote.who} <span class="daily-quote-series">{quote.series}</span>
+        <span class="daily-quote-who">{quote.who}</span>
+        <span class="daily-quote-series">{quote.series}</span>
       </figcaption>
     </figure>
   );
