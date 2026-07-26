@@ -507,6 +507,110 @@
     worse, not better.
   tags: [gpu, roofline]
 
+# --- m1/01b DRAM internals (D-036) ---
+
+- id: m1/q-033
+  lesson: m1/01b-dram-internals
+  type: mcq
+  prompt: >-
+    A signal travels about 15 cm per nanosecond along a circuit-board trace,
+    and a DRAM access takes roughly 40 ns. Moving the memory chip from 3 cm
+    away onto the processor's own package removes the wire entirely. Roughly
+    what fraction of the access does that remove?
+  options:
+    - "About 1% — the delay is inside the chip, not on the wire"
+    - "About half — distance is the dominant cost of a memory access"
+    - "About 15% — noticeable but not decisive"
+    - "All of it — on-package memory has no latency"
+  answer: 0
+  explanation: >-
+    3 cm away is a 6 cm round trip, and 6 / 15 = 0.4 ns against a 40 ns access,
+    which is about 1%. This is why on-package memory is a BANDWIDTH technique:
+    a short dense connection allows a far wider bus, and width is what
+    bandwidth is made of. Anyone answering "about half" is carrying the
+    intuition that distance explains the wait, which is the specific belief
+    this arithmetic is meant to kill.
+  tags: [dram, latency]
+
+- id: m1/q-034
+  lesson: m1/01b-dram-internals
+  type: short
+  prompt: >-
+    What is the name for the strip of sense amplifiers holding one complete
+    DRAM row after it has been read out and amplified? (two words)
+  accept: ["row buffer", "the row buffer", "rowbuffer"]
+  explanation: >-
+    The row buffer. Activating a row dumps every cell along it onto the sense
+    amplifiers, which amplify the tiny stored charges into clean digital
+    values; the resulting strip holds the whole row, typically 8192 bits, even
+    though the request wanted a few bytes of it. Whether your next request
+    finds its row already sitting there is the difference between about 14 ns
+    and about 41 ns.
+  tags: [dram, row-buffer]
+
+- id: m1/q-035
+  lesson: m1/01b-dram-internals
+  type: mcq
+  prompt: >-
+    A read arrives for a row that is not currently open, while a different row
+    in that bank is. Which sequence does the chip perform?
+  options:
+    - "Precharge the open row, activate the wanted row, then read the column"
+    - "Read the column, then precharge and activate for next time"
+    - "Activate the wanted row, then precharge the old one, then read"
+    - "Read the column directly — precharge is only needed before a write"
+  answer: 0
+  explanation: >-
+    tRP closes the open row and returns the bank to a neutral state, tRCD
+    activates the wanted row onto the sense amplifiers, and only then can CL
+    read the column out. The order matters physically: reading drains the
+    cells, so the bank must be reset before a different row can be sensed. At
+    22 ticks each on a DDR4-3200 part that is 66 ticks, about 41 ns.
+  tags: [dram, timings]
+
+- id: m1/q-036
+  lesson: m1/01b-dram-internals
+  type: mcq
+  prompt: >-
+    Two loops read the same 64 MB float32 array and do identical arithmetic;
+    one walks it in order and one visits the same elements in random order. The
+    random one is far slower. Which pair of effects explains it?
+  options:
+    - "Wasted cache lines, and row-buffer misses in DRAM"
+    - "Wasted cache lines only — DRAM behaves identically either way"
+    - "Row-buffer misses only — cache lines are irrelevant once data is in DRAM"
+    - "Neither; the difference is that random indexing costs extra arithmetic"
+  answer: 0
+  explanation: >-
+    Two independent effects stack. The random walk uses one value from each
+    64-byte line it fetches and discards the other 15, which is lesson 01's
+    argument. It also lands in a different DRAM row almost every time, paying
+    tRP + tRCD + CL instead of CL alone, which is roughly three times the
+    memory time. The arithmetic is identical in both loops, so the cost is
+    entirely a consequence of order rather than of quantity.
+  tags: [dram, cache-lines, access-patterns]
+
+- id: m1/q-037
+  lesson: m1/01b-dram-internals
+  type: mcq
+  prompt: >-
+    Why has DRAM latency improved so much more slowly than DRAM bandwidth over
+    several decades?
+  options:
+    - "Bandwidth scales by adding wires; latency is limited by sensing a tiny charge"
+    - "Manufacturers have simply not prioritised latency, and could fix it cheaply"
+    - "Latency is limited by the speed of light over the distance to the chip"
+    - "Latency has actually improved just as fast; the figures are misreported"
+  answer: 0
+  explanation: >-
+    Adding a memory channel or widening the bus adds wires, which are cheap and
+    work in parallel, so bandwidth scales with money. Latency is dominated by
+    sensing the minuscule charge in a capacitor, an analog measurement whose
+    improvements cost silicon area and therefore capacity or price. The
+    speed-of-light option is the tempting one and is ruled out by arithmetic:
+    the round trip to a chip 3 cm away is about 0.4 ns out of roughly 40.
+  tags: [dram, bandwidth, latency]
+
 # ---------------------------------------------------------------------------
 # TEMPLATED QUESTIONS (D-030). Each entry below has a `vars` block and expands
 # at build time into one question per combination of those values, with every

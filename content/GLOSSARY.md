@@ -47,7 +47,7 @@ the drift this ledger prevents:
 | register                                               | m1/01          | the handful of bytes the core does its arithmetic in — fastest storage on the chip                                           |
 | DRAM                                                   | m1/01          | main memory — the gigabytes; slow, far from the core                                                                         |
 | kernel (ML sense)                                      | m1/01          | one routine doing one specific piece of array maths (a matmul, a convolution). **Not** the OS kernel                         |
-| clock, cycle, GHz                                      | m1/02          | clock ticks at a fixed rate; one tick = one cycle; 3 GHz = 3 billion ticks/s = 0.33 ns each                                  |
+| clock, cycle, GHz                                      | m1/01b         | clock ticks at a fixed rate; one tick = one cycle; 3 GHz = 3 billion ticks/s = 0.33 ns each                                  |
 | instruction                                            | m1/01          | one primitive step of machine work — add these, load that, jump if zero                                                      |
 | pipelining                                             | m1/02          | assembly line: five stages each busy with a different instruction                                                            |
 | execution unit                                         | m1/02          | the separate pieces of circuitry that do the actual work — one for whole numbers, others for decimals, others for memory     |
@@ -61,7 +61,7 @@ the drift this ledger prevents:
 | issue                                                  | m1/02          | to start an instruction                                                                                                      |
 | P-core / E-core                                        | m1/02          | performance cores are the big fast ones; efficiency cores are small and don't count to peak                                  |
 | latency                                                | m1/01          | time for one round trip — measured in nanoseconds                                                                            |
-| bandwidth                                              | m1/03          | bytes moved per second while streaming — measured in GB/s                                                                    |
+| bandwidth                                              | m1/01b         | bytes moved per second while streaming — measured in GB/s                                                                    |
 | throughput                                             | m1/03          | work finished per unit time (contrast: latency = time for one item)                                                          |
 | arithmetic intensity                                   | m1/03          | FLOPs done per byte moved — which budget the code lives on                                                                   |
 | memory-/compute-bound                                  | m1/03          | which of the two is the actual ceiling                                                                                       |
@@ -159,7 +159,6 @@ D-025 — kept here so nobody re-litigates them on the next run:
 
 | Term           | Appears in | Why it's fine                                                            |
 | -------------- | ---------- | ------------------------------------------------------------------------ |
-| `bandwidth`    | m1/02      | closing signpost only: "bandwidth versus latency versus compute is next" |
 | `roofline`     | m1/03      | closing signpost only: "one picture — the roofline — is the next lesson" |
 | `quantization` | m1/04      | carries its own point-of-use gloss ("storing numbers in smaller dtypes") |
 | `optimizer`    | m3/02      | carries its own point-of-use gloss; M5/02 builds it properly             |
