@@ -1,0 +1,5 @@
+# Test fixture: practice problems that must be rejected (not real curriculum).
+id: fx-pbad
+title: "Fixture: broken practice problems"
+lessons:
+  - 01-practice

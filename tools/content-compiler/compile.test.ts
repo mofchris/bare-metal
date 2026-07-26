@@ -117,6 +117,72 @@ describe("question templates (D-030)", () => {
   });
 });
 
+describe("practice problems (D-034)", () => {
+  const lesson = compileContent(join(fixtures, "practice-problems")).modules[0]!
+    .lessons[0]!;
+
+  it("renders a practice block where its marker sits in the prose", () => {
+    // Placement matters: a problem belongs where the argument reaches it, not
+    // swept to the end of the lesson.
+    expect(lesson.html.indexOf("Some prose")).toBeLessThan(
+      lesson.html.indexOf("Easy one with"),
+    );
+    expect(lesson.html.indexOf("Easy one with")).toBeLessThan(
+      lesson.html.indexOf("More prose"),
+    );
+  });
+
+  it("leaves no unreplaced markers in the finished lesson", () => {
+    expect(lesson.html).not.toContain("{{practice");
+  });
+
+  it("hides hints and the answer behind details elements", () => {
+    // The whole point: nothing is revealed until it is asked for.
+    expect(lesson.html).toContain('<details class="practice-hint"><summary>Hint 1');
+    expect(lesson.html).toContain('<details class="practice-hint"><summary>Hint 2');
+    expect(lesson.html).toContain('<details class="practice-answer">');
+    expect(lesson.html).toContain("The easy answer.");
+  });
+
+  it("never nests the block inside a paragraph, which browsers would re-nest", () => {
+    expect(lesson.html).not.toMatch(/<p>\s*<div class="practice"/);
+  });
+
+  it("labels each problem with its difficulty level", () => {
+    expect(lesson.html).toContain("Problem 1 · level 1");
+    expect(lesson.html).toContain("Problem 2 · level 3");
+  });
+
+  it("renders Markdown inside a problem", () => {
+    expect(lesson.html).toContain("<code>code</code>");
+  });
+
+  it("allows a problem with no hints at all", () => {
+    expect(lesson.html).toContain("Harder one.");
+  });
+});
+
+describe("malformed practice problems", () => {
+  const compileBad = (name: string) => () => compileContent(join(fixtures, name));
+
+  it("rejects a problem that is authored but never placed in the body", () => {
+    // Otherwise it silently never appears — the quiet failure CLAUDE.md bans.
+    expect(compileBad("practice-unplaced")).toThrow(/practice entry 2 is never placed/);
+  });
+
+  it("rejects a marker with no matching problem", () => {
+    expect(compileBad("practice-unplaced")).toThrow(
+      /\{\{practice:9\}\} has no matching entry/,
+    );
+  });
+
+  it("rejects problems that get easier instead of harder", () => {
+    expect(compileBad("practice-unplaced")).toThrow(
+      /is easier \(level 1\) than the one before it \(level 5\)/,
+    );
+  });
+});
+
 describe("malformed question templates — every problem reported at once", () => {
   it("names each broken template rather than failing on the first", () => {
     let error: ContentError;

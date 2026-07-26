@@ -1349,3 +1349,63 @@ article h2,
 .link-button:hover {
   color: var(--copper-bright);
 }
+
+/* Practice problems inside a lesson (D-034). Hints and the answer are native
+   <details>, so nothing is revealed until asked for and no JavaScript is
+   involved — it works offline, with a keyboard, and inside the pre-rendered
+   lesson HTML. The block is boxed so the eye can see where the prose stops and
+   the work starts; before this, answers sat in the same paragraph as the
+   question and were read before the question had been attempted. */
+.practice {
+  margin: 1.4rem 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--copper) 28%, var(--hairline));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--copper) 4%, transparent);
+}
+.practice-label {
+  margin: 0 0 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--copper);
+}
+.practice-problem {
+  margin-bottom: 0.7rem;
+}
+.practice-hint,
+.practice-answer {
+  border-top: 1px solid var(--hairline);
+  padding: 0.45rem 0 0;
+  margin-top: 0.45rem;
+}
+.practice-hint summary,
+.practice-answer summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--copper);
+  list-style: none;
+}
+.practice-hint summary::before,
+.practice-answer summary::before {
+  content: "▸ ";
+}
+.practice-hint[open] summary::before,
+.practice-answer[open] summary::before {
+  content: "▾ ";
+}
+.practice-hint summary::-webkit-details-marker,
+.practice-answer summary::-webkit-details-marker {
+  display: none;
+}
+.practice-answer summary {
+  color: var(--copper-bright);
+  font-weight: 600;
+}
+.practice-hint > div,
+.practice-answer > div {
+  margin-top: 0.4rem;
+  font-size: 0.92rem;
+}

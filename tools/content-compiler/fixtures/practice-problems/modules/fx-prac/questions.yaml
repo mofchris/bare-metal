@@ -1,0 +1,7 @@
+- id: fxp/q-001
+  lesson: fxp/01-practice
+  type: mcq
+  prompt: "Fixture MCQ"
+  options: ["first", "second"]
+  answer: 0
+  explanation: "Because."

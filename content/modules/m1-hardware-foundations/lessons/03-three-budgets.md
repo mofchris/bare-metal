@@ -9,6 +9,49 @@ sources:
   - "Williams, Waterman & Patterson, Roofline: An Insightful Visual Performance Model for Multicore Architectures, CACM 2009"
   - "Ulrich Drepper, What Every Programmer Should Know About Memory (2007), sections 2 and 6"
   - "Horace He, Making Deep Learning Go Brrrr From First Principles (horace.io/brrr_intro.html, 2022)"
+practice:
+  - level: 1
+    problem: >-
+      A float32 loop computes `c[i] = a[i] + b[i]`. Work out its arithmetic
+      intensity in FLOPs per byte before reading on.
+    hints:
+      - "Count the floating-point operations for ONE element first. An addition is one."
+      - >-
+        Now count every byte that moves for that element. Two arrays are read
+        and one is written, and a float32 is 4 bytes — the write counts.
+    answer: >-
+      1 FLOP per element, and 12 bytes moved (4 read from `a`, 4 read from `b`,
+      4 written to `c`). The intensity is 1 ÷ 12 = **0.083 FLOPs per byte**.
+  - level: 2
+    problem: >-
+      A dot product multiplies two float32 arrays elementwise and adds the
+      results into a running total. Work out its intensity, and say why it beats
+      the loop above.
+    hints:
+      - "Each element pair costs a multiply AND an add, so two operations."
+      - >-
+        The running total lives in a register, so nothing is written to memory
+        per element. Only the two reads count.
+    answer: >-
+      2 FLOPs over 8 bytes = **0.25 FLOPs per byte**, three times better. Both
+      the extra operation and the absent write help: more arithmetic on top of
+      fewer bytes.
+  - level: 3
+    problem: >-
+      Two N×N float32 matrices are multiplied. Derive the intensity as a formula
+      in N, then say what makes it different in kind from the first two.
+    hints:
+      - >-
+        Each of the N² output positions needs N multiplications and N additions,
+        so the FLOP count is 2N³.
+      - "Three N×N float32 matrices move, which is 3 × N² × 4 bytes."
+      - "Divide, and watch what happens to N."
+    answer: >-
+      2N³ ÷ 12N² = **N ÷ 6 FLOPs per byte**. The difference in kind is that it
+      GROWS with N — every value loaded is used N times instead of once. At
+      N = 1000 that is about 167, two thousand times the elementwise add, which
+      is why matrix multiplication can run near a machine's arithmetic limit and
+      why deep learning is affordable at all.
 ---
 
 ## What this lesson answers
@@ -85,24 +128,18 @@ moves to and from memory.
 It answers a single question: how much arithmetic do you get out of each byte
 you go and fetch?
 
-Work three examples by hand, because doing this yourself is the skill.
+Three examples follow. Work each one before opening its answer — doing this
+yourself is the skill, and reading someone else's arithmetic is not the same
+thing. Each is harder than the last, and the hints are there if you stall.
 
 An **elementwise** operation applies the same arithmetic to each position of an
-array independently, with no mixing between positions. Take `c[i] = a[i] + b[i]`
-on float32 data. Each element costs 1 FLOP, one addition. Each element moves 12
-bytes: 4 bytes read from `a`, 4 read from `b`, and 4 written to `c`. The
-intensity is 1 ÷ 12 = **0.083 FLOPs per byte**.
+array independently, with no mixing between positions.
 
-A dot product multiplies two arrays elementwise and adds the results together.
-Each element pair costs 2 FLOPs, one multiplication and one addition, and moves
-8 bytes, 4 from each array. Nothing is written back per element, because the
-running total stays in a register. The intensity is 2 ÷ 8 = **0.25 FLOPs per
-byte**, three times better than the elementwise add.
+{{practice:1}}
 
-Matrix multiplication of two N×N matrices performs 2N³ FLOPs, because each of
-the N² output positions needs N multiplications and N additions. It moves three
-matrices of N² float32 values, which is 3 × N² × 4 = 12N² bytes. The intensity
-is 2N³ ÷ 12N² = **N ÷ 6 FLOPs per byte**.
+{{practice:2}}
+
+{{practice:3}}
 
 Look at what makes matrix multiplication different. Its intensity grows with N,
 because every value that gets loaded is used N times rather than once. At

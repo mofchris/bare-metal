@@ -1,0 +1,5 @@
+# Test fixture: a lesson carrying practice problems (not real curriculum).
+id: fx-prac
+title: "Fixture: practice problems"
+lessons:
+  - 01-practice

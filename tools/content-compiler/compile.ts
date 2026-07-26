@@ -189,7 +189,151 @@ function readLesson(file: string, problems: string[]): Lesson | null {
   if (id === null || title === null || objectives === null || sources === null) {
     return null;
   }
-  return { id, title, objectives, sources, html: marked.parse(body) as string };
+  const withPractice = injectPractice(body, meta["practice"], file, problems);
+  return { id, title, objectives, sources, html: withPractice };
+}
+
+/* ---------------- practice problems (D-034) ----------------
+
+   A lesson may declare practice problems in its frontmatter and place them in
+   the body with a {{practice:N}} marker, so a problem sits where the argument
+   actually reaches it rather than being swept to the end:
+
+     practice:
+       - level: 1
+         problem: "Compute the arithmetic intensity of `c[i] = a[i] + b[i]`."
+         hints:
+           - "Count the FLOPs per element first."
+           - "Then count every byte that moves, including the write."
+         answer: "1 FLOP over 12 bytes is 0.083 FLOPs per byte."
+
+   WHY THIS EXISTS. Every lesson had a "Check your understanding" section, but
+   34 of the 43 printed "A correct answer says..." in the same paragraph as the
+   question — so the eye reached the solution before the brain reached the
+   problem, and there was nowhere in Metal to attempt anything. Christopher hit
+   the sharpest version at m1/03, which told him to work three examples by hand
+   and then worked all three for him.
+
+   The rendered block uses native <details> elements, so hints and the answer
+   stay hidden until asked for with NO JavaScript at all — it works inside the
+   pre-rendered lesson HTML, offline, and with the keyboard, and there is no
+   component to keep in sync. */
+
+interface PracticeItem {
+  level: number;
+  problem: string;
+  hints: string[];
+  answer: string;
+}
+
+/** Replace every {{practice:N}} marker in `body` with its rendered block. */
+function injectPractice(
+  body: string,
+  raw: unknown,
+  file: string,
+  problems: string[],
+): string {
+  const items = readPracticeItems(raw, file, problems);
+  const used = new Set<number>();
+
+  const html = marked.parse(body) as string;
+  // The marker sits on its own line, so Markdown wraps it in <p>…</p>. Consume
+  // that wrapper too: a <div> inside a <p> is invalid and browsers silently
+  // re-nest it, which breaks the block's styling in ways that are painful to
+  // trace back to their cause.
+  const rendered = html.replace(
+    /(?:<p>\s*)?\{\{\s*practice:\s*(\d+)\s*\}\}(?:\s*<\/p>)?/g,
+    (_match, n: string) => {
+      const index = Number(n);
+      if (index < 1 || index > items.length) {
+        problems.push(
+          `${file}: {{practice:${index}}} has no matching entry — ` +
+            `the practice list holds ${items.length}`,
+        );
+        return "";
+      }
+      used.add(index);
+      return renderPractice(items[index - 1]!, index);
+    },
+  );
+
+  // An authored problem with no marker would never appear on the page — the
+  // silent failure this project bans.
+  items.forEach((_item, i) => {
+    if (!used.has(i + 1)) {
+      problems.push(
+        `${file}: practice entry ${i + 1} is never placed — ` +
+          `add a {{practice:${i + 1}}} marker in the lesson body`,
+      );
+    }
+  });
+  return rendered;
+}
+
+function readPracticeItems(
+  raw: unknown,
+  file: string,
+  problems: string[],
+): PracticeItem[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    problems.push(`${file}: "practice" must be a list`);
+    return [];
+  }
+  const items: PracticeItem[] = [];
+  raw.forEach((entry, i) => {
+    const where = `${file} practice entry ${i + 1}`;
+    if (!isRecord(entry)) {
+      problems.push(`${where}: expected a mapping`);
+      return;
+    }
+    const problem = requireString(entry, "problem", where, problems);
+    const answer = requireString(entry, "answer", where, problems);
+    const hints = optionalStringArray(entry, "hints", where, problems) ?? [];
+    const level = entry["level"] === undefined ? i + 1 : entry["level"];
+    if (typeof level !== "number" || !Number.isInteger(level) || level < 1) {
+      problems.push(`${where}: "level" must be a positive integer`);
+      return;
+    }
+    if (problem !== null && answer !== null) {
+      items.push({ level, problem, hints, answer });
+    }
+  });
+  // Difficulty is meant to climb — Christopher asked for it explicitly — so a
+  // list that goes backwards is an authoring mistake, not a style choice.
+  for (let i = 1; i < items.length; i++) {
+    if (items[i]!.level < items[i - 1]!.level) {
+      problems.push(
+        `${file}: practice entry ${i + 1} is easier (level ${items[i]!.level}) than ` +
+          `the one before it (level ${items[i - 1]!.level}) — problems must get harder`,
+      );
+    }
+  }
+  return items;
+}
+
+/** Inline Markdown (code spans, emphasis) without wrapping it in a paragraph. */
+function renderInline(text: string): string {
+  return marked.parseInline(text) as string;
+}
+
+function renderPractice(item: PracticeItem, index: number): string {
+  const hints = item.hints
+    .map(
+      (hint, i) =>
+        `<details class="practice-hint"><summary>Hint ${i + 1}</summary>` +
+        `<div>${renderInline(hint)}</div></details>`,
+    )
+    .join("");
+  return (
+    `<div class="practice">` +
+    `<p class="practice-label">Problem ${index} · level ${item.level}</p>` +
+    `<div class="practice-problem">${renderInline(item.problem)}</div>` +
+    hints +
+    `<details class="practice-answer"><summary>Show the answer</summary>` +
+    `<div>${renderInline(item.answer)}</div></details>` +
+    `</div>`
+  );
 }
 
 /* ---------------- questions ---------------- */
