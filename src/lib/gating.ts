@@ -24,6 +24,13 @@ export function lessonUnlocked(
 ): boolean {
   const index = module.lessons.findIndex((l) => l.id === lessonId);
   if (index <= 0) return true;
+  // A lesson you have already passed is never locked. Without this, INSERTING
+  // a lesson into a module retroactively locks the one after it: adding
+  // m1/01b made m1/02's predecessor a lesson Christopher had never opened, so
+  // m1/02 showed as locked while displaying "best 100%", and the lesson after
+  // it stayed open — a sequence that cannot be walked. A pass is earned and
+  // cannot be un-earned by later authoring.
+  if (lessonPassed(statuses.get(lessonId))) return true;
   return lessonPassed(statuses.get(module.lessons[index - 1]!.id));
 }
 

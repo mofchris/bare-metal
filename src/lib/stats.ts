@@ -8,7 +8,7 @@
 // linear pass per derivation; a test pins that with 5000 records.
 
 import type { Curriculum } from "./curriculum";
-import type { AttemptRecord } from "./progress-store";
+import type { AttemptRecord, QuizKind } from "./progress-store";
 
 export interface LessonMastery {
   lessonId: string;
@@ -28,6 +28,9 @@ export interface RunSummary {
   startedAt: string;
   correct: number;
   total: number;
+  /** What kind of quiz it was; undefined for runs recorded before the field
+      existed, which the dashboard shows as a plain "Quiz". */
+  kind?: QuizKind;
 }
 
 /** Local-timezone YYYY-MM-DD — streaks follow the student's wall clock. */
@@ -102,11 +105,15 @@ export function runHistory(attempts: AttemptRecord[], limit: number): RunSummary
         startedAt: attempt.at,
         correct: attempt.correct ? 1 : 0,
         total: 1,
+        kind: attempt.kind,
       });
     } else {
       run.total += 1;
       if (attempt.correct) run.correct += 1;
       if (attempt.at < run.startedAt) run.startedAt = attempt.at;
+      // Every attempt in a run shares its kind; take the first one that has it
+      // so a run spanning the upgrade is still labelled.
+      run.kind = run.kind ?? attempt.kind;
     }
   }
   return [...runs.values()]

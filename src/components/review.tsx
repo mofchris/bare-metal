@@ -83,6 +83,7 @@ export function Review({
       title="Spaced review"
       backHref="#/"
       backLabel="All modules"
+      kind="review"
       questions={deck.questions}
       db={db}
     />

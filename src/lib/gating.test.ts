@@ -100,4 +100,20 @@ describe("passedLessonCount", () => {
     ]);
     expect(passedLessonCount(m, statuses)).toBe(1);
   });
+
+  it("keeps a lesson open once passed, even if a new lesson is inserted before it", () => {
+    // The real regression: inserting m1/01b between 01 and 02 made 02's
+    // predecessor a lesson he had never opened, so a lesson he had already
+    // passed at 100% displayed as locked while the one after it stayed open.
+    const withInsertion = mod("m", ["l/01", "l/01b", "l/02", "l/03"]);
+    const statuses = new Map<string, LessonProgressRecord>([
+      ["l/01", { lessonId: "l/01", status: "done", bestScorePct: 100 }],
+      ["l/02", { lessonId: "l/02", status: "done", bestScorePct: 100 }],
+    ]);
+    expect(lessonUnlocked(withInsertion, "l/02", statuses)).toBe(true);
+    // And the inserted lesson itself is open, because its predecessor passed.
+    expect(lessonUnlocked(withInsertion, "l/01b", statuses)).toBe(true);
+    // A lesson that is neither passed nor preceded by a pass stays locked.
+    expect(lessonUnlocked(withInsertion, "l/03", statuses)).toBe(true);
+  });
 });

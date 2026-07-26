@@ -421,6 +421,7 @@ function DailyReviewScreen({
       backLabel="Home"
       questions={questions}
       db={db}
+      kind="daily"
       lessonTitles={lessonTitles(curriculum)}
       onAttempted={() => {
         // Fired on the FIRST answer, not at the summary: abandoning the review
@@ -455,6 +456,7 @@ function LessonQuizScreen({
       backLabel={location.lesson.title}
       questions={questions}
       db={db}
+      kind="lesson"
       markDoneLessonId={location.lesson.id}
       next={location.next}
     />
@@ -475,6 +477,7 @@ function ExamScreen({ module, db }: { module: Module; db: ProgressDb | null }) {
       backLabel="Home"
       questions={questions}
       db={db}
+      kind="exam"
       examModuleId={module.id}
     />
   );
@@ -503,6 +506,7 @@ function CheckpointScreen({
       title={`Checkpoint ${checkpoint.number} · ${a} + ${b}`}
       backHref="#/"
       backLabel="Home"
+      kind="checkpoint"
       questions={questions}
       db={db}
     />

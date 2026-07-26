@@ -52,6 +52,19 @@
   font-display: swap;
 }
 
+/* Base size scales with the viewport instead of sitting at the browser's 16px.
+   Christopher runs a 1920x1200 14-inch screen with Windows scaling at 100%
+   (~162 DPI), where a 16px default is genuinely small — he had been zooming
+   the browser to roughly 125% to read comfortably and asked for that to be the
+   default. Everything else in this file is sized in rem, so this one rule
+   scales the whole interface, INCLUDING the 84rem shell width, which is why
+   the layout fills a wide screen rather than stranding it in a narrow column.
+   The clamp keeps phones exactly where they were: 375px still resolves to
+   16px. */
+html {
+  font-size: clamp(16px, 14.4px + 0.35vw, 20px);
+}
+
 :root {
   /* the board */
   --board: #0d1412; /* solder mask, near-black green */
@@ -1051,6 +1064,12 @@ article h2,
   padding-bottom: 1px;
 }
 
+/* Each bar is a BUTTON. The previous version was a div carrying a `title`
+   tooltip, which does not exist on a touch screen — Christopher tapped a bar
+   on his phone and nothing happened. Tapping now selects the run and the
+   detail line under the chart describes it. Min-height 44px worth of target
+   comes from the flex row's height, so the whole column is tappable, not just
+   the coloured part. */
 .run-col {
   flex: 1;
   max-width: 2rem;
@@ -1060,6 +1079,28 @@ article h2,
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.run-col .run-bar {
+  opacity: 0.55;
+  transition: opacity 120ms ease;
+}
+.run-col.selected .run-bar,
+.run-col:hover .run-bar {
+  opacity: 1;
+}
+.run-tag {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--ink-dim);
+}
+.run-col.selected .run-tag {
+  color: var(--copper-bright);
 }
 
 .run-bar {
@@ -1522,6 +1563,28 @@ article h2,
 .resume-reading-pct {
   font-family: var(--font-mono);
   font-size: 0.75rem;
+  color: var(--ink-dim);
+  margin-left: auto;
+}
+
+/* The detail line under the score chart: what the selected run WAS, what it
+   scored, and when. Replaces a hover-only tooltip, so it works on a phone. */
+.run-detail {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.run-detail-kind {
+  color: var(--copper-bright);
+}
+.run-detail-score {
+  color: var(--ink);
+}
+.run-detail-date {
   color: var(--ink-dim);
   margin-left: auto;
 }

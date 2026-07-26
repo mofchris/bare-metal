@@ -15,7 +15,7 @@ import type { Lesson, Question } from "../lib/curriculum";
 import { gradeResponse, type QuizResponse } from "../lib/quiz";
 import { PASS_MARK } from "../lib/gating";
 import { lessonHref } from "../lib/route";
-import type { ProgressDb } from "../lib/progress-store";
+import type { ProgressDb, QuizKind } from "../lib/progress-store";
 
 interface QuizProps {
   /** Context line above the question counter (module title, or "Spaced review"). */
@@ -39,6 +39,10 @@ interface QuizProps {
   /** Lesson id → title, so a missed question can name the lesson to reread.
       Absent for single-lesson quizzes, where the lesson is already obvious. */
   lessonTitles?: ReadonlyMap<string, string>;
+  /** Recorded on every attempt, so the score chart can say what each run WAS
+      instead of showing anonymous bars (his report: "i don't know what type of
+      quiz each bar reps"). */
+  kind: QuizKind;
 }
 
 interface AnsweredQuestion {
@@ -58,6 +62,7 @@ export function Quiz({
   next,
   onAttempted,
   lessonTitles,
+  kind,
 }: QuizProps) {
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   // "answering" → inputs live; "feedback" → result + explanation shown.
@@ -89,6 +94,7 @@ export function Quiz({
           correct,
           givenAnswer,
           sessionId,
+          kind,
         }),
         db.updateSrsOnAnswer(current.id, correct, now),
       ];

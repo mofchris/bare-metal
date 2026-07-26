@@ -2,8 +2,10 @@
 // bars. Depends on: lib/stats, lib/route. Depended on by: home.tsx (side
 // rail) and dashboard.tsx (detail page) — one visual vocabulary, two screens.
 
+import { useState } from "preact/hooks";
 import { lessonHref } from "../lib/route";
 import { localDateKey, type LessonMastery, type RunSummary } from "../lib/stats";
+import type { QuizKind } from "../lib/progress-store";
 import {
   DAILY_GOAL_SECONDS,
   secondsByDay,
@@ -13,31 +15,70 @@ import {
 
 /* Single-series column list: height ∝ accuracy, baseline-anchored; per-column
    title tooltip; only the latest run gets a direct label. */
+/** Human label for a run's kind. Old runs have none — say so rather than guess. */
+const KIND_LABELS: Record<QuizKind, string> = {
+  lesson: "Lesson quiz",
+  exam: "Module exam",
+  checkpoint: "Checkpoint",
+  daily: "Daily review",
+  review: "Spaced review",
+};
+
+/** One-letter tag under each bar, so the kind is readable without tapping. */
+const KIND_TAGS: Record<QuizKind, string> = {
+  lesson: "L",
+  exam: "E",
+  checkpoint: "C",
+  daily: "D",
+  review: "R",
+};
+
 export function RunTrend({ runs }: { runs: RunSummary[] }) {
+  // Which bar's details are on screen. Defaults to the newest run so the panel
+  // says something useful before anything is tapped.
+  const [selected, setSelected] = useState<string | null>(null);
   if (runs.length < 2) return null;
+
+  const shown = runs.find((r) => r.sessionId === selected) ?? runs[runs.length - 1]!;
+  const shownPct = Math.round((shown.correct / shown.total) * 100);
+
   return (
     <section>
       <h3 class="dash-section">Last {runs.length} quiz runs</h3>
-      <div
-        class="run-trend"
-        role="img"
-        aria-label="Accuracy per quiz run, oldest to newest"
-      >
-        {runs.map((run, i) => {
+      <div class="run-trend">
+        {runs.map((run) => {
           const pct = Math.round((run.correct / run.total) * 100);
-          const latest = i === runs.length - 1;
+          const isShown = run.sessionId === shown.sessionId;
+          const label = run.kind ? KIND_LABELS[run.kind] : "Quiz";
           return (
-            <div
+            // A button, not a div with a title attribute. The old version put
+            // the score in a tooltip, which simply does not exist on a phone —
+            // Christopher tapped a bar and nothing happened.
+            <button
               key={run.sessionId}
-              class="run-col"
-              title={`${new Date(run.startedAt).toLocaleDateString()}: ${run.correct}/${run.total} (${pct}%)`}
+              type="button"
+              class={isShown ? "run-col selected" : "run-col"}
+              aria-label={`${label}, ${pct}%, ${new Date(run.startedAt).toLocaleDateString()}`}
+              aria-pressed={isShown}
+              onClick={() => setSelected(run.sessionId)}
             >
-              {latest && <span class="run-label">{pct}%</span>}
-              <div class="run-bar" style={{ height: `${Math.max(pct, 4)}%` }} />
-            </div>
+              <span class="run-bar" style={{ height: `${Math.max(pct, 4)}%` }} />
+              <span class="run-tag">{run.kind ? KIND_TAGS[run.kind] : "?"}</span>
+            </button>
           );
         })}
       </div>
+      <p class="run-detail">
+        <span class="run-detail-kind">
+          {shown.kind ? KIND_LABELS[shown.kind] : "Quiz"}
+        </span>
+        <span class="run-detail-score">
+          {shown.correct}/{shown.total} · {shownPct}%
+        </span>
+        <span class="run-detail-date">
+          {new Date(shown.startedAt).toLocaleDateString()}
+        </span>
+      </p>
     </section>
   );
 }
