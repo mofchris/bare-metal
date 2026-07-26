@@ -29,18 +29,38 @@ import { secondsByDay, type StudyTimeRecord } from "./study-time";
 export interface CurriculumProgress {
   passed: number;
   total: number;
-  /** 0–100, rounded. */
+  /** 0–100, rounded, from `passed` — the headline number. */
   pct: number;
+  /**
+   * Lesson-equivalents completed INCLUDING partial reading, so 2 passed plus a
+   * lesson read halfway counts as 2.4. The headline stays whole lessons
+   * because "2/44 passed" is what he has actually earned, but the pace
+   * estimate uses this: without it the projection cannot move between passes,
+   * which is exactly the staleness Christopher noticed — a week of reading
+   * would leave the finish date untouched.
+   */
+  effective: number;
 }
 
 export function curriculumProgress(
   curriculum: Curriculum,
   statuses: ReadonlyMap<string, LessonProgressRecord>,
+  readFractions: ReadonlyMap<string, number> = new Map(),
 ): CurriculumProgress {
   const lessons = curriculum.modules.flatMap((m) => m.lessons);
   const passed = lessons.filter((l) => lessonPassed(statuses.get(l.id))).length;
+  const effective = lessons.reduce(
+    (sum, l) =>
+      sum + lessonProgressFraction(statuses.get(l.id), readFractions.get(l.id) ?? null),
+    0,
+  );
   const total = lessons.length;
-  return { passed, total, pct: total === 0 ? 0 : Math.round((passed / total) * 100) };
+  return {
+    passed,
+    total,
+    pct: total === 0 ? 0 : Math.round((passed / total) * 100),
+    effective,
+  };
 }
 
 /**
@@ -94,7 +114,10 @@ export function paceEstimate(
   now: Date,
 ): PaceEstimate | null {
   if (progress.passed < MIN_LESSONS_FOR_ESTIMATE) return null;
-  const remainingLessons = progress.total - progress.passed;
+  // Rate and remaining work both use the FRACTIONAL figure, so finishing a
+  // lesson is not the only event that can move the date — reading moves it too.
+  const done = Math.max(progress.effective, progress.passed);
+  const remainingLessons = progress.total - done;
   if (remainingLessons <= 0) return null;
 
   const byDay = secondsByDay(studyTime);
@@ -104,7 +127,7 @@ export function paceEstimate(
   const totalMinutes = activeDays.reduce((sum, [, s]) => sum + s, 0) / 60;
   if (totalMinutes <= 0) return null;
 
-  const minutesPerLesson = totalMinutes / progress.passed;
+  const minutesPerLesson = totalMinutes / done;
   const minutesPerActiveDay = totalMinutes / activeDays.length;
 
   // How often he sits down, measured from his first study day to today.
@@ -123,7 +146,7 @@ export function paceEstimate(
   return {
     minutesPerLesson: Math.round(minutesPerLesson),
     minutesPerActiveDay: Math.round(minutesPerActiveDay),
-    lessonsPerActiveDay: progress.passed / activeDays.length,
+    lessonsPerActiveDay: done / activeDays.length,
     activeDays: activeDays.length,
     studyFrequency,
     daysRemaining,

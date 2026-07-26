@@ -45,11 +45,54 @@ describe("curriculumProgress", () => {
       curriculumOf(["a", "b", "c", "d"]),
       passed(["a", "b"]),
     );
-    expect(progress).toEqual<CurriculumProgress>({ passed: 2, total: 4, pct: 50 });
+    expect(progress).toEqual<CurriculumProgress>({
+      passed: 2,
+      total: 4,
+      pct: 50,
+      effective: 2,
+    });
   });
 
   it("reports zero rather than dividing by zero for an empty curriculum", () => {
     expect(curriculumProgress(curriculumOf([]), new Map()).pct).toBe(0);
+  });
+});
+
+describe("partial reading counts toward the estimate", () => {
+  it("counts a part-read lesson as partial progress, not zero", () => {
+    const progress = curriculumProgress(
+      curriculumOf(["a", "b", "c", "d"]),
+      passed(["a"]),
+      new Map([["b", 0.5]]),
+    );
+    // 1 passed + 0.5 read x 0.8 = 1.4 lesson-equivalents.
+    expect(progress.passed).toBe(1);
+    expect(progress.effective).toBeCloseTo(1.4, 5);
+  });
+
+  it("moves the finish date as he reads, not only as he passes", () => {
+    const curriculum = curriculumOf(Array.from({ length: 20 }, (_, i) => `l${i}`));
+    const days = studyDays(["2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26"], 60);
+    const now = new Date(2026, 6, 26);
+    const justPassed = paceEstimate(
+      curriculumProgress(curriculum, passed(["l0", "l1", "l2", "l3"])),
+      days,
+      now,
+    )!;
+    const alsoReading = paceEstimate(
+      curriculumProgress(
+        curriculum,
+        passed(["l0", "l1", "l2", "l3"]),
+        new Map([
+          ["l4", 1],
+          ["l5", 1],
+        ]),
+      ),
+      days,
+      now,
+    )!;
+    // Two lessons fully read but unpassed pull the projection in.
+    expect(alsoReading.daysRemaining).toBeLessThan(justPassed.daysRemaining);
   });
 });
 
@@ -58,7 +101,7 @@ describe("paceEstimate", () => {
 
   it("projects a finish date from measured pace", () => {
     // 4 lessons of 10 done, 4 study days of 60 min = 240 min => 60 min/lesson.
-    const progress = { passed: 4, total: 10, pct: 40 };
+    const progress = { passed: 4, total: 10, pct: 40, effective: 4 };
     const est = paceEstimate(
       progress,
       studyDays(["2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26"], 60),
@@ -74,7 +117,7 @@ describe("paceEstimate", () => {
 
   it("stretches the estimate when he studies only some days", () => {
     // Same work, but spread over 8 elapsed days with only 4 studied.
-    const progress = { passed: 4, total: 10, pct: 40 };
+    const progress = { passed: 4, total: 10, pct: 40, effective: 4 };
     const est = paceEstimate(
       progress,
       studyDays(["2026-07-19", "2026-07-21", "2026-07-23", "2026-07-26"], 60),
@@ -87,14 +130,18 @@ describe("paceEstimate", () => {
 
   it("says nothing until enough lessons are done to have a rate", () => {
     expect(
-      paceEstimate({ passed: 1, total: 10, pct: 10 }, studyDays(["2026-07-23"], 60), now),
+      paceEstimate(
+        { passed: 1, total: 10, pct: 10, effective: 1 },
+        studyDays(["2026-07-23"], 60),
+        now,
+      ),
     ).toBeNull();
   });
 
   it("says nothing until he has studied on enough separate days", () => {
     expect(
       paceEstimate(
-        { passed: 4, total: 10, pct: 40 },
+        { passed: 4, total: 10, pct: 40, effective: 4 },
         studyDays(["2026-07-25", "2026-07-26"], 60),
         now,
       ),
@@ -104,7 +151,7 @@ describe("paceEstimate", () => {
   it("says nothing once the curriculum is finished", () => {
     expect(
       paceEstimate(
-        { passed: 10, total: 10, pct: 100 },
+        { passed: 10, total: 10, pct: 100, effective: 10 },
         studyDays(["2026-07-23", "2026-07-24", "2026-07-25"], 60),
         now,
       ),

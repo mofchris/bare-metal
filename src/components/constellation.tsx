@@ -79,6 +79,7 @@ export function Constellation() {
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
+      if (rect.width === width && rect.height === height) return;
       const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
       width = rect.width;
       height = rect.height;
@@ -89,14 +90,24 @@ export function Constellation() {
       // Fewer nodes on a phone: the same count on a small canvas is a scribble,
       // and the link test is quadratic in node count.
       const count = Math.max(14, Math.round((NODE_TARGET * width) / 1200));
-      nodes = Array.from({ length: count }, () => ({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        // Slow, but varied — a uniform speed reads as a screensaver.
-        vx: (Math.random() - 0.5) * 0.34,
-        vy: (Math.random() - 0.5) * 0.34,
-        radius: 1.2 + Math.random() * 1.4,
+      // Keep the nodes that already exist and just bring them inside the new
+      // bounds. Rebuilding the whole field on every measurement would make the
+      // network visibly jump each time the hero's height changed.
+      nodes = nodes.slice(0, count).map((node) => ({
+        ...node,
+        x: Math.min(node.x, width),
+        y: Math.min(node.y, height),
       }));
+      while (nodes.length < count) {
+        nodes.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          // Slow, but varied — a uniform speed reads as a screensaver.
+          vx: (Math.random() - 0.5) * 0.34,
+          vy: (Math.random() - 0.5) * 0.34,
+          radius: 1.2 + Math.random() * 1.4,
+        });
+      }
       pulses = [];
     };
 
@@ -121,10 +132,36 @@ export function Constellation() {
         }
         node.x += node.vx;
         node.y += node.vy;
+
         // Bounce off the edges rather than wrapping: wrapping makes lines snap
         // across the whole canvas as a node teleports.
-        if (node.x <= 0 || node.x >= width) node.vx *= -1;
-        if (node.y <= 0 || node.y >= height) node.vy *= -1;
+        //
+        // REFLECT the position and force the velocity INWARD, rather than
+        // clamping to the edge and flipping the sign. The clamp-and-flip
+        // version had a real bug: when the pointer pushed a node past the
+        // boundary, the clamp pinned it exactly on the edge and the sign
+        // flipped every single frame without the node ever moving, so nodes
+        // collected in a line along the bottom and the links between them drew
+        // a permanent gold smear (Christopher's "gold residue"). Reflecting the
+        // overshoot puts the node back inside the canvas, and taking abs() of
+        // the velocity guarantees it is now heading away from that wall, so it
+        // cannot get stuck there however hard the pointer pushes.
+        if (node.x < 0) {
+          node.x = -node.x;
+          node.vx = Math.abs(node.vx);
+        } else if (node.x > width) {
+          node.x = 2 * width - node.x;
+          node.vx = -Math.abs(node.vx);
+        }
+        if (node.y < 0) {
+          node.y = -node.y;
+          node.vy = Math.abs(node.vy);
+        } else if (node.y > height) {
+          node.y = 2 * height - node.y;
+          node.vy = -Math.abs(node.vy);
+        }
+        // A reflection can still land outside if the overshoot exceeded the
+        // canvas — only possible under a violent resize — so clamp as a floor.
         node.x = Math.min(width, Math.max(0, node.x));
         node.y = Math.min(height, Math.max(0, node.y));
       }
@@ -237,7 +274,16 @@ export function Constellation() {
     const onVisibility = () =>
       document.visibilityState === "visible" ? start() : stop();
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("resize", resize);
+
+    // A window resize is NOT the only way this canvas changes size. The hero
+    // grows and shrinks with its own contents — adding the whole-curriculum bar
+    // made it taller with no resize event at all — and the JS width/height then
+    // stayed stale. Everything below the stale height was drawn but never
+    // cleared, leaving a permanent copper smear along the bottom (Christopher's
+    // "gold residue"). A ResizeObserver watches the element itself, so the
+    // measurement follows the layout however it changed.
+    const resizeObserver = new ResizeObserver(() => resize());
+    resizeObserver.observe(canvas);
 
     // Pointer tracking listens on the PARENT: the canvas itself has
     // pointer-events disabled so it can never swallow a click on the hero.
@@ -260,8 +306,8 @@ export function Constellation() {
     return () => {
       stop();
       observer.disconnect();
+      resizeObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("resize", resize);
       host?.removeEventListener("pointermove", onPointerMove);
       host?.removeEventListener("pointerleave", onPointerLeave);
     };

@@ -542,7 +542,11 @@ function Hero({
   totalLessons: number;
   continueLesson: Lesson | undefined;
 }) {
-  const overall = curriculumProgress(curriculum, data?.statuses ?? new Map());
+  const overall = curriculumProgress(
+    curriculum,
+    data?.statuses ?? new Map(),
+    data?.readFractions ?? new Map(),
+  );
   const pace = data ? paceEstimate(overall, data.studyTime, new Date()) : null;
   const questionTotal = curriculum.modules.reduce((n, m) => n + m.questions.length, 0);
 
