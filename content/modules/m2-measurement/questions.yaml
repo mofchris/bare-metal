@@ -377,3 +377,71 @@
     could describe an excellent system or an unusable one. The mirror-image
     mistake is quoting a latency without saying at what load.
   tags: [ml-benchmarking, batching]
+
+# ---------------------------------------------------------------------------
+# TEMPLATED QUESTIONS (D-030). One authored entry expands at build time into
+# one question per combination of its `vars`, with every number computed from
+# the `derive` formulas rather than typed by hand. Format: the template section
+# of tools/content-compiler/compile.ts.
+# ---------------------------------------------------------------------------
+
+- id: m2/q-021
+  lesson: m2/03-profiling
+  type: mcq
+  vars:
+    percent_of_runtime: [30, 60, 80]
+    speedup_factor: [2, 4, 10]
+  derive:
+    p: percent_of_runtime / 100
+    overall: round(1 / ((1 - p) + p / speedup_factor), 2)
+    if_deleted_entirely: round(1 / (1 - p), 2)
+    naive_whole_program: speedup_factor
+  prompt: >-
+    Profiling shows one function is {{percent_of_runtime}}% of total runtime.
+    You believe you can make that function {{speedup_factor}}x faster. By
+    Amdahl's law, what is the speedup of the whole program?
+  options:
+    - "{{overall}}x"
+    - "{{naive_whole_program}}x"
+    - "{{if_deleted_entirely}}x"
+    - "{{percent_of_runtime}}x"
+  answer: 0
+  explanation: >-
+    Amdahl's law is 1 / ((1 - p) + p/s) with p = {{p}} and s =
+    {{speedup_factor}}, giving {{overall}}x. Answering {{naive_whole_program}}x
+    applies the component's speedup to the whole program, which is the mistake
+    the law exists to prevent — the other {{percent_of_runtime}}% of the
+    runtime did not change. {{if_deleted_entirely}}x is the ceiling you would
+    get by making that function take zero time, so it is the most the work
+    could ever be worth.
+  tags: [profiling, amdahl, templated]
+
+- id: m2/q-022
+  lesson: m2/04-benchmarking-ml
+  type: mcq
+  vars:
+    batch_size: [8, 16, 32, 64]
+    per_batch_ms: [20, 40]
+  derive:
+    throughput: round(batch_size / per_batch_ms * 1000)
+    wait_for_full_batch_ms: round((batch_size - 1) / batch_size * per_batch_ms, 1)
+    per_sample_ms: round(per_batch_ms / batch_size, 2)
+  prompt: >-
+    A server batches {{batch_size}} requests and takes {{per_batch_ms}} ms to
+    run the model over the whole batch. Requests arrive steadily. What
+    throughput does this achieve, in samples per second?
+  options:
+    - "{{throughput}}"
+    - "{{per_batch_ms}}"
+    - "{{batch_size}}"
+    - "{{per_sample_ms}}"
+  answer: 0
+  explanation: >-
+    {{batch_size}} samples finish every {{per_batch_ms}} ms, so per second that
+    is {{batch_size}} / {{per_batch_ms}} x 1000 = {{throughput}} samples. Note
+    what this number does NOT say: a request arriving at an empty batch waits
+    for the other {{batch_size}} minus one before anything happens to it, so
+    its latency is worse than the {{per_sample_ms}} ms that dividing the batch
+    time might suggest. A throughput figure is unfinished without a latency
+    figure beside it.
+  tags: [throughput, latency, batching, templated]
