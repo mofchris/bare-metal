@@ -810,14 +810,16 @@ function CurriculumBar({
       <p class="curriculum-progress-eta">
         {pace ? (
           <>
-            At {pace.minutesPerActiveDay} min a study day, finishing around{" "}
+            {pace.lessonsPerActiveDay.toFixed(1)} lessons per study day, studying{" "}
+            {Math.round(pace.studyFrequency * 7)} days in 7 — finishing around{" "}
             <b>
               {pace.finishDate.toLocaleDateString(undefined, {
                 month: "long",
                 year: "numeric",
               })}
-            </b>{" "}
-            — about {pace.daysRemaining} days at your current pace.
+            </b>
+            , about {pace.daysRemaining} days away. Finish lessons or study more days to
+            pull that in.
           </>
         ) : (
           "Finish date appears once a few lessons and study days are on record."

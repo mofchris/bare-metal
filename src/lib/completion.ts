@@ -53,10 +53,15 @@ export const MIN_LESSONS_FOR_ESTIMATE = 2;
 export const MIN_ACTIVE_DAYS_FOR_ESTIMATE = 3;
 
 export interface PaceEstimate {
-  /** Minutes of study per lesson passed, measured. */
+  /** Minutes of study per lesson passed, measured. Reported, not a driver —
+      see the note on what actually moves the date. */
   minutesPerLesson: number;
-  /** Average minutes on days he actually studied. */
+  /** Average minutes on days he actually studied. Reported, not a driver. */
   minutesPerActiveDay: number;
+  /** Lessons finished per day studied. THIS is what moves the date. */
+  lessonsPerActiveDay: number;
+  /** Days he has actually studied on. */
+  activeDays: number;
   /** Fraction of elapsed days he studied at all, 0–1. */
   studyFrequency: number;
   /** Calendar days until the curriculum is finished at this pace. */
@@ -73,6 +78,15 @@ export interface PaceEstimate {
  * contains: how fast he moves when studying, and how often he studies. Assuming
  * he studies every day would flatter the estimate; using only elapsed days
  * would punish a deliberate rest day. Multiplying the two is the honest middle.
+ *
+ * WHAT ACTUALLY MOVES THE DATE, because the first version of the UI copy got
+ * this wrong. Work the algebra through: minutes per lesson is T/P and minutes
+ * per active day is T/A, so days needed is R x (T/P) / (T/A) = R x A / P. The
+ * total minutes T CANCELS. Sitting in the app longer therefore changes nothing
+ * on its own — only finishing lessons (raising P) and studying on more days
+ * (raising frequency) do. That is the right behaviour for a projection, since
+ * minutes spent without progress are not evidence of progress, but the UI must
+ * not imply otherwise.
  */
 export function paceEstimate(
   progress: CurriculumProgress,
@@ -109,6 +123,8 @@ export function paceEstimate(
   return {
     minutesPerLesson: Math.round(minutesPerLesson),
     minutesPerActiveDay: Math.round(minutesPerActiveDay),
+    lessonsPerActiveDay: progress.passed / activeDays.length,
+    activeDays: activeDays.length,
     studyFrequency,
     daysRemaining,
     finishDate,

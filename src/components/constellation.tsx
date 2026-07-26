@@ -7,12 +7,19 @@
 // about, and it reads as a circuit rather than decoration because the palette
 // stays copper.
 //
+// THREE THINGS MAKE IT FEEL ALIVE rather than merely moving, after he asked for
+// something more dynamic than the first version:
+//   - node sizes and speeds vary, so the field never settles into one sweep
+//   - the pointer becomes a node: nearby points link to it and drift aside
+//   - signal pulses run down links, which is what makes it read as a circuit
+//     carrying something rather than a lattice sitting there
+//
 // CANVAS, NOT SVG. Roughly forty nodes means hundreds of candidate lines every
 // frame; as SVG that is hundreds of DOM elements mutating 60 times a second,
 // which is exactly the kind of thing that makes a phone warm. One canvas draw
 // call per frame does not.
 //
-// THREE THINGS KEEP IT CHEAP, because this sits behind the home screen of a
+// AND THREE THINGS KEEP IT CHEAP, because this sits behind the home screen of a
 // study app and must never compete with the studying:
 //   - it stops completely when the tab is hidden or the canvas is scrolled off
 //   - device pixel ratio is capped at 2
@@ -25,12 +32,30 @@ const NODE_TARGET = 42;
 /** Distance within which two nodes are joined, as a fraction of canvas width. */
 const LINK_DISTANCE_RATIO = 0.18;
 const MAX_DPR = 2;
+/** How far the pointer reaches, as a fraction of canvas width. */
+const POINTER_RADIUS_RATIO = 0.22;
+/** Simultaneous signal pulses travelling along links. */
+const MAX_PULSES = 3;
+/** Chance per frame that a new pulse starts, when there is room for one. */
+const PULSE_SPAWN_CHANCE = 0.014;
+/** Fraction of a link traversed per frame. */
+const PULSE_SPEED = 0.013;
 
 interface Node {
   x: number;
   y: number;
   vx: number;
   vy: number;
+  /** Per-node radius, so the field has some depth instead of uniform dots. */
+  radius: number;
+}
+
+/** A bright dot running from one node to another along their link. */
+interface Pulse {
+  from: number;
+  to: number;
+  /** 0 at the source, 1 on arrival. */
+  t: number;
 }
 
 export function Constellation() {
@@ -46,8 +71,10 @@ export function Constellation() {
     let width = 0;
     let height = 0;
     let nodes: Node[] = [];
+    let pulses: Pulse[] = [];
     let frame = 0;
     let running = false;
+    const pointer = { x: 0, y: 0, active: false };
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -65,17 +92,33 @@ export function Constellation() {
       nodes = Array.from({ length: count }, () => ({
         x: Math.random() * width,
         y: Math.random() * height,
-        // Slow: a drift you notice only if you look for it.
-        vx: (Math.random() - 0.5) * 0.22,
-        vy: (Math.random() - 0.5) * 0.22,
+        // Slow, but varied — a uniform speed reads as a screensaver.
+        vx: (Math.random() - 0.5) * 0.34,
+        vy: (Math.random() - 0.5) * 0.34,
+        radius: 1.2 + Math.random() * 1.4,
       }));
+      pulses = [];
     };
 
     const draw = () => {
       context.clearRect(0, 0, width, height);
       const linkDistance = width * LINK_DISTANCE_RATIO;
+      const pointerRadius = width * POINTER_RADIUS_RATIO;
 
       for (const node of nodes) {
+        // The pointer nudges nearby nodes gently aside, so the field reacts to
+        // the cursor instead of ignoring it. Deliberately weak: it should feel
+        // like the network noticing you, not like dragging it around.
+        if (pointer.active) {
+          const dx = node.x - pointer.x;
+          const dy = node.y - pointer.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance > 0.001 && distance < pointerRadius) {
+            const push = (1 - distance / pointerRadius) * 0.35;
+            node.x += (dx / distance) * push;
+            node.y += (dy / distance) * push;
+          }
+        }
         node.x += node.vx;
         node.y += node.vy;
         // Bounce off the edges rather than wrapping: wrapping makes lines snap
@@ -91,13 +134,12 @@ export function Constellation() {
         const a = nodes[i]!;
         for (let j = i + 1; j < nodes.length; j++) {
           const b = nodes[j]!;
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const distance = Math.hypot(dx, dy);
+          const distance = Math.hypot(a.x - b.x, a.y - b.y);
           if (distance > linkDistance) continue;
           // Fade the line out as the pair separates, so links appear and vanish
           // smoothly instead of blinking at the threshold.
-          context.strokeStyle = `rgba(208, 138, 74, ${0.28 * (1 - distance / linkDistance)})`;
+          const alpha = 0.28 * (1 - distance / linkDistance);
+          context.strokeStyle = "rgba(208, 138, 74, " + alpha + ")";
           context.beginPath();
           context.moveTo(a.x, a.y);
           context.lineTo(b.x, b.y);
@@ -105,10 +147,63 @@ export function Constellation() {
         }
       }
 
+      // Links to the pointer itself, so it reads as another node in the mesh.
+      if (pointer.active) {
+        for (const node of nodes) {
+          const distance = Math.hypot(node.x - pointer.x, node.y - pointer.y);
+          if (distance > pointerRadius) continue;
+          const alpha = 0.3 * (1 - distance / pointerRadius);
+          context.strokeStyle = "rgba(226, 164, 104, " + alpha + ")";
+          context.beginPath();
+          context.moveTo(node.x, node.y);
+          context.lineTo(pointer.x, pointer.y);
+          context.stroke();
+        }
+      }
+
+      // Signal pulses: a bright dot running down a link, which is what makes
+      // the thing read as a circuit carrying something rather than a lattice.
+      if (
+        nodes.length > 1 &&
+        pulses.length < MAX_PULSES &&
+        Math.random() < PULSE_SPAWN_CHANCE
+      ) {
+        const from = Math.floor(Math.random() * nodes.length);
+        const source = nodes[from]!;
+        const candidates: number[] = [];
+        for (let i = 0; i < nodes.length; i++) {
+          if (i === from) continue;
+          const n = nodes[i]!;
+          if (Math.hypot(n.x - source.x, n.y - source.y) < linkDistance)
+            candidates.push(i);
+        }
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        if (pick !== undefined) pulses.push({ from, to: pick, t: 0 });
+      }
+      pulses = pulses.filter((pulse) => {
+        const a = nodes[pulse.from];
+        const b = nodes[pulse.to];
+        if (!a || !b) return false;
+        pulse.t += PULSE_SPEED;
+        if (pulse.t >= 1) return false;
+        // A pulse whose link has stretched past the join distance dies with it,
+        // rather than flying across empty space.
+        if (Math.hypot(a.x - b.x, a.y - b.y) > linkDistance) return false;
+        const x = a.x + (b.x - a.x) * pulse.t;
+        const y = a.y + (b.y - a.y) * pulse.t;
+        // Fade in and out so it never pops into existence.
+        const brightness = Math.sin(pulse.t * Math.PI);
+        context.fillStyle = "rgba(240, 190, 140, " + 0.85 * brightness + ")";
+        context.beginPath();
+        context.arc(x, y, 2.1, 0, Math.PI * 2);
+        context.fill();
+        return true;
+      });
+
       context.fillStyle = "rgba(226, 164, 104, 0.55)";
       for (const node of nodes) {
         context.beginPath();
-        context.arc(node.x, node.y, 1.6, 0, Math.PI * 2);
+        context.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
         context.fill();
       }
     };
@@ -144,11 +239,31 @@ export function Constellation() {
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("resize", resize);
 
+    // Pointer tracking listens on the PARENT: the canvas itself has
+    // pointer-events disabled so it can never swallow a click on the hero.
+    // Touch is deliberately not wired — on a phone the finger is scrolling, and
+    // a mesh recoiling from every scroll would be noise.
+    const host = canvas.parentElement;
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse") return;
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = event.clientX - rect.left;
+      pointer.y = event.clientY - rect.top;
+      pointer.active = true;
+    };
+    const onPointerLeave = () => {
+      pointer.active = false;
+    };
+    host?.addEventListener("pointermove", onPointerMove);
+    host?.addEventListener("pointerleave", onPointerLeave);
+
     return () => {
       stop();
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", resize);
+      host?.removeEventListener("pointermove", onPointerMove);
+      host?.removeEventListener("pointerleave", onPointerLeave);
     };
   }, []);
 
