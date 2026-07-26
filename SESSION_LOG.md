@@ -703,3 +703,77 @@ questions per lesson does not exist in a lesson that teaches five ideas.
 **New DECISIONS.md entries this session:** D-029, D-030, D-031, D-032, D-033
 (all ratified; D-029 through D-032 were logged as pending earlier in the same
 session and ratified once he delegated).
+
+## Session 2026-07-26 (twenty-eighth block — templates, daily review, daily quote)
+
+**Stage:** B | **Gate status:** Gate B unsigned
+
+**Trigger:** Christopher delegated the batch — "do what you determine is right"
+— with one instruction of his own: the quotes must include original lines from
+Ego, Isagi and Nagi.
+
+**Done this session:**
+
+- **Question templates (D-030).** `tools/content-compiler/expression.ts`: a
+  ~150-line recursive-descent arithmetic evaluator, hand-rolled rather than
+  taken from npm and deliberately NOT `eval` — authored content must never be
+  executable at build time. Templates in `questions.yaml` declare `vars` and
+  `derive` formulas; the compiler expands the cross product and COMPUTES every
+  number. Five authored entries became **46 questions**, taking M1 from 27 to
+  73 and the curriculum from 217 to **263**.
+- **Sized quizzes.** Lesson quizzes and module exams previously served every
+  question they had, which after templates would have meant a 30-question
+  lesson quiz and a 73-question M1 exam. Now LESSON_QUIZ_SIZE (5) and
+  EXAM_SIZE (20), with exams spread across a module's lessons so one lesson
+  cannot dominate.
+- **Daily review quiz (D-029).** `src/lib/daily-review.ts` + a Home card +
+  route `#/daily`. Draws from lessons already passed, once per local day,
+  staying until taken or dismissed. Uses the existing `meta` store, so again no
+  schema bump. A missed question now links to the lesson that grounds it.
+- **Daily quote (D-031).** `content/quotes.yaml` compiled into curriculum.json,
+  `src/lib/quotes.ts` indexing by day-of-year modulo list length, quiet quote
+  block at the top of Home.
+- 140 tests green (was 94), typecheck clean, term audit CLEAN, build clean.
+
+**The finding that justifies the whole template design.** A structural check
+over the generated output caught `m1/q-028` shipping DUPLICATE OPTIONS: the
+"assumed float32" distractor computes line ÷ 4, which equals the correct
+line ÷ element when element is 4 — one of four variants was unanswerable while
+the other three were fine. Fixed the distractor, and then added the real fix: the
+compiler now REJECTS any mcq whose options are not distinct. This is exactly
+the class of bug that templates create and hand-authoring does not, and it is
+now impossible to ship. Separately, all 46 generated answers were re-derived by
+independent arithmetic parsed back out of the finished prompts — zero wrong.
+
+**On the quotes, and why there are nine rather than 365.** Verifying three
+lines against sources caught me about to attribute Isagi's "devour everyone in
+front of me" to Ego. That is the misattribution rate on material I "know", and
+it is why the file is a seed and not a calendar: writing 365 would have meant
+inventing most of them and putting fabricated words beside real characters'
+names. The app therefore indexes day-of-year MODULO list length, so it works
+correctly at nine entries and at 365, and adding a line never renumbers the
+others. `content/quotes.yaml` carries that explanation and the authoring format
+in its header. Filling it out is Christopher's — he has watched these shows.
+
+**Browser-verified, not just tested:** checkpoint rows render; lesson quiz is
+5 questions from a pool of 10; five consecutive retakes after marking half the
+bank answered drew their first question from the unseen half every time; the
+daily card renders, starts a 10-question review, and disappears once taken
+(with `dailyReviewTakenDay` written); a summary with five wrong answers shows
+five "Reread the lesson →" links; the day's quote renders with attribution and
+matches an independently computed day-of-year. Seeded test data was deleted
+after each check.
+
+**In progress / half-finished:** nothing.
+
+**Next session should start with:** templates for M2–M10, whose lessons still
+hold 5 questions each and therefore still cannot rotate. M1 is the worked
+example to copy. After that: D-032's in-app what's-new, then M11–M14.
+
+**Open questions for Christopher:** does he want to grow `content/quotes.yaml`
+himself, or should the seed stay small? And the M1 templates are the first
+content of their kind — worth his eye on whether the generated variants read
+as naturally as the hand-written ones.
+
+**New DECISIONS.md entries this session:** none new — this implements D-029,
+D-030 and D-031, all ratified in the previous block.
