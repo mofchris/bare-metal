@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 import { marked } from "marked";
 import type { Curriculum, Lesson, Module, Question } from "../../src/lib/curriculum.ts";
+import { evaluateExpression } from "./expression.ts";
 
 export class ContentError extends Error {
   readonly problems: string[];
@@ -175,6 +176,13 @@ function readQuestions(file: string, problems: string[]): Question[] {
       problems.push(`${where}: expected a mapping`);
       return;
     }
+    // A "vars" block marks a TEMPLATE: one authored question that expands into
+    // many concrete ones, so the bank grows without the arithmetic being
+    // transcribed by hand (D-030). Everything else is an ordinary question.
+    if (entry["vars"] !== undefined) {
+      questions.push(...expandTemplate(entry, where, problems));
+      return;
+    }
     const id = requireString(entry, "id", where, problems);
     const lesson = requireString(entry, "lesson", where, problems);
     const prompt = requireString(entry, "prompt", where, problems);
@@ -217,6 +225,289 @@ function readQuestions(file: string, problems: string[]): Question[] {
   return questions;
 }
 
+/* ---------------- question templates (D-030) ----------------
+
+   One authored entry with a `vars` block expands into one question per
+   combination of those values. `derive` holds formulas evaluated per
+   combination, and {{name}} placeholders in the prompt, options, explanation
+   and accept list are replaced with the resulting numbers.
+
+   The point is that the arithmetic is COMPUTED, never transcribed: the author
+   writes the formula once, and twelve variants cannot disagree with it. That
+   is what makes growing the bank honest rather than a fabrication risk.
+
+     - id: m1/q-020
+       lesson: m1/03-three-budgets
+       type: mcq
+       vars:
+         latency_ns: [80, 100, 120, 150]
+         clock_ghz: [2.4, 3.0, 3.6]
+       derive:
+         cycles: round(latency_ns * clock_ghz)
+         divided_instead: round(latency_ns / clock_ghz)
+       prompt: "A {{latency_ns}} ns DRAM access on a {{clock_ghz}} GHz core…"
+       options: ["{{cycles}} cycles", "{{divided_instead}} cycles", …]
+       answer: 0
+       explanation: "{{latency_ns}} ns × {{clock_ghz}} GHz = {{cycles}} cycles…"
+*/
+
+/** A template with more variants than this is almost certainly a runaway cross
+    product rather than an intention — 60 phrasings of one idea already exceeds
+    what any single lesson can justify. */
+const MAX_VARIANTS_PER_TEMPLATE = 60;
+
+function expandTemplate(
+  entry: Record<string, unknown>,
+  where: string,
+  problems: string[],
+): Question[] {
+  const id = requireString(entry, "id", where, problems);
+  const lesson = requireString(entry, "lesson", where, problems);
+  const promptTemplate = requireString(entry, "prompt", where, problems);
+  const explanationTemplate = requireString(entry, "explanation", where, problems);
+  const tags = optionalStringArray(entry, "tags", where, problems) ?? [];
+  const type = entry["type"];
+
+  const vars = readVarTable(entry["vars"], where, problems);
+  const derive = readDeriveTable(entry["derive"], where, problems);
+  if (vars === null || derive === null) return [];
+  for (const name of Object.keys(derive)) {
+    if (name in vars) {
+      problems.push(`${where}: "${name}" is both a var and a derive — pick one`);
+      return [];
+    }
+  }
+
+  const combinations = cartesianProduct(vars);
+  if (combinations.length > MAX_VARIANTS_PER_TEMPLATE) {
+    problems.push(
+      `${where}: template expands to ${combinations.length} variants, over the ` +
+        `limit of ${MAX_VARIANTS_PER_TEMPLATE} — narrow one of the var lists`,
+    );
+    return [];
+  }
+  if (id === null || lesson === null || promptTemplate === null) return [];
+  if (explanationTemplate === null) return [];
+
+  const optionTemplates =
+    type === "mcq" ? requireStringArray(entry, "options", where, problems) : null;
+  const acceptTemplates =
+    type === "short" ? requireStringArray(entry, "accept", where, problems) : null;
+  const answer = entry["answer"];
+
+  if (type === "mcq") {
+    if (optionTemplates === null) return [];
+    if (optionTemplates.length < 2 || optionTemplates.length > 6) {
+      problems.push(`${where}: mcq needs 2–6 options, got ${optionTemplates.length}`);
+      return [];
+    }
+    if (typeof answer !== "number" || !Number.isInteger(answer)) {
+      problems.push(`${where}: mcq "answer" must be an integer index`);
+      return [];
+    }
+    if (answer < 0 || answer >= optionTemplates.length) {
+      problems.push(
+        `${where}: answer index ${answer} out of range for ` +
+          `${optionTemplates.length} options`,
+      );
+      return [];
+    }
+  } else if (type === "short") {
+    if (acceptTemplates === null) return [];
+  } else {
+    problems.push(`${where}: unknown question type "${String(type)}" (mcq | short)`);
+    return [];
+  }
+
+  const out: Question[] = [];
+  combinations.forEach((binding, variantIndex) => {
+    const values: Record<string, number> = { ...binding };
+    // Derives are evaluated in author order, so a later formula may build on an
+    // earlier one — which is how a multi-step derivation stays readable.
+    for (const [name, formula] of Object.entries(derive)) {
+      try {
+        values[name] = evaluateExpression(formula, values);
+      } catch (e) {
+        problems.push(`${where}: derive "${name}" — ${(e as Error).message}`);
+        return;
+      }
+    }
+
+    const variantId = `${id}-${variantSuffix(binding)}`;
+    const substituteHere = (text: string, field: string): string | null => {
+      try {
+        return substitutePlaceholders(text, values);
+      } catch (e) {
+        problems.push(`${where} (${variantId}) ${field}: ${(e as Error).message}`);
+        return null;
+      }
+    };
+
+    const prompt = substituteHere(promptTemplate, "prompt");
+    const explanation = substituteHere(explanationTemplate, "explanation");
+    if (prompt === null || explanation === null) return;
+
+    if (type === "mcq") {
+      const options: string[] = [];
+      for (const template of optionTemplates!) {
+        const option = substituteHere(template, "option");
+        if (option === null) return;
+        options.push(option);
+      }
+      // Rotate so the correct answer is not at the same index in every variant
+      // — otherwise twelve variants of one template teach "it's always B".
+      const rotation = variantIndex % options.length;
+      out.push({
+        id: variantId,
+        lesson,
+        type: "mcq",
+        prompt,
+        options: rotateBy(options, rotation),
+        answer: ((answer as number) + rotation) % options.length,
+        explanation,
+        tags,
+      });
+    } else {
+      const accept: string[] = [];
+      for (const template of acceptTemplates!) {
+        const value = substituteHere(template, "accept");
+        if (value === null) return;
+        accept.push(value);
+      }
+      out.push({
+        id: variantId,
+        lesson,
+        type: "short",
+        prompt,
+        accept,
+        explanation,
+        tags,
+      });
+    }
+  });
+  return out;
+}
+
+/** `vars` must map each name to a non-empty list of numbers. */
+function readVarTable(
+  raw: unknown,
+  where: string,
+  problems: string[],
+): Record<string, number[]> | null {
+  if (!isRecord(raw)) {
+    problems.push(`${where}: "vars" must be a mapping of name → list of numbers`);
+    return null;
+  }
+  const table: Record<string, number[]> = {};
+  for (const [name, values] of Object.entries(raw)) {
+    if (
+      !Array.isArray(values) ||
+      values.length === 0 ||
+      values.some((v) => typeof v !== "number" || !Number.isFinite(v))
+    ) {
+      problems.push(`${where}: var "${name}" must be a non-empty list of numbers`);
+      return null;
+    }
+    if (new Set(values).size !== values.length) {
+      // A duplicated value would silently produce two identical variants that
+      // collide on the same generated id.
+      problems.push(`${where}: var "${name}" contains duplicate values`);
+      return null;
+    }
+    table[name] = values as number[];
+  }
+  if (Object.keys(table).length === 0) {
+    problems.push(`${where}: "vars" is empty — a template needs something to vary`);
+    return null;
+  }
+  return table;
+}
+
+/** `derive` (optional) maps each name to a formula string. */
+function readDeriveTable(
+  raw: unknown,
+  where: string,
+  problems: string[],
+): Record<string, string> | null {
+  if (raw === undefined) return {};
+  if (!isRecord(raw)) {
+    problems.push(`${where}: "derive" must be a mapping of name → formula`);
+    return null;
+  }
+  const table: Record<string, string> = {};
+  for (const [name, formula] of Object.entries(raw)) {
+    if (typeof formula !== "string" || formula.trim() === "") {
+      problems.push(`${where}: derive "${name}" must be a non-empty formula string`);
+      return null;
+    }
+    table[name] = formula;
+  }
+  return table;
+}
+
+/** Every combination of the var lists, in declaration order. */
+function cartesianProduct(vars: Record<string, number[]>): Record<string, number>[] {
+  let combinations: Record<string, number>[] = [{}];
+  for (const [name, values] of Object.entries(vars)) {
+    const next: Record<string, number>[] = [];
+    for (const combination of combinations) {
+      for (const value of values) next.push({ ...combination, [name]: value });
+    }
+    combinations = next;
+  }
+  return combinations;
+}
+
+/**
+ * A short, stable id suffix derived from the variant's VALUES rather than its
+ * position. Position would be a bug: adding one more clock speed later would
+ * renumber every variant after it, silently pointing Christopher's stored
+ * attempt history at different questions. Values never move.
+ */
+function variantSuffix(binding: Record<string, number>): string {
+  const canonical = Object.keys(binding)
+    .sort()
+    .map((name) => `${name}=${binding[name]}`)
+    .join(";");
+  return createHash("sha256").update(canonical).digest("hex").slice(0, 6);
+}
+
+/** Replace every {{name}} with its value; {{name:,}} adds thousands separators. */
+function substitutePlaceholders(
+  text: string,
+  values: Readonly<Record<string, number>>,
+): string {
+  return text.replace(
+    /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::\s*(,))?\s*\}\}/g,
+    (_match, name: string, grouped: string | undefined) => {
+      if (!(name in values)) {
+        const known = Object.keys(values).sort().join(", ");
+        throw new Error(`unknown placeholder "{{${name}}}" (available: ${known})`);
+      }
+      return formatNumber(values[name]!, grouped === ",");
+    },
+  );
+}
+
+/**
+ * Numbers as a reader expects them. toFixed(6) then back through Number strips
+ * binary floating-point noise (0.30000000000000004 → 0.3) without inventing
+ * precision; authors control real rounding with round() in the formula.
+ */
+function formatNumber(value: number, grouped: boolean): string {
+  const clean = Number(value.toFixed(6));
+  return grouped ? clean.toLocaleString("en-US") : String(clean);
+}
+
+/** items[j] moves to index (j + by) % length. */
+function rotateBy<T>(items: T[], by: number): T[] {
+  const out = new Array<T>(items.length);
+  items.forEach((item, j) => {
+    out[(j + by) % items.length] = item;
+  });
+  return out;
+}
+
 /* ---------------- cross-module checks ---------------- */
 
 function validateCrossReferences(modules: Module[], problems: string[]): void {
@@ -245,6 +536,22 @@ function validateCrossReferences(modules: Module[], problems: string[]): void {
         problems.push(
           `module ${mod.id}: question "${q.id}" references unknown lesson "${q.lesson}"`,
         );
+      }
+      // Two identical options make the question unanswerable — one of the two
+      // is "correct" and the other scores wrong for identical text. Hand-typed
+      // banks rarely hit this, but a template whose distractor formula happens
+      // to equal the answer for one combination of values does, and only for
+      // SOME variants (m1/q-028 shipped exactly that until the build caught
+      // it). This is why the check lives here rather than in review.
+      if (q.type === "mcq") {
+        const duplicates = q.options.filter((opt, i) => q.options.indexOf(opt) !== i);
+        if (duplicates.length > 0) {
+          problems.push(
+            `module ${mod.id}: question "${q.id}" has duplicate options ` +
+              `(${[...new Set(duplicates)].map((d) => `"${d}"`).join(", ")}) — ` +
+              `a distractor collides with another option`,
+          );
+        }
       }
     }
     for (const p of mod.prereqs) {

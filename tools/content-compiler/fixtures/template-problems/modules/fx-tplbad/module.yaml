@@ -1,0 +1,5 @@
+# Test fixture: templates that must be rejected (not real curriculum).
+id: fx-tplbad
+title: "Fixture: broken question templates"
+lessons:
+  - 01-templated

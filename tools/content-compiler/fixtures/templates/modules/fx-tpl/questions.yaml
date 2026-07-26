@@ -1,0 +1,48 @@
+# Test fixture questions exercising template expansion (not real curriculum).
+
+# 4 latencies x 3 clocks = 12 variants from one authored entry.
+- id: fxt/q-001
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    latency_ns: [80, 100, 120, 150]
+    clock_ghz: [2.4, 3.0, 3.6]
+  derive:
+    cycles: round(latency_ns * clock_ghz)
+    divided_instead: round(latency_ns / clock_ghz)
+    off_by_thousand: round(latency_ns * clock_ghz * 1000)
+  prompt: >-
+    A {{latency_ns}} ns DRAM access on a {{clock_ghz}} GHz core wastes roughly
+    how many cycles?
+  options:
+    - "{{cycles}}"
+    - "{{divided_instead}}"
+    - "{{off_by_thousand:,}}"
+  answer: 0
+  explanation: >-
+    {{latency_ns}} ns at {{clock_ghz}} GHz is {{latency_ns}} × {{clock_ghz}} =
+    {{cycles}} cycles.
+  tags: [fixture, templated]
+
+# A short-answer template, to prove the accept list is substituted too.
+- id: fxt/q-002
+  lesson: fxt/01-templated
+  type: short
+  vars:
+    bytes_per_line: [64, 128]
+  derive:
+    floats: bytes_per_line / 4
+  prompt: "How many float32 values fit in a {{bytes_per_line}}-byte cache line?"
+  accept: ["{{floats}}"]
+  explanation: "{{bytes_per_line}} / 4 = {{floats}}."
+  tags: [fixture]
+
+# An ordinary hand-written question, to prove both forms coexist in one bank.
+- id: fxt/q-003
+  lesson: fxt/01-templated
+  type: mcq
+  prompt: "Fixture MCQ: which option is second?"
+  options: ["first", "second"]
+  answer: 1
+  explanation: "Index 1 is the second option."
+  tags: [fixture]

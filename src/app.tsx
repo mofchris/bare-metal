@@ -7,14 +7,19 @@
 // a silent failure (CLAUDE.md).
 
 import { useEffect, useRef, useState } from "preact/hooks";
-import type { Curriculum, Question } from "./lib/curriculum";
-import { summariseHistory } from "./lib/question-selection";
+import type { Curriculum, Module, Question } from "./lib/curriculum";
+import {
+  examQuestions,
+  lessonQuizQuestions,
+  summariseHistory,
+  type QuestionHistory,
+} from "./lib/question-selection";
 import { localDateKey } from "./lib/stats";
 import { TICK_SECONDS } from "./lib/study-time";
 import { getAuth, syncNow } from "./lib/sync";
 import { loadCurriculum } from "./lib/load-curriculum";
 import { parseRoute, type Route } from "./lib/route";
-import { findLesson, questionsFor } from "./lib/lookup";
+import { findLesson, type LessonLocation } from "./lib/lookup";
 import { checkpointById, checkpointQuestions, type Checkpoint } from "./lib/checkpoints";
 import { openProgressDb, type ProgressDb } from "./lib/progress-store";
 import { Home } from "./components/home";
@@ -218,15 +223,7 @@ function Screen({
       <Gated db={db} gateKey={`${route.screen}:${location.lesson.id}`} check={lessonGate}>
         {({ statuses }) =>
           route.screen === "quiz" ? (
-            <Quiz
-              title={location.module.title}
-              backHref={lessonHref(location.lesson.id)}
-              backLabel={location.lesson.title}
-              questions={questionsFor(location.module, location.lesson.id)}
-              db={db}
-              markDoneLessonId={location.lesson.id}
-              next={location.next}
-            />
+            <LessonQuizScreen key={location.lesson.id} location={location} db={db} />
           ) : (
             <LessonView
               location={location}
@@ -266,14 +263,7 @@ function Screen({
           return null;
         }}
       >
-        <Quiz
-          title={`${module.title} — module exam`}
-          backHref="#/"
-          backLabel="Home"
-          questions={module.questions}
-          db={db}
-          examModuleId={module.id}
-        />
+        <ExamScreen key={module.id} module={module} db={db} />
       </Gated>
     );
   }
@@ -309,22 +299,24 @@ function Screen({
 }
 
 /**
- * A checkpoint quiz over two modules. The sample is drawn ONCE per visit and
- * held in state, so re-renders — a study-time tick, an answer — cannot
- * reshuffle mid-quiz; navigating away and back draws a fresh mix. Selection is
- * seen-aware (D-030): it reads the attempt history first so a retake reaches
- * for questions he has not answered before. No examModuleId or
- * markDoneLessonId, so nothing is gated or marked done.
+ * Draw a question set ONCE per visit, after reading attempt history so the
+ * draw is seen-aware (D-030). The result is held in state, so a re-render — a
+ * study-time tick, an answer — cannot reshuffle a quiz already in progress.
+ *
+ * Every caller must be given a `key` that identifies the screen, so navigating
+ * from one quiz to another remounts and draws afresh rather than reusing the
+ * previous screen's questions.
  */
-function CheckpointScreen({
-  checkpoint,
-  db,
-}: {
-  checkpoint: Checkpoint;
-  db: ProgressDb | null;
-}) {
+function useDrawnQuestions(
+  db: ProgressDb | null,
+  draw: (history: ReadonlyMap<string, QuestionHistory>) => Question[],
+): Question[] | null {
   const [questions, setQuestions] = useState<Question[] | null>(null);
-  // True once a draw has used real history. Guards the case where this screen
+  // The draw closure is rebuilt every render; keeping it in a ref means the
+  // effect below depends only on `db` and cannot re-fire into a redraw loop.
+  const drawRef = useRef(draw);
+  drawRef.current = draw;
+  // True once a draw has used real history. Guards the case where the screen
   // mounts while the database is still opening: the blind draw shows something
   // immediately, and the arrival of `db` upgrades it exactly once.
   const drawnWithHistory = useRef(false);
@@ -333,17 +325,89 @@ function CheckpointScreen({
     if (drawnWithHistory.current) return;
     let cancelled = false;
     void (async () => {
-      const history = db ? summariseHistory(await db.allAttempts()) : undefined;
+      const history = db
+        ? summariseHistory(await db.allAttempts())
+        : new Map<string, QuestionHistory>();
       if (cancelled) return;
       if (db) drawnWithHistory.current = true;
-      setQuestions(checkpointQuestions(checkpoint, { history }));
+      setQuestions(drawRef.current(history));
     })();
     return () => {
       cancelled = true;
     };
-  }, [checkpoint, db]);
+  }, [db]);
 
-  if (questions === null) return <p class="muted">Drawing your questions…</p>;
+  return questions;
+}
+
+/** Shown while the attempt history is read and the sample drawn. */
+function DrawingQuestions() {
+  return <p class="muted">Drawing your questions…</p>;
+}
+
+/**
+ * A lesson quiz: LESSON_QUIZ_SIZE questions drawn from that lesson's bank,
+ * worst-served first, so a retake after a failed attempt reaches for questions
+ * he has not answered rather than replaying the same list (D-030).
+ */
+function LessonQuizScreen({
+  location,
+  db,
+}: {
+  location: LessonLocation;
+  db: ProgressDb | null;
+}) {
+  const questions = useDrawnQuestions(db, (history) =>
+    lessonQuizQuestions(location.module, location.lesson.id, history),
+  );
+  if (questions === null) return <DrawingQuestions />;
+  return (
+    <Quiz
+      title={location.module.title}
+      backHref={lessonHref(location.lesson.id)}
+      backLabel={location.lesson.title}
+      questions={questions}
+      db={db}
+      markDoneLessonId={location.lesson.id}
+      next={location.next}
+    />
+  );
+}
+
+/**
+ * A module exam: EXAM_SIZE questions spread across the module's lessons, so it
+ * cannot accidentally over-sample one lesson and skip another.
+ */
+function ExamScreen({ module, db }: { module: Module; db: ProgressDb | null }) {
+  const questions = useDrawnQuestions(db, (history) => examQuestions(module, history));
+  if (questions === null) return <DrawingQuestions />;
+  return (
+    <Quiz
+      title={`${module.title} — module exam`}
+      backHref="#/"
+      backLabel="Home"
+      questions={questions}
+      db={db}
+      examModuleId={module.id}
+    />
+  );
+}
+
+/**
+ * A checkpoint quiz over two modules. No examModuleId or markDoneLessonId, so
+ * nothing is gated or marked done.
+ */
+function CheckpointScreen({
+  checkpoint,
+  db,
+}: {
+  checkpoint: Checkpoint;
+  db: ProgressDb | null;
+}) {
+  const questions = useDrawnQuestions(db, (history) =>
+    checkpointQuestions(checkpoint, { history }),
+  );
+  if (questions === null) return <DrawingQuestions />;
 
   const a = checkpoint.first.title.split(":")[0]!;
   const b = checkpoint.second.title.split(":")[0]!;

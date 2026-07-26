@@ -1,0 +1,5 @@
+# Test fixture: a module whose bank is built from question templates (D-030).
+id: fx-tpl
+title: "Fixture: templated question bank"
+lessons:
+  - 01-templated

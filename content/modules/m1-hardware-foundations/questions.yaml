@@ -506,3 +506,170 @@
     below this card's. Faster hardware makes low arithmetic intensity relatively
     worse, not better.
   tags: [gpu, roofline]
+
+# ---------------------------------------------------------------------------
+# TEMPLATED QUESTIONS (D-030). Each entry below has a `vars` block and expands
+# at build time into one question per combination of those values, with every
+# number computed from the `derive` formulas rather than typed by hand. See the
+# template section of tools/content-compiler/compile.ts for the format.
+#
+# The ids of generated variants end in a hash of their own values, so adding a
+# value to a list later never renames existing variants — stored progress keeps
+# pointing at the question it was actually earned on.
+# ---------------------------------------------------------------------------
+
+- id: m1/q-028
+  lesson: m1/01-memory-hierarchy
+  type: mcq
+  vars:
+    line_bytes: [64, 128]
+    element_bytes: [2, 8]
+  derive:
+    values_per_line: line_bytes / element_bytes
+    assumed_float32: line_bytes / 4
+  prompt: >-
+    A machine moves data between DRAM and cache in {{line_bytes}}-byte cache
+    lines, and you are streaming an array whose values occupy {{element_bytes}}
+    bytes each. Touching one value pulls in a whole line. How many of the
+    array's values arrive in that single line?
+  options:
+    - "{{values_per_line}}"
+    - "{{assumed_float32}}"
+    - "{{line_bytes}}"
+    - "1"
+  answer: 0
+  explanation: >-
+    A line carries {{line_bytes}} bytes and each value occupies
+    {{element_bytes}} of them, so {{line_bytes}} ÷ {{element_bytes}} =
+    {{values_per_line}} values arrive together. The tempting wrong answer is
+    {{assumed_float32}}, which is {{line_bytes}} ÷ 4 — correct only for
+    float32, and this array is not float32, so the element size has to be read
+    from the problem rather than assumed. Answering 1 is the assumption that
+    you receive only the value you asked for, which is exactly what a cache
+    line does not do; answering {{line_bytes}} confuses a count of values with
+    a count of bytes.
+  tags: [memory, cache-lines, templated]
+
+- id: m1/q-029
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  vars:
+    latency_ns: [80, 100, 120, 150]
+    clock_ghz: [2.4, 3.0, 3.6]
+  derive:
+    cycles: round(latency_ns * clock_ghz)
+    ns_per_cycle: round(1 / clock_ghz, 2)
+    divided_instead: round(latency_ns / clock_ghz)
+  prompt: >-
+    A core runs at {{clock_ghz}} GHz and a request that misses every cache
+    waits {{latency_ns}} ns for DRAM. Roughly how many cycles does the core
+    lose during that single wait?
+  options:
+    - "{{cycles}}"
+    - "{{divided_instead}}"
+    - "{{latency_ns}}"
+    - "{{ns_per_cycle}}"
+  answer: 0
+  explanation: >-
+    At {{clock_ghz}} GHz one cycle takes 1 ÷ {{clock_ghz}} = {{ns_per_cycle}}
+    ns. A wait of {{latency_ns}} ns therefore spans {{latency_ns}} ÷
+    {{ns_per_cycle}} = about {{cycles}} cycles, which is the same as
+    {{latency_ns}} × {{clock_ghz}}. Answering {{latency_ns}} treats nanoseconds
+    as if they were cycles; {{ns_per_cycle}} is the duration of one cycle, not
+    a count of them; and {{divided_instead}} divides the two numbers the wrong
+    way round. This gap is the whole reason caches exist.
+  tags: [cpu, latency, cycles, templated]
+
+- id: m1/q-030
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  vars:
+    cores: [4, 8]
+    clock_ghz: [2.0, 2.5, 3.0]
+    fma_units: [1, 2]
+  derive:
+    gflops: cores * 8 * 2 * fma_units * clock_ghz
+    forgot_fma_pairing: cores * 8 * fma_units * clock_ghz
+    forgot_simd: cores * 2 * fma_units * clock_ghz
+    counted_fma_twice: cores * 8 * 4 * fma_units * clock_ghz
+  prompt: >-
+    Estimate the peak throughput of a chip with {{cores}} cores at
+    {{clock_ghz}} GHz, where each core has AVX2 registers holding 8 float32
+    lanes and {{fma_units}} FMA unit(s) that can each issue once per cycle.
+  options:
+    - "{{gflops}} GFLOPS"
+    - "{{forgot_fma_pairing}} GFLOPS"
+    - "{{forgot_simd}} GFLOPS"
+    - "{{counted_fma_twice}} GFLOPS"
+  answer: 0
+  explanation: >-
+    Multiply every source of parallelism: {{cores}} cores × 8 lanes × 2 FLOPs
+    per FMA × {{fma_units}} unit(s) × {{clock_ghz}} GHz = {{gflops}} GFLOPS.
+    {{forgot_fma_pairing}} drops the ×2 and counts one FMA as one operation
+    when it performs a multiply and an add. {{forgot_simd}} keeps the FMA
+    pairing but forgets the 8 lanes, which is the scalar answer.
+    {{counted_fma_twice}} applies the ×2 twice. Treat the result as a ceiling
+    and not a promise — it assumes every unit issues every cycle with all lanes
+    full.
+  tags: [cpu, simd, peak-flops, templated]
+
+- id: m1/q-031
+  lesson: m1/03-three-budgets
+  type: mcq
+  vars:
+    arrays_read: [1, 2, 3]
+    flops_per_element: [1, 2, 3]
+  derive:
+    bytes_moved: (arrays_read + 1) * 4
+    intensity: round(flops_per_element / bytes_moved, 3)
+    forgot_the_write: round(flops_per_element / (arrays_read * 4), 3)
+    inverted: round(bytes_moved / flops_per_element, 2)
+  prompt: >-
+    An elementwise float32 loop reads {{arrays_read}} array(s), writes 1 array,
+    and performs {{flops_per_element}} floating-point operation(s) per element.
+    What is its arithmetic intensity, in FLOPs per byte?
+  options:
+    - "{{intensity}}"
+    - "{{forgot_the_write}}"
+    - "{{inverted}}"
+    - "{{flops_per_element}}"
+  answer: 0
+  explanation: >-
+    Each element moves ({{arrays_read}} read + 1 written) × 4 bytes =
+    {{bytes_moved}} bytes and does {{flops_per_element}} FLOP(s), so the
+    intensity is {{flops_per_element}} ÷ {{bytes_moved}} = {{intensity}} FLOPs
+    per byte. {{forgot_the_write}} counts only the bytes read and forgets that
+    the result has to be stored, which is the most common slip here.
+    {{inverted}} is bytes per FLOP, the ratio upside down. Every value here
+    sits far below this laptop's break-even point of about 4 FLOPs per byte, so
+    the loop is memory-bound whatever the arithmetic count.
+  tags: [arithmetic-intensity, memory-bound, templated]
+
+- id: m1/q-032
+  lesson: m1/04-roofline-model
+  type: mcq
+  vars:
+    peak_gflops: [200, 380, 800]
+    bandwidth_gbs: [50, 100, 150]
+  derive:
+    ridge: round(peak_gflops / bandwidth_gbs, 2)
+    inverted: round(bandwidth_gbs / peak_gflops, 3)
+    subtracted: peak_gflops - bandwidth_gbs
+  prompt: >-
+    A machine peaks at {{peak_gflops}} GFLOPS and {{bandwidth_gbs}} GB/s. Where
+    is its ridge point, in FLOPs per byte?
+  options:
+    - "{{ridge}}"
+    - "{{inverted}}"
+    - "{{subtracted}}"
+    - "{{peak_gflops}}"
+  answer: 0
+  explanation: >-
+    The ridge point is peak compute divided by peak bandwidth: {{peak_gflops}}
+    ÷ {{bandwidth_gbs}} = {{ridge}} FLOPs per byte. It is the exchange rate
+    between the two budgets — below it memory sets the speed, above it the
+    arithmetic units do. {{inverted}} divides the wrong way and gives bytes per
+    FLOP. {{subtracted}} subtracts the two, which cannot be right because
+    GFLOPS and GB/s are different units and only their ratio is meaningful.
+    Note that a machine with a higher ridge is harder to keep busy, not easier.
+  tags: [roofline, ridge-point, templated]

@@ -1,0 +1,89 @@
+# Every entry here is deliberately broken; the compiler must report all of them
+# in one pass rather than stopping at the first (not real curriculum).
+
+# A placeholder naming something that was never defined.
+- id: fxb/q-001
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    a: [1, 2]
+  prompt: "What is {{nonexistent}}?"
+  options: ["{{a}}", "other"]
+  answer: 0
+  explanation: "Explanation for {{a}}."
+
+# A formula referring to a variable that does not exist.
+- id: fxb/q-002
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    a: [1, 2]
+  derive:
+    b: a * missing_var
+  prompt: "What is {{b}}?"
+  options: ["{{b}}", "other"]
+  answer: 0
+  explanation: "Explanation for {{b}}."
+
+# A cross product far past the variant cap.
+- id: fxb/q-003
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    a: [1, 2, 3, 4, 5]
+    b: [1, 2, 3, 4, 5]
+    c: [1, 2, 3, 4]
+  prompt: "What is {{a}}?"
+  options: ["{{a}}", "other"]
+  answer: 0
+  explanation: "Explanation."
+
+# A var list containing the same value twice would generate colliding ids.
+- id: fxb/q-004
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    a: [1, 1]
+  prompt: "What is {{a}}?"
+  options: ["{{a}}", "other"]
+  answer: 0
+  explanation: "Explanation."
+
+# A name used as both a var and a derive.
+- id: fxb/q-005
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    a: [1, 2]
+  derive:
+    a: a * 2
+  prompt: "What is {{a}}?"
+  options: ["{{a}}", "other"]
+  answer: 0
+  explanation: "Explanation."
+
+# An answer index outside the option list.
+- id: fxb/q-006
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    a: [1, 2]
+  prompt: "What is {{a}}?"
+  options: ["{{a}}", "other"]
+  answer: 7
+  explanation: "Explanation."
+
+# A distractor formula that collides with the correct answer for SOME variants
+# only (a = 4 makes "a * 2" equal "a + 4"), which is the bug m1/q-028 shipped.
+- id: fxb/q-007
+  lesson: fxt/01-templated
+  type: mcq
+  vars:
+    a: [2, 4]
+  derive:
+    doubled: a * 2
+    plus_four: a + 4
+  prompt: "What is double {{a}}?"
+  options: ["{{doubled}}", "{{plus_four}}"]
+  answer: 0
+  explanation: "{{a}} × 2 = {{doubled}}."

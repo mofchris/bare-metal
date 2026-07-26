@@ -25,7 +25,7 @@
 // store, no schema version bump, and therefore none of the blocked-upgrade risk
 // that produced the 2026-07-19 hotfix.
 
-import type { Question } from "./curriculum";
+import type { Module, Question } from "./curriculum";
 import type { AttemptRecord } from "./progress-store";
 
 /** What the attempt history says about one question. */
@@ -142,6 +142,71 @@ export function selectQuestions(
 export function cleanTakes(poolSize: number, quizSize: number): number {
   if (quizSize <= 0) return 0;
   return Math.floor(poolSize / quizSize);
+}
+
+/**
+ * How many questions a lesson quiz asks. Fixed rather than "however many the
+ * lesson has", because templates make bank size vary wildly — m1/02 now holds
+ * 30 questions, and serving all of them would turn a five-minute quiz into a
+ * thirty-question slog. Five keeps the quiz the length it has always been and
+ * lets the surplus become rotation instead of length.
+ */
+export const LESSON_QUIZ_SIZE = 5;
+
+/**
+ * How many questions a module exam asks. Modules held 15–27 questions before
+ * templates and exams simply served all of them; m1 alone now holds 73, so a
+ * fixed size is required. Twenty sits inside the old range, so the exam feels
+ * the same as the ones already sat.
+ */
+export const EXAM_SIZE = 20;
+
+/** The questions a lesson quiz should serve this time round. */
+export function lessonQuizQuestions(
+  module: Module,
+  lessonId: string,
+  history: ReadonlyMap<string, QuestionHistory>,
+  count = LESSON_QUIZ_SIZE,
+  rng: () => number = Math.random,
+): Question[] {
+  const pool = module.questions.filter((q) => q.lesson === lessonId);
+  return selectQuestions(pool, history, count, rng);
+}
+
+/**
+ * The questions a module exam should serve this time round: spread across the
+ * module's lessons rather than drawn from the module as one bag, so an exam
+ * cannot happen to ask five questions about one lesson and none about another.
+ * A lesson with a thin bank contributes what it has and the shortfall is made
+ * up from whatever is left, so the exam is always `count` long if the module
+ * can fill it.
+ */
+export function examQuestions(
+  module: Module,
+  history: ReadonlyMap<string, QuestionHistory>,
+  count = EXAM_SIZE,
+  rng: () => number = Math.random,
+): Question[] {
+  const lessonIds = module.lessons.map((lesson) => lesson.id);
+  if (lessonIds.length === 0)
+    return selectQuestions(module.questions, history, count, rng);
+
+  const base = Math.floor(count / lessonIds.length);
+  const remainder = count % lessonIds.length;
+  const chosen: Question[] = [];
+  lessonIds.forEach((lessonId, i) => {
+    const quota = base + (i < remainder ? 1 : 0);
+    chosen.push(...lessonQuizQuestions(module, lessonId, history, quota, rng));
+  });
+
+  // Lessons with thin banks leave the exam short; top up from everything not
+  // already picked, still worst-served first.
+  if (chosen.length < count) {
+    const taken = new Set(chosen.map((q) => q.id));
+    const rest = module.questions.filter((q) => !taken.has(q.id));
+    chosen.push(...selectQuestions(rest, history, count - chosen.length, rng));
+  }
+  return shuffle(chosen, rng);
 }
 
 /** Fisher–Yates over a copy, using the injected rng. */

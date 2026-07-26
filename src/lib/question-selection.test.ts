@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   cleanTakes,
+  EXAM_SIZE,
+  examQuestions,
+  LESSON_QUIZ_SIZE,
+  lessonQuizQuestions,
   selectQuestions,
   summariseHistory,
   type QuestionHistory,
 } from "./question-selection";
-import type { Question } from "./curriculum";
+import type { Module, Question } from "./curriculum";
 import type { AttemptRecord } from "./progress-store";
 
 /** `n` throwaway questions, ids q-0 … q-(n-1). */
@@ -148,6 +152,106 @@ describe("selectQuestions", () => {
 
   it("asks for nothing without throwing when the pool is empty", () => {
     expect(selectQuestions([], new Map(), 5, seededRng())).toEqual([]);
+  });
+});
+
+/** A module whose lessons hold the given question counts. */
+function moduleWith(counts: Record<string, number>): Module {
+  const questions: Question[] = [];
+  for (const [lessonId, n] of Object.entries(counts)) {
+    for (let i = 0; i < n; i++) {
+      questions.push({
+        id: `${lessonId}/q-${i}`,
+        lesson: lessonId,
+        type: "mcq",
+        prompt: "p",
+        options: ["a", "b"],
+        answer: 0,
+        explanation: "because",
+        tags: [],
+      } as Question);
+    }
+  }
+  return {
+    id: "m-test",
+    title: "Test module",
+    prereqs: [],
+    lessons: Object.keys(counts).map((id) => ({ id }) as never),
+    questions,
+  } as unknown as Module;
+}
+
+describe("lessonQuizQuestions", () => {
+  it("asks the fixed quiz size even when the lesson bank is much larger", () => {
+    // m1/02 really does hold 30 questions now; the quiz must stay five long.
+    const module = moduleWith({ "l/01": 30 });
+    const served = lessonQuizQuestions(module, "l/01", new Map(), undefined, seededRng());
+    expect(served).toHaveLength(LESSON_QUIZ_SIZE);
+  });
+
+  it("draws only from the lesson asked for", () => {
+    const module = moduleWith({ "l/01": 10, "l/02": 10 });
+    const served = lessonQuizQuestions(module, "l/02", new Map(), undefined, seededRng());
+    expect(served.every((q) => q.lesson === "l/02")).toBe(true);
+  });
+
+  it("serves a whole thin bank rather than padding it", () => {
+    const module = moduleWith({ "l/01": 3 });
+    const served = lessonQuizQuestions(module, "l/01", new Map(), undefined, seededRng());
+    expect(served).toHaveLength(3);
+  });
+
+  it("gives six clean retakes from a thirty-question lesson", () => {
+    const module = moduleWith({ "l/01": 30 });
+    const attempts: AttemptRecord[] = [];
+    const seen = new Set<string>();
+    let clock = Date.parse("2026-07-01T10:00:00.000Z");
+    for (let take = 0; take < 6; take++) {
+      const served = lessonQuizQuestions(
+        module,
+        "l/01",
+        summariseHistory(attempts),
+        undefined,
+        seededRng(take + 1),
+      );
+      for (const q of served) {
+        expect(seen.has(q.id)).toBe(false);
+        seen.add(q.id);
+      }
+      attempts.push(...answered(served, clock));
+      clock += 3_600_000;
+    }
+    expect(seen.size).toBe(30);
+  });
+});
+
+describe("examQuestions", () => {
+  it("spreads the exam across every lesson instead of over-sampling one", () => {
+    const module = moduleWith({ "l/01": 30, "l/02": 10, "l/03": 10, "l/04": 10 });
+    const served = examQuestions(module, new Map(), EXAM_SIZE, seededRng());
+    expect(served).toHaveLength(EXAM_SIZE);
+    for (const lessonId of ["l/01", "l/02", "l/03", "l/04"]) {
+      expect(served.filter((q) => q.lesson === lessonId).length).toBe(5);
+    }
+  });
+
+  it("tops up from other lessons when one bank is too thin to fill its share", () => {
+    const module = moduleWith({ "l/01": 30, "l/02": 1 });
+    const served = examQuestions(module, new Map(), EXAM_SIZE, seededRng());
+    expect(served).toHaveLength(EXAM_SIZE);
+    expect(served.filter((q) => q.lesson === "l/02")).toHaveLength(1);
+  });
+
+  it("never repeats a question inside one exam", () => {
+    const module = moduleWith({ "l/01": 30, "l/02": 1 });
+    const served = examQuestions(module, new Map(), EXAM_SIZE, seededRng());
+    expect(new Set(served.map((q) => q.id)).size).toBe(served.length);
+  });
+
+  it("returns only what exists when the module cannot fill the exam", () => {
+    const module = moduleWith({ "l/01": 4, "l/02": 3 });
+    const served = examQuestions(module, new Map(), EXAM_SIZE, seededRng());
+    expect(served).toHaveLength(7);
   });
 });
 
