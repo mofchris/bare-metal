@@ -56,6 +56,7 @@ the drift this ledger prevents:
 | branch, prediction                                     | m1/02          | branch = can go one of two ways; the chip bets on history, ~15–20 cycles lost when wrong                                     |
 | register width, lane                                   | m1/02          | a 256-bit register holds 8 float32 side by side; each slot is a lane                                                         |
 | SIMD                                                   | m1/02          | one instruction, all lanes at once                                                                                           |
+| vector extension, AVX2, AVX-512, NEON, SVE             | m1/02          | one family's wide registers + their instructions; width ÷ 32 bits = float32 lanes                                            |
 | FMA                                                    | m1/02          | fused multiply-add: `a×b + c` in one step = 2 operations                                                                     |
 | FLOP vs FLOPS                                          | m1/02          | FLOP = one floating-point operation (a count). FLOPS = per second (a rate)                                                   |
 | issue                                                  | m1/02          | to start an instruction                                                                                                      |

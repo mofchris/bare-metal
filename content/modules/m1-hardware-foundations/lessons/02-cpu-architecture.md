@@ -4,11 +4,15 @@ title: "Why CPUs are fast — and why that's not enough"
 objectives:
   - "Explain pipelining, superscalar execution, and branch prediction in a sentence each"
   - "Estimate a CPU's peak FLOPS from cores × SIMD width × FMA × clock"
+  - "Give the float32 lane count for AVX2, AVX-512, NEON and SVE, and say why wider is not automatically faster"
   - "Explain why a vectorized NumPy operation beats a Python loop by 100× or more"
 sources:
   - "Hennessy & Patterson, Computer Architecture: A Quantitative Approach, 6th ed., ch. 3 and appendix C"
   - "Agner Fog, The microarchitecture of Intel, AMD and VIA CPUs (agner.org/optimize)"
   - "Patterson & Hennessy, Computer Organization and Design, RISC-V ed., ch. 4"
+  - "Intel 64 and IA-32 Architectures Optimization Reference Manual (AVX-512 width and its frequency behaviour)"
+  - "Arm Neon Programmer's Guide and the Arm Architecture Reference Manual (NEON, 128-bit)"
+  - "Stephens et al., The ARM Scalable Vector Extension, IEEE Micro 37(2), 2017 (vector-length-agnostic SVE, 128–2048 bits)"
 ---
 
 ## What this lesson answers
@@ -236,6 +240,48 @@ issues two FMA instructions every single cycle, with all eight lanes full and
 no waiting. Real code never sustains that, and the largest reason is the one
 lesson 01 gave you: the arithmetic units can only work if data reaches them,
 and main memory is 100 times slower than the core.
+
+## The same idea on hardware that is not your laptop
+
+AVX2 is one **vector extension** — one manufacturer's set of wide registers and
+the instructions that operate on them. Every processor family has its own, and
+they differ in exactly one number that matters here: how many float32 lanes fit
+in a register. The formula above does not change. Only the lane count does.
+
+| Hardware    | Vector extension | Register width         | float32 lanes |
+| ----------- | ---------------- | ---------------------- | ------------- |
+| Intel / AMD | AVX2 / FMA3      | 256 bits               | 8             |
+| Intel / AMD | AVX-512          | 512 bits               | 16            |
+| ARM         | NEON             | 128 bits               | 4             |
+| ARM         | SVE / SVE2       | 128–2048 bits          | 4–64          |
+| NVIDIA GPU  | CUDA cores       | 32 threads in lockstep | 32            |
+
+Read the table as one sentence repeated five times: take the width, divide by
+32 bits, and that is how many float32 values move per instruction.
+
+Three things in it are worth more than the numbers.
+
+**ARM is not a phone-only concern.** NEON is the vector extension on Apple
+Silicon and on the ARM server chips that now run a large share of cloud
+instances, so a model that benchmarks well on your Intel laptop is running on
+a machine with **half** the lanes when it lands on some of that hardware.
+
+**SVE removed the constant.** With AVX2 the number 8 is fixed when the code is
+compiled. SVE is _vector-length agnostic_: the same binary runs on a chip with
+128-bit registers or 2048-bit ones and adapts, because the loop asks the
+hardware how many lanes it has rather than being told at compile time. That is
+a different way to write vector code, not just a wider version of the same way.
+
+**Wider is not automatically faster.** On several Intel generations, sustained
+heavy AVX-512 code makes the core drop its clock to stay inside its power
+budget. Doubling the lanes while losing a fraction of the clock is still a net
+win for most arithmetic-heavy code, but it is not the clean 2× the formula
+promises — which is exactly why module 2 makes you measure rather than
+multiply.
+
+The GPU row uses the same idea with different vocabulary: 32 threads are run
+in lockstep on one instruction, so it behaves as a 32-lane machine. Lesson 05
+takes that apart properly and gives the pieces their names.
 
 ## Why does NumPy beat a Python loop?
 

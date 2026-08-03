@@ -780,3 +780,48 @@
     GFLOPS and GB/s are different units and only their ratio is meaningful.
     Note that a machine with a higher ridge is harder to keep busy, not easier.
   tags: [roofline, ridge-point, templated]
+
+- id: m1/q-038
+  lesson: m1/02-cpu-architecture
+  type: mcq
+  prompt: >-
+    A kernel is tuned on an Intel laptop with AVX2 and then deployed unchanged
+    to ARM server instances, where it uses NEON. Ignoring clock and core-count
+    differences, what happens to the float32 lanes per instruction?
+  options:
+    - "It stays at 8 — lane count is a property of float32, not the hardware"
+    - "It halves, from 8 to 4"
+    - "It doubles, from 8 to 16"
+    - "It drops to 1 — ARM chips have no vector extension"
+  answer: 1
+  explanation: >-
+    An AVX2 register is 256 bits and a NEON register is 128, so dividing each
+    by the 32 bits of a float32 gives 8 lanes against 4. The lane count is a
+    property of the register width, not of the data type — that is why the
+    same divide-by-32 works on every row of the table. NEON absolutely exists;
+    it is simply half as wide. AVX-512 is the row that doubles to 16.
+  tags: [simd, portability, arm]
+
+- id: m1/q-039
+  lesson: m1/02-cpu-architecture
+  type: short
+  prompt: >-
+    AVX-512 has twice the lanes of AVX2, yet swapping to it does not reliably
+    give twice the throughput on several Intel generations. What does the core
+    do that eats part of the gain? (a few words)
+  accept:
+    - "lowers the clock"
+    - "drops the clock"
+    - "downclocks"
+    - "reduces clock speed"
+    - "frequency throttling"
+    - "throttles the frequency"
+    - "runs at a lower frequency"
+  explanation: >-
+    It drops its clock frequency to stay inside its power budget while running
+    sustained 512-bit code. The peak-FLOPS formula multiplies lanes by clock,
+    so doubling one term while shrinking another does not give the clean 2×
+    the arithmetic promises. It is usually still a net win for heavy
+    arithmetic — but "usually" is a measurement question, not a formula
+    question, which is the habit module 2 is about.
+  tags: [simd, avx-512, clock]
