@@ -16,6 +16,7 @@ import { gradeResponse, type QuizResponse } from "../lib/quiz";
 import { PASS_MARK } from "../lib/gating";
 import { lessonHref } from "../lib/route";
 import type { ProgressDb, QuizKind } from "../lib/progress-store";
+import { TopBar } from "./reading-progress";
 
 interface QuizProps {
   /** Context line above the question counter (module title, or "Spaced review"). */
@@ -127,18 +128,23 @@ export function Quiz({
   const finished = phase !== "feedback" && answered.length === questions.length;
   if (finished) {
     return (
-      <Summary
-        backHref={backHref}
-        backLabel={backLabel}
-        answered={answered}
-        onRestart={restart}
-        db={db}
-        saveError={saveError}
-        markDoneLessonId={markDoneLessonId}
-        examModuleId={examModuleId}
-        next={next}
-        lessonTitles={lessonTitles}
-      />
+      <>
+        {/* Full, because it is: the run is over. The bar carries through to the
+            summary rather than vanishing, so it reads as an arrival. */}
+        <TopBar fraction={1} label="Quiz complete" />
+        <Summary
+          backHref={backHref}
+          backLabel={backLabel}
+          answered={answered}
+          onRestart={restart}
+          db={db}
+          saveError={saveError}
+          markDoneLessonId={markDoneLessonId}
+          examModuleId={examModuleId}
+          next={next}
+          lessonTitles={lessonTitles}
+        />
+      </>
     );
   }
 
@@ -148,6 +154,13 @@ export function Quiz({
 
   return (
     <div>
+      {/* Progress is ANSWERED questions, not the one on screen: the bar should
+          measure work done, and it moves the instant he answers, which is the
+          moment the movement means something. */}
+      <TopBar
+        fraction={answered.length / questions.length}
+        label={`Question ${number} of ${questions.length}`}
+      />
       <nav class="crumbs">
         <a href={backHref}>← {backLabel}</a>
       </nav>

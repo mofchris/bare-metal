@@ -1,13 +1,20 @@
-// Scroll progress and the resume-where-you-stopped bookmark (D-035).
+// Top progress bar and the resume-where-you-stopped bookmark (D-035, D-040).
 // Depends on: lib/reading-position (pure maths), lib/progress-store.
-// Depended on by: app.tsx (the bar, on every screen) and components/
-// lesson-view.tsx (the bookmark, on lessons only).
+// Depended on by: app.tsx (the scroll bar), components/quiz.tsx (the same bar
+// driven by question count) and components/lesson-view.tsx (the bookmark).
 //
-// TWO SEPARATE THINGS, deliberately. The BAR belongs on every scrollable
-// screen — Christopher asked for it "not just the study part but parts like
-// the quiz part home screen and other areas too" — so it lives in the app
-// shell. The BOOKMARK only makes sense for a lesson: nobody needs to resume a
-// home screen, and saving a position for one would be noise.
+// THREE SEPARATE THINGS, deliberately. TopBar is the dumb strip: it draws
+// whatever fraction it is handed, so the screen that actually knows how far
+// along you are is the screen that supplies it. ReadingBar wires it to scroll
+// position for reading surfaces. The BOOKMARK only makes sense for a lesson:
+// nobody needs to resume a home screen, and saving a position for one would be
+// noise.
+//
+// Why the split (D-040): the bar used to be scroll-driven everywhere, and a
+// quiz question fits on one screen with nothing to scroll — which
+// scrollFraction reports as 1, correctly for reading and disastrously here. It
+// showed a full copper bar on question 3 of 19. On a quiz the honest measure is
+// questions answered, not pixels travelled.
 //
 // The save is THROTTLED. Scroll fires dozens of times a second and an
 // IndexedDB write per event would be absurd; a write every SAVE_INTERVAL_MS
@@ -56,16 +63,37 @@ function useScrollFraction(): number {
 }
 
 /**
- * The bar across the top of the viewport. Rendered by the app shell on every
- * screen, and keyed by route there so it resets when the page changes.
+ * The bar across the top of the viewport, drawing a 0..1 fraction. Knows
+ * nothing about what it is measuring — the caller does.
+ *
+ * `label` is what a screen reader announces; the bar is decorative on a
+ * scrolling page (the scrollbar already says this) but genuinely informative on
+ * a quiz, where nothing else on screen states the position as a proportion.
  */
-export function ReadingBar() {
-  const fraction = useScrollFraction();
+export function TopBar({ fraction, label }: { fraction: number; label?: string }) {
+  const clamped = Math.min(1, Math.max(0, fraction));
+  const aria = label
+    ? ({
+        role: "progressbar",
+        "aria-label": label,
+        "aria-valuenow": Math.round(clamped * 100),
+        "aria-valuemin": 0,
+        "aria-valuemax": 100,
+      } as const)
+    : ({ role: "presentation" } as const);
   return (
-    <div class="reading-bar" role="presentation">
-      <div class="reading-bar-fill" style={{ width: `${fraction * 100}%` }} />
+    <div class="reading-bar" {...aria}>
+      <div class="reading-bar-fill" style={{ width: `${clamped * 100}%` }} />
     </div>
   );
+}
+
+/**
+ * The scroll-driven bar, for reading surfaces. Rendered by the app shell and
+ * keyed by route there so it resets when the page changes.
+ */
+export function ReadingBar() {
+  return <TopBar fraction={useScrollFraction()} />;
 }
 
 /**

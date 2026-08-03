@@ -147,12 +147,23 @@ export function App() {
   // Reading surfaces stay a centered column; home manages the full width.
   const narrow = route.screen !== "home";
 
+  // Every screen that runs the Quiz component draws its OWN top bar, measured
+  // in questions answered (D-040). The shell must not also draw a scroll bar
+  // there: two bars would stack, and the scroll one reads 100% on a quiz that
+  // fits the screen — which is what made it wrong in the first place.
+  const quizDrivesTheBar =
+    route.screen === "quiz" ||
+    route.screen === "exam" ||
+    route.screen === "review" ||
+    route.screen === "daily" ||
+    route.screen === "checkpoint";
+
   return (
     <div class="shell">
-      {/* Scroll progress on EVERY screen, not just lessons (his request).
-          Keyed by route so a navigation resets it rather than leaving the
-          previous page's fill in place. */}
-      <ReadingBar key={location.hash} />
+      {/* Scroll progress on every reading screen, not just lessons (his
+          request). Keyed by route so a navigation resets it rather than
+          leaving the previous page's fill in place. */}
+      {!quizDrivesTheBar && <ReadingBar key={location.hash} />}
       <header class="shell-header">
         <h1>
           <a href="#/">Metal</a>
